@@ -1,6 +1,6 @@
 # Deadline Tracker Agent
 
-Agent that helps you keep track as your assignment/homework/task deadlines.
+Agent that helps you keep track of your assignment/homework/task deadlines.
 
 ## Status
 Work in progress.
