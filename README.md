@@ -5,8 +5,8 @@ Agent that helps you keep track of your assignment/homework/task deadlines.
 ## Status
 Work in progress.
 - [x] Project setup with Google ADK
-- [ ] Custom agent and instructions
-- [ ] Tool to add deadlines
+- [x] Custom agent and instructions
+- [x] Tool to add deadlines
 - [ ] Tools to list deadlines and find the next one
 - [ ] Save deadlines to a file
 
