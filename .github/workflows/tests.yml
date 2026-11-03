@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The job can only read the code. It cannot push, comment or change anything.
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the older run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # The two newest versions listed in the google-adk 2.11.0 package metadata
+        python-version: ["3.13", "3.14"]
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that no .env or deadlines.json is committed
+        run: |
+          found=$(git ls-files -- ':(glob)**/.env' ':(glob)**/deadlines.json')
+          if [ -n "$found" ]; then
+            echo "::error::Found a committed .env or deadlines.json. These hold your API key and personal deadlines. Remove them with 'git rm --cached <file>' and commit again."
+            echo "$found"
+            exit 1
+          fi
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Check that no API key is set
+        run: |
+          names=$(compgen -e | grep -E '^(GOOGLE|GEMINI)_' || true)
+          if [ -n "$names" ]; then
+            echo "::error::The tests must pass without any API key, but these variables are set:"
+            echo "$names"
+            exit 1
+          fi
+
+      - name: Run the tests
+        run: python -m pytest
