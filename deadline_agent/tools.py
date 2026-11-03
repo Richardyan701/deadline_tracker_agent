@@ -15,6 +15,7 @@ code below (not the AI model) turns those words into that saved form.
 import json
 import os
 import re
+import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -49,6 +50,10 @@ FILLER_WORDS = {"due", "by", "on", "at"}
 
 # Added to the end of every date error so the student knows what to type.
 DATE_EXAMPLES = "Try something like 'next friday 5pm', 'in 3 days' or '20 nov'."
+
+# Reminders look this many days ahead unless asked otherwise, and never more than MAX_DAYS_AHEAD.
+REMINDER_DAYS = 7
+MAX_DAYS_AHEAD = 60
 
 
 # ---------- helpers (not tools, the model never sees these) ----------
@@ -341,6 +346,89 @@ def _not_found(title: str) -> dict:
     }
 
 
+# ---------- reminders ----------
+#
+# get_reminders (the tool) and Groot's instruction (in agent.py) both use
+# _reminders below, so they always agree on what is overdue or due soon.
+
+
+def _plural(count: int, word: str) -> str:
+    """'1 day', '2 days'."""
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def _time_phrase(due: datetime, now: datetime) -> str:
+    """How long is left, or how late it is, in friendly words.
+
+    On a different day we count whole calendar days ("tomorrow", "in 3 days",
+    "2 days overdue"). On the same day we count hours, or minutes if it is
+    under an hour. Part hours are dropped, so we never promise more time
+    than there really is.
+    """
+    days = (due.date() - now.date()).days
+    if days < 0:
+        return f"{_plural(-days, 'day')} overdue"
+    if days == 1:
+        return "tomorrow"
+    if days > 1:
+        return f"in {_plural(days, 'day')}"
+
+    # Same day, so count hours or minutes
+    minutes = int(abs((due - now).total_seconds()) // 60)
+    if due < now:
+        minutes = max(minutes, 1)  # a few seconds late still counts as late
+    elif minutes == 0:
+        return "right now"
+    hours = minutes // 60
+    amount = _plural(hours, "hour") if hours else _plural(minutes, "minute")
+    return f"{amount} overdue" if due < now else f"in {amount}"
+
+
+def _reminders(days_ahead: int) -> dict:
+    """Unfinished deadlines that need attention, split into three groups.
+
+    "overdue": the due time has already passed (most overdue first).
+    "due_today": not passed yet and due some time today.
+    "due_soon": due after today, at most days_ahead days from today.
+    Each group is soonest first, so overdue starts with the most overdue.
+    Each item has "title", "subject", "due_date" and "when" (a friendly
+    phrase like "in 3 hours", "tomorrow" or "2 days overdue").
+    """
+    now = _now()
+    last_day = now.date() + timedelta(days=days_ahead)
+    groups = {"overdue": [], "due_today": [], "due_soon": []}
+
+    for deadline in _soonest_first(_load_deadlines()):
+        if deadline["done"]:
+            continue
+        due = _parse_due_date(deadline["due_date"])
+        if due < now:
+            group = "overdue"
+        elif due.date() == now.date():
+            group = "due_today"
+        elif due.date() <= last_day:
+            group = "due_soon"
+        else:
+            continue  # too far away to worry about yet
+        groups[group].append({
+            "title": deadline["title"],
+            "subject": deadline["subject"],
+            "due_date": deadline["due_date"],
+            "when": _time_phrase(due, now),
+        })
+    return groups
+
+
+def _days_ahead_error(days_ahead):
+    """An error message if days_ahead is not a whole number from 1 to MAX_DAYS_AHEAD, otherwise None."""
+    # Numbers from the model can arrive as 7.0 instead of 7, so whole floats are fine.
+    # True and False count as numbers in Python, so they are refused on purpose.
+    is_number = isinstance(days_ahead, (int, float)) and not isinstance(days_ahead, bool)
+    if is_number and 1 <= days_ahead <= MAX_DAYS_AHEAD and float(days_ahead).is_integer():
+        return None
+    return f"days_ahead must be a whole number of days from 1 to {MAX_DAYS_AHEAD}, but I got {days_ahead!r}."
+
+
 # ---------- the tools ----------
 
 
@@ -405,6 +493,8 @@ def add_deadline(title: str, due_date: str, subject: str = "") -> dict:
 def list_deadlines() -> dict:
     """Lists every saved deadline, soonest first, including finished ones.
 
+    If the student only wants what is overdue or due soon, use get_reminders instead.
+
     Returns:
         A dict with "status", a "message" and "deadlines", a list where each
         item has "title", "due_date", "subject" and "done" (True if finished).
@@ -423,7 +513,8 @@ def next_deadline() -> dict:
     """Finds the next upcoming deadline that is not finished yet.
 
     Deadlines that are already done or already past are skipped. A deadline
-    with no time is still upcoming until the end of that day.
+    with no time is still upcoming until the end of that day. To see
+    everything overdue or due soon, use get_reminders instead.
 
     Returns:
         A dict with "status", a "message" and "deadline" (the next one, or
@@ -481,3 +572,49 @@ def mark_done(title: str) -> dict:
     found["done"] = True
     _save_deadlines(deadlines)
     return {"status": "success", "message": f"Marked '{found['title']}' as done."}
+
+
+def get_reminders(days_ahead: int = 7) -> dict:
+    """Finds unfinished deadlines that are overdue, due today or due soon.
+
+    Call this when the student asks things like "what's due soon?",
+    "anything overdue?", "what do I need to do this week?" or "remind me
+    what's coming up". Finished deadlines are never included. Tell the
+    student about them briefly and kindly, using the "when" phrases.
+
+    Args:
+        days_ahead: How many days ahead counts as "due soon", from 1 to 60.
+            Use 7 unless the student asks about a different period, for
+            example 14 for "the next two weeks" or 1 for "by tomorrow".
+
+    Returns:
+        A dict with "status" ("success" or "error") and a friendly "message".
+        On success it also has three lists:
+        "overdue" (the due time has passed, most overdue first),
+        "due_today" (still to come today) and
+        "due_soon" (after today, within days_ahead days, soonest first).
+        Each item has "title", "subject", "due_date" and "when", a phrase
+        like "in 3 hours", "tomorrow", "in 4 days" or "2 days overdue".
+    """
+    error = _days_ahead_error(days_ahead)
+    if error:
+        return {"status": "error", "message": error}
+    days_ahead = int(days_ahead)
+
+    groups = _reminders(days_ahead)
+    period = f"the next {_plural(days_ahead, 'day')}"
+    parts = []
+    if groups["overdue"]:
+        parts.append(f"{len(groups['overdue'])} overdue")
+    if groups["due_today"]:
+        parts.append(f"{len(groups['due_today'])} due today")
+    if groups["due_soon"]:
+        parts.append(f"{len(groups['due_soon'])} due in {period}")
+
+    if not parts:
+        message = f"Good news, nothing is overdue and nothing is due in {period}. You're all caught up!"
+    elif len(parts) == 1:
+        message = f"Heads up, you have {parts[0]}."
+    else:
+        message = f"Heads up, you have {', '.join(parts[:-1])} and {parts[-1]}."
+    return {"status": "success", "message": message, **groups}

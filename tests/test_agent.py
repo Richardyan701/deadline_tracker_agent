@@ -1,4 +1,4 @@
-"""Checks Agent Groot's setup: its five tools and its instruction.
+"""Checks Agent Groot's setup: its six tools and its instruction.
 
 Importing the agent needs no API key. The key is only used when the agent
 actually talks to Gemini.
@@ -7,11 +7,19 @@ actually talks to Gemini.
 import asyncio
 from datetime import datetime
 
+import pytest
+
 from deadline_agent import agent, tools
 from deadline_agent.agent import root_agent
 
 
-def test_root_agent_has_all_five_tools():
+@pytest.fixture(autouse=True)
+def deadlines_file(tmp_path, monkeypatch):
+    """The instruction now reads saved deadlines, so use a fresh temporary file."""
+    monkeypatch.setenv("DEADLINES_FILE", str(tmp_path / "deadlines.json"))
+
+
+def test_root_agent_has_all_six_tools():
     names = {tool.__name__ for tool in root_agent.tools}
 
     assert names == {
@@ -20,6 +28,7 @@ def test_root_agent_has_all_five_tools():
         "next_deadline",
         "delete_deadline",
         "mark_done",
+        "get_reminders",
     }
 
 
