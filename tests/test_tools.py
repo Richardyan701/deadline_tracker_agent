@@ -14,15 +14,28 @@ import pytest
 
 from deadline_agent import tools
 
+# Pretend "now" is Thursday 5 Nov 2026, 10:00
+NOW = datetime(2026, 11, 5, 10, 0)
+
 
 @pytest.fixture(autouse=True)
 def deadlines_file(tmp_path, monkeypatch):
     """Point the tools at a fresh temporary file and freeze the clock."""
     path = tmp_path / "deadlines.json"
     monkeypatch.setenv("DEADLINES_FILE", str(path))
-    # Pretend "now" is 5 Nov 2026, 10:00
-    monkeypatch.setattr(tools, "_now", lambda: datetime(2026, 11, 5, 10, 0))
+    monkeypatch.setattr(tools, "_now", lambda: NOW)
     return path
+
+
+def add_back_on_1_oct(monkeypatch, title, due_date):
+    """Add a deadline as if it was 1 Oct, then go back to NOW.
+
+    Adding a date that is already past is refused, so this is how a test
+    gets a deadline that has passed since it was saved.
+    """
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2026, 10, 1, 9, 0))
+    assert tools.add_deadline(title, due_date)["status"] == "success"
+    monkeypatch.setattr(tools, "_now", lambda: NOW)
 
 
 # ---------- add_deadline ----------
@@ -57,10 +70,7 @@ def test_add_deadline_accepts_date_with_time():
 @pytest.mark.parametrize(
     "bad_date",
     [
-        "tomorrow",  # natural language is not supported yet
-        "next Friday",
         "",
-        "20/11/2026",  # wrong order
         "2026/11/20",  # wrong separator
         "2026-1-5",  # missing leading zeros
         "2026-13-01",  # month 13 does not exist
@@ -75,7 +85,7 @@ def test_add_deadline_rejects_bad_dates(bad_date, deadlines_file):
     result = tools.add_deadline("Assignment 1", bad_date)
 
     assert result["status"] == "error"
-    assert "YYYY-MM-DD" in result["message"]
+    assert tools.DATE_EXAMPLES in result["message"]
     assert not deadlines_file.exists()  # nothing was saved
 
 
@@ -152,15 +162,15 @@ def test_next_deadline_skips_done_ones():
     assert tools.next_deadline()["deadline"]["title"] == "Later"
 
 
-def test_next_deadline_skips_past_ones():
-    tools.add_deadline("Old", "2026-11-01")
+def test_next_deadline_skips_past_ones(monkeypatch):
+    add_back_on_1_oct(monkeypatch, "Old", "2026-11-01")
     tools.add_deadline("Coming", "2026-11-30")
 
     assert tools.next_deadline()["deadline"]["title"] == "Coming"
 
 
-def test_next_deadline_when_everything_is_past_or_done():
-    tools.add_deadline("Old", "2026-11-01")
+def test_next_deadline_when_everything_is_past_or_done(monkeypatch):
+    add_back_on_1_oct(monkeypatch, "Old", "2026-11-01")
     tools.add_deadline("Finished", "2026-11-30")
     tools.mark_done("Finished")
 
@@ -174,8 +184,8 @@ def test_date_without_time_is_still_upcoming_later_today():
     assert tools.next_deadline()["deadline"]["title"] == "Due today"
 
 
-def test_date_with_time_earlier_today_is_past():
-    tools.add_deadline("This morning", "2026-11-05 09:00")
+def test_date_with_time_earlier_today_is_past(monkeypatch):
+    add_back_on_1_oct(monkeypatch, "This morning", "2026-11-05 09:00")
 
     assert tools.next_deadline()["deadline"] is None
 
