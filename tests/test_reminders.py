@@ -244,6 +244,27 @@ def test_time_phrases(due, expected):
     assert tools._time_phrase(due, NOW) == expected
 
 
+@pytest.mark.parametrize(
+    "now, due, expected",
+    [
+        # Clocks go forward at 2 AM on Sunday 4 Oct 2026, so 1 AM to 4 AM is only 2 real hours
+        (datetime(2026, 10, 4, 1, 0), datetime(2026, 10, 4, 4, 0), "in 2 hours"),
+        (datetime(2026, 10, 4, 3, 30), datetime(2026, 10, 4, 1, 30), "1 hour overdue"),
+        # Clocks go back at 3 AM on Sunday 5 Apr 2026, so 1:30 AM to 3:30 AM is 3 real hours
+        (datetime(2026, 4, 5, 1, 30), datetime(2026, 4, 5, 3, 30), "in 3 hours"),
+    ],
+)
+def test_time_phrases_count_real_time_when_the_clocks_change(now, due, expected):
+    assert tools._time_phrase(due, now) == expected
+
+
+def test_reminder_never_promises_an_hour_that_does_not_exist(monkeypatch, deadlines_file):
+    save(deadlines_file, ("Quiz", "2026-10-04 04:00"))
+    set_now(monkeypatch, datetime(2026, 10, 4, 1, 0))  # 1 AM, just before the clocks go forward
+
+    assert tools.get_reminders()["due_today"][0]["when"] == "in 2 hours"  # it used to say 3
+
+
 def test_plural():
     assert tools._plural(1, "day") == "1 day"
     assert tools._plural(2, "day") == "2 days"
@@ -510,12 +531,12 @@ def test_injected_newline_cannot_add_a_line(deadlines_file):
         "\x0c",  # form feed
         "\x1c",  # file separator, Python treats it as a line break
         "\x85",  # next line
-        " ",  # line separator
-        " ",  # paragraph separator
+        "\u2028",  # line separator
+        "\u2029",  # paragraph separator
         "\x00",  # null
         "\x1b[31m",  # terminal colour code
-        "​",  # zero width space
-        "‮",  # right to left override
+        "\u200b",  # zero width space
+        "\u202e",  # right to left override
         "\t",
     ],
 )

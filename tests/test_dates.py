@@ -55,6 +55,10 @@ def saved_date(monkeypatch, now, due_date):
         ("in 2 weeks", "2026-11-19"),
         ("in 3 hours", "2026-11-05 13:00"),
         ("in an hour", "2026-11-05 11:00"),
+        ("in 30 minutes", "2026-11-05 10:30"),
+        ("in 1 minute", "2026-11-05 10:01"),
+        ("in a minute", "2026-11-05 10:01"),
+        ("in 90 minutes", "2026-11-05 11:30"),
         # weekdays
         ("friday", "2026-11-06"),
         ("fri", "2026-11-06"),
@@ -79,6 +83,8 @@ def saved_date(monkeypatch, now, due_date):
         ("5 pm", "2026-11-05 17:00"),
         ("5:30pm", "2026-11-05 17:30"),
         ("5:30 PM", "2026-11-05 17:30"),
+        ("5.30pm", "2026-11-05 17:30"),  # the Australian way to write it, not "30pm"
+        ("5.30 pm", "2026-11-05 17:30"),
         ("11am", "2026-11-05 11:00"),
         ("17:00", "2026-11-05 17:00"),
         ("noon", "2026-11-05 12:00"),
@@ -94,6 +100,7 @@ def saved_date(monkeypatch, now, due_date):
         ("in 3 days 9am", "2026-11-08 09:00"),
         ("20 nov 17:00", "2026-11-20 17:00"),
         ("20/11/2026 9:15am", "2026-11-20 09:15"),
+        ("friday 9.15am", "2026-11-06 09:15"),
         ("tomorrow 09:30", "2026-11-06 09:30"),
         ("tomorrow at noon", "2026-11-06 12:00"),
         ("tomorrow 12am", "2026-11-06 00:00"),  # 12am is the start of the day
@@ -162,10 +169,81 @@ def test_weekdays_near_the_weekend(monkeypatch, now, phrase, expected):
         (datetime(2026, 12, 30, 10, 0), "next monday", "2027-01-04"),
         (datetime(2026, 12, 30, 10, 0), "end of next week", "2027-01-10"),
         (datetime(2026, 12, 31, 22, 30), "in 3 hours", "2027-01-01 01:30"),
+        (datetime(2026, 12, 31, 23, 50), "in 15 minutes", "2027-01-01 00:05"),
         (datetime(2026, 12, 30, 10, 0), "20 jan 2027", "2027-01-20"),
     ],
 )
 def test_month_and_year_rollover(monkeypatch, now, phrase, expected):
+    assert saved_date(monkeypatch, now, phrase) == expected
+
+
+# ---------- a day and month with no year means the next one ----------
+
+
+@pytest.mark.parametrize(
+    "now, phrase, expected",
+    [
+        (THURSDAY, "20 jan", "2027-01-20"),  # this year's 20 Jan has passed
+        (THURSDAY, "20/1", "2027-01-20"),
+        (THURSDAY, "1 nov", "2027-11-01"),  # four days ago
+        (THURSDAY, "1/11", "2027-11-01"),
+        (THURSDAY, "4 nov", "2027-11-04"),  # yesterday
+        (THURSDAY, "5 nov", "2026-11-05"),  # today has not passed, it lasts until 11:59 PM
+        (THURSDAY, "6 nov", "2026-11-06"),
+        (THURSDAY, "31 dec", "2026-12-31"),
+        (datetime(2026, 12, 31, 10, 0), "1 jan", "2027-01-01"),
+        (datetime(2026, 12, 30, 10, 0), "20 jan", "2027-01-20"),
+        (datetime(2027, 11, 5, 10, 0), "29 feb", "2028-02-29"),  # next year is a leap year
+    ],
+)
+def test_day_and_month_without_a_year_means_the_next_one(monkeypatch, now, phrase, expected):
+    assert saved_date(monkeypatch, now, phrase) == expected
+
+
+@pytest.mark.parametrize(
+    "phrase, expected",
+    [("20 jan 2027", "2027-01-20"), ("20/1/2027", "2027-01-20"), ("20 nov 2027", "2027-11-20")],
+)
+def test_a_typed_year_is_always_used(monkeypatch, phrase, expected):
+    assert saved_date(monkeypatch, THURSDAY, phrase) == expected
+
+
+def test_success_message_points_out_next_year(monkeypatch):
+    result = add_at(monkeypatch, THURSDAY, "20 jan")
+
+    assert result["message"] == "Saved 'Task', due Wednesday 20 Jan 2027, 11:59 PM. That's in 2027, not this year."
+
+
+@pytest.mark.parametrize(
+    "now, phrase",
+    [(datetime(2026, 12, 31, 10, 0), "tomorrow"), (datetime(2026, 12, 30, 10, 0), "friday"), (THURSDAY, "20 nov 2027")],
+)
+def test_any_date_in_a_later_year_is_pointed_out(monkeypatch, now, phrase):
+    assert "That's in 2027, not this year." in add_at(monkeypatch, now, phrase)["message"]
+
+
+# ---------- the nights Sydney's clocks change ----------
+#
+# In 2026 the clocks go back an hour at 3 AM on Sunday 5 April (so 2 AM to 3 AM
+# happens twice), and forward an hour at 2 AM on Sunday 4 October (so 2 AM to
+# 3 AM never happens). "in N hours" means that much real time has passed.
+
+
+@pytest.mark.parametrize(
+    "now, phrase, expected",
+    [
+        # Clocks go forward overnight, so 12 real hours after 8 PM is 9 AM, not 8 AM
+        (datetime(2026, 10, 3, 20, 0), "in 12 hours", "2026-10-04 09:00"),
+        (datetime(2026, 10, 4, 1, 30), "in 1 hour", "2026-10-04 03:30"),
+        (datetime(2026, 10, 4, 1, 30), "in 45 minutes", "2026-10-04 03:15"),
+        # Clocks go back overnight, so 12 real hours after 8 PM is 7 AM, not 8 AM
+        (datetime(2026, 4, 4, 20, 0), "in 12 hours", "2026-04-05 07:00"),
+        (datetime(2026, 4, 5, 1, 30), "in 3 hours", "2026-04-05 03:30"),
+        # A normal night is unchanged
+        (datetime(2026, 11, 5, 20, 0), "in 12 hours", "2026-11-06 08:00"),
+    ],
+)
+def test_in_hours_counts_real_time_when_the_clocks_change(monkeypatch, now, phrase, expected):
     assert saved_date(monkeypatch, now, phrase) == expected
 
 
@@ -202,13 +280,16 @@ def test_leap_day_with_the_year_is_fine(monkeypatch):
 # ---------- dates in the past ----------
 
 
+# "1 nov" and "1/11" used to be refused here. Now a day and month with no
+# year means the next one, so they are tested above as 1 Nov 2027.
 @pytest.mark.parametrize(
     "phrase",
     [
         "today 9am",  # it is already 10:00
         "9am",
-        "1 nov",  # this year's 1 Nov has passed, and we do not guess 2027
-        "1/11",
+        "5 nov 9am",  # today's date has not passed, only its 9am has, so it is not moved to next year
+        "1 nov 2026",  # a year the student typed is always used, even one that has passed
+        "1/11/2026",
         "20 nov 2025",
         "2026-11-01",
         "2026-11-05 09:00",
@@ -224,7 +305,8 @@ def test_past_dates_are_refused(monkeypatch, phrase, deadlines_file):
 
 
 def test_past_message_shows_the_date_it_understood(monkeypatch):
-    result = add_at(monkeypatch, THURSDAY, "1 nov")
+    # The year is typed, because "1 nov" on its own now means next year's
+    result = add_at(monkeypatch, THURSDAY, "1 nov 2026")
 
     assert "Sunday 1 Nov 2026" in result["message"]
 
@@ -232,15 +314,6 @@ def test_past_message_shows_the_date_it_understood(monkeypatch):
 @pytest.mark.parametrize("phrase, expected", [("today 11am", "2026-11-05 11:00"), ("today", "2026-11-05")])
 def test_later_today_is_fine(monkeypatch, phrase, expected):
     assert saved_date(monkeypatch, THURSDAY, phrase) == expected
-
-
-def test_day_month_in_the_past_asks_for_the_year(monkeypatch):
-    # On 30 Dec, "20 jan" means 20 Jan 2026, which has passed. We say so
-    # instead of quietly picking 2027.
-    result = add_at(monkeypatch, datetime(2026, 12, 30, 10, 0), "20 jan")
-
-    assert result["status"] == "error"
-    assert "add the year" in result["message"]
 
 
 # ---------- unclear or impossible input ----------
@@ -265,6 +338,11 @@ def test_day_month_in_the_past_asks_for_the_year(monkeypatch):
         "in 1000 days",
         "end of the week 5pm",
         "in 2 hours 5pm",
+        "in 10 minutes 5pm",
+        "in -5 minutes",
+        "in 1000 minutes",
+        "5.30",  # a dot with no am or pm
+        "13.30pm",
         "30 feb",
         "31/04",
         "32 nov",
@@ -287,10 +365,19 @@ def test_unclear_or_impossible_input_is_refused(monkeypatch, phrase, deadlines_f
     assert not deadlines_file.exists()
 
 
-def test_impossible_date_names_the_date(monkeypatch):
-    result = add_at(monkeypatch, THURSDAY, "30 feb")
+@pytest.mark.parametrize(
+    "phrase, shown",
+    [
+        ("31 nov", "31 Nov 2026 doesn't exist"),
+        # This year's February has passed, so these are read as next year's (which used to say 2026)
+        ("30 feb", "30 Feb 2027 doesn't exist"),
+        ("29 feb", "29 Feb 2027 doesn't exist"),  # 2027 is not a leap year
+    ],
+)
+def test_impossible_date_names_the_date(monkeypatch, phrase, shown):
+    result = add_at(monkeypatch, THURSDAY, phrase)
 
-    assert "30 Feb 2026 doesn't exist" in result["message"]
+    assert shown in result["message"]
 
 
 def test_morning_or_evening_question(monkeypatch):
