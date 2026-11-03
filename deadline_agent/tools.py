@@ -5,7 +5,9 @@ the function name, type hints and docstring to tell the model what the tool
 does, so keep the docstrings clear.
 
 Deadlines are saved in a JSON file, so they survive a restart. The file is
-read at the start of every tool call and written after every change.
+read at the start of every tool call and written after every change. Each
+save writes a complete new file and swaps it in, and a file that cannot be
+read is copied to a backup before it is replaced.
 
 Due dates are always saved as "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" in Sydney
 time. Students can type friendlier things like "next friday 5pm", and the
@@ -15,8 +17,11 @@ code below (not the AI model) turns those words into that saved form.
 import json
 import os
 import re
+import shutil
+import tempfile
+import threading
 import unicodedata
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -55,6 +60,12 @@ DATE_EXAMPLES = "Try something like 'next friday 5pm', 'in 3 days' or '20 nov'."
 REMINDER_DAYS = 7
 MAX_DAYS_AHEAD = 60
 
+# Only one tool call may read or change the file at a time. adk web runs tools
+# one after another, but ADK can also run them on several threads at once
+# (RunConfig.tool_thread_pool_config), and then two changes made at the same
+# moment would undo each other.
+_file_lock = threading.Lock()
+
 
 # ---------- helpers (not tools, the model never sees these) ----------
 
@@ -78,6 +89,31 @@ def _now() -> datetime:
     due dates, which are plain Sydney times with no timezone attached.
     """
     return datetime.now(SYDNEY).replace(tzinfo=None)
+
+
+def _utc(moment: datetime) -> datetime:
+    """The same Sydney time as a moment in UTC.
+
+    Sydney clocks jump an hour on the two daylight saving nights each year,
+    but UTC never jumps. So lengths of time, like "in 3 hours" or "2 hours
+    overdue", are worked out in UTC to stay right on those nights.
+    """
+    return moment.replace(tzinfo=SYDNEY).astimezone(timezone.utc)
+
+
+def _text(value, name: str) -> str:
+    """Tidy up a text argument from the model.
+
+    The model sometimes sends nothing (None), which counts as empty text.
+    Runs of spaces, tabs and line breaks become one space, so a title always
+    stays on one line. Anything else that is not text, like a number, raises
+    ValueError with a message the model can use to try again.
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be text, but I got {value!r}.")
+    return " ".join(value.split())
 
 
 def _parse_due_date(text) -> datetime:
@@ -134,8 +170,8 @@ def _split_time(text: str):
 
     Returns (hour, minute) or None, and the rest of the text without the time.
     """
-    # 12 hour time with am/pm: "5pm", "5 pm", "5:30pm"
-    match = re.search(r"\b([0-9]{1,2})(?::([0-9]{2}))? ?(am|pm)\b", text)
+    # 12 hour time with am/pm: "5pm", "5 pm", "5:30pm", or "5.30pm" as Australians often write it
+    match = re.search(r"\b([0-9]{1,2})(?:[:.]([0-9]{2}))? ?(am|pm)\b", text)
     if match:
         hour, minute = int(match[1]), int(match[2] or 0)
         if not 1 <= hour <= 12 or minute > 59:
@@ -180,6 +216,21 @@ def _real_date(year: int, month: int, day: int) -> date:
         raise ValueError(f"{shown} doesn't exist, so please check the day and month. {DATE_EXAMPLES}") from None
 
 
+def _next_date(day: int, month: int, year_text, today: date) -> date:
+    """The date for a day and month like "20 nov" or "20/11", with or without a year.
+
+    A year the student typed is always used. With no year, it is the next
+    time that date comes round: this year, or next year if this year's has
+    already passed. So in November, "20 jan" means 20 January next year.
+    """
+    if year_text:
+        return _real_date(int(year_text), month, day)
+    year = today.year
+    if (month, day) < (today.month, today.day):
+        year += 1  # this year's has already passed
+    return _real_date(year, month, day)
+
+
 def _read_day(text: str, today: date):
     """Turn the date part of the words (with any time already removed) into a date.
 
@@ -211,14 +262,12 @@ def _read_day(text: str, today: date):
     # "20 nov", "20th november", "20 nov 2026"
     match = re.fullmatch(r"([0-9]{1,2})(?:st|nd|rd|th)? ([a-z]+)(?: ([0-9]{4}))?", text)
     if match and match[2] in MONTHS:
-        year = int(match[3]) if match[3] else today.year
-        return _real_date(year, MONTHS[match[2]], int(match[1]))
+        return _next_date(int(match[1]), MONTHS[match[2]], match[3], today)
 
     # "20/11" or "20/11/2026". Day comes first, as in Australia.
     match = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})(?:/([0-9]{4}))?", text)
     if match:
-        year = int(match[3]) if match[3] else today.year
-        return _real_date(year, int(match[2]), int(match[1]))
+        return _next_date(int(match[1]), int(match[2]), match[3], today)
 
     return None
 
@@ -231,10 +280,13 @@ def _read_words(text: str, now: datetime):
     words = [word for word in text.lower().replace(",", " ").split() if word not in FILLER_WORDS]
     text = " ".join(words)
 
-    # "in 2 hours" is an exact moment from now, so it keeps its minutes
-    match = re.fullmatch(r"in ([0-9]{1,3}|an?) (hour|hours)", text)
+    # "in 2 hours" or "in 30 minutes" is an exact moment from now, so it keeps its minutes.
+    # The time is added in UTC, so it is still right on the nights the clocks change.
+    match = re.fullmatch(r"in ([0-9]{1,3}|an?) (minute|minutes|hour|hours)", text)
     if match:
-        return (now + timedelta(hours=_number(match[1]))).strftime("%Y-%m-%d %H:%M")
+        amount = _number(match[1])
+        length = timedelta(hours=amount) if match[2].startswith("hour") else timedelta(minutes=amount)
+        return (_utc(now) + length).astimezone(SYDNEY).strftime("%Y-%m-%d %H:%M")
 
     # "end of the week" is this Sunday, "end of next week" is next Sunday.
     # Saved with no time, so it lasts until 23:59 that Sunday.
@@ -259,12 +311,14 @@ def _read_words(text: str, now: datetime):
 def _understand_due_date(phrase: str, now: datetime) -> str:
     """Turn what the student typed into "YYYY-MM-DD" or "YYYY-MM-DD HH:MM".
 
-    Raises ValueError with a friendly message if the words are unclear, the
-    date does not exist, or the date is already in the past.
+    Raises ValueError with a friendly message if no date was given, the words
+    are unclear, the date does not exist, or the date is already in the past.
     """
     text = phrase.strip()
+    if not text:
+        raise ValueError(f"Please tell me when it is due. {DATE_EXAMPLES}")
     if re.fullmatch(ISO_DATE, text) or re.fullmatch(ISO_DATE_TIME, text):
-        # Already in the saved form, so keep it exactly as typed (like task 1)
+        # Already in the saved form, so keep it exactly as typed
         saved = text
         try:
             due = _parse_due_date(saved)
@@ -279,7 +333,7 @@ def _understand_due_date(phrase: str, now: datetime) -> str:
     if due < now:
         raise ValueError(
             f"'{text}' would be {_friendly(due)}, which is already in the past. "
-            "Please check the date, and add the year if you meant next year (like '20 jan 2027')."
+            "Please check the date and time."
         )
     return saved
 
@@ -302,34 +356,123 @@ def _looks_valid(deadlines) -> bool:
     return True
 
 
+def _read_file(path: Path):
+    """The deadlines saved in the file at path.
+
+    Returns [] if there is no file yet, and None if the file is there but
+    cannot be read or is not a valid list of deadlines.
+    """
+    try:
+        # "utf-8-sig" also accepts the invisible byte order mark that Windows
+        # PowerShell and older Notepad put at the start of UTF-8 files
+        deadlines = json.loads(path.read_text(encoding="utf-8-sig"))
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError):  # no permission, bad text encoding or bad JSON
+        return None
+    return deadlines if _looks_valid(deadlines) else None
+
+
 def _load_deadlines() -> list:
     """Read all deadlines from the file.
 
-    A missing or corrupted file is treated as "no deadlines yet" instead of
-    crashing. (The next change will then write a fresh, valid file.)
+    A missing file means no deadlines yet. A file that cannot be read or
+    understood is treated as empty too, so Groot can always start. That file
+    is left exactly as it is, and the next save keeps a copy of it first.
+    """
+    deadlines = _read_file(_data_file())
+    return [] if deadlines is None else deadlines
+
+
+def _save_deadlines(deadlines: list):
+    """Write all deadlines to the file.
+
+    If the file there now cannot be understood, a copy of it is kept first,
+    so nothing the student saved is lost. Returns that copy's path, or None
+    if no copy was needed. Raises OSError if the file cannot be written.
     """
     path = _data_file()
-    if not path.exists():
-        return []
+    backup = _keep_copy(path) if _read_file(path) is None else None
+    _replace_file(path, json.dumps(deadlines, indent=2))
+    return backup
+
+
+def _keep_copy(path: Path) -> Path:
+    """Copy a file we could not understand to a new file beside it, and return the copy's path.
+
+    The name has the date and time in it, like deadlines.json.corrupt-20261105-100000,
+    and a number is added if that name is taken, so an older copy is never overwritten.
+    """
+    stamp = _now().strftime("%Y%m%d-%H%M%S")
+    backup = path.with_name(f"{path.name}.corrupt-{stamp}")
+    number = 1
+    while backup.exists():
+        number += 1
+        backup = path.with_name(f"{path.name}.corrupt-{stamp}-{number}")
+    shutil.copyfile(path, backup)
+    return backup
+
+
+def _replace_file(path: Path, text: str) -> None:
+    """Swap the whole file for new text in one step, so it is never left half written.
+
+    The text goes into a temporary file in the same folder first, then
+    os.replace puts that file in place of the old one in a single step. A
+    crash leaves either the old file or the new one, never a mix. If anything
+    fails, the old file is untouched and the temporary file is removed.
+    """
+    temp = tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, prefix=f"{path.name}.", suffix=".tmp", delete=False
+    )
     try:
-        deadlines = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError:  # bad JSON or bad text encoding
-        return []
-    if not _looks_valid(deadlines):
-        return []
-    return deadlines
+        with temp:
+            temp.write(text)
+            temp.flush()
+            os.fsync(temp.fileno())  # make sure the text has really reached the disk
+        os.replace(temp.name, path)
+    finally:
+        Path(temp.name).unlink(missing_ok=True)  # only still there if something failed
 
 
-def _save_deadlines(deadlines: list) -> None:
-    """Write all deadlines to the file."""
-    _data_file().write_text(json.dumps(deadlines, indent=2), encoding="utf-8")
+def _backup_note(backup) -> str:
+    """Extra words for a success message when an unreadable old file was copied first."""
+    if backup is None:
+        return ""
+    return (
+        " Your old deadlines file could not be read, so I kept a copy of it called"
+        f" {backup.name} in the same folder and started a fresh list."
+    )
+
+
+def _not_saved(error: OSError) -> dict:
+    """The error a tool gives when the deadlines file cannot be written."""
+    reason = error.strerror or type(error).__name__
+    return {
+        "status": "error",
+        "message": f"I couldn't save your deadlines ({reason}), so nothing has changed. "
+        "Please check the deadlines file and its folder are not read only or open in another program, then try again.",
+    }
+
+
+def _title_key(title: str) -> str:
+    """The form of a title used to compare titles, so titles that look the same match.
+
+    NFKC turns look-alike characters into one standard form (a full width A
+    from an Asian keyboard becomes a plain A, and an accent typed as a separate
+    mark joins its letter), casefold ignores upper and lower case, and
+    split/join ignores extra spaces.
+    """
+    return " ".join(unicodedata.normalize("NFKC", title).casefold().split())
 
 
 def _find(deadlines: list, title: str):
-    """Return the deadline with this title (ignoring upper/lower case), or None."""
-    wanted = title.strip().casefold()
+    """Return the saved deadline with this title, or None.
+
+    Titles match when they look the same, so upper/lower case and extra spaces are ignored.
+    """
+    wanted = _title_key(title)
     for deadline in deadlines:
-        if deadline["title"].casefold() == wanted:
+        if _title_key(deadline["title"]) == wanted:
             return deadline
     return None
 
@@ -373,8 +516,9 @@ def _time_phrase(due: datetime, now: datetime) -> str:
     if days > 1:
         return f"in {_plural(days, 'day')}"
 
-    # Same day, so count hours or minutes
-    minutes = int(abs((due - now).total_seconds()) // 60)
+    # Same day, so count hours or minutes. They are counted in UTC, so the
+    # count is still right on the nights the clocks change for daylight saving.
+    minutes = int(abs((_utc(due) - _utc(now)).total_seconds()) // 60)
     if due < now:
         minutes = max(minutes, 1)  # a few seconds late still counts as late
     elif minutes == 0:
@@ -398,7 +542,9 @@ def _reminders(days_ahead: int) -> dict:
     last_day = now.date() + timedelta(days=days_ahead)
     groups = {"overdue": [], "due_today": [], "due_soon": []}
 
-    for deadline in _soonest_first(_load_deadlines()):
+    with _file_lock:
+        deadlines = _load_deadlines()
+    for deadline in _soonest_first(deadlines):
         if deadline["done"]:
             continue
         due = _parse_due_date(deadline["due_date"])
@@ -437,57 +583,63 @@ def add_deadline(title: str, due_date: str, subject: str = "") -> dict:
 
     Args:
         title: Name of the task, for example "Assignment 1". Must be unique
-            (upper/lower case is ignored).
+            (upper/lower case and extra spaces are ignored).
         due_date: When it is due, in the student's own words exactly as they
             typed them. Do not convert it yourself, this tool works out the
             date using today's date in Sydney. Understood forms:
             "today", "tomorrow", "in 3 days", "in 2 weeks", "in 4 hours",
-            "friday" (the next Friday after today), "next friday" (the Friday
-            of next week), "20 nov", "20 november 2026", "20/11",
-            "20/11/2026" (day first), "end of the week", "end of next week",
-            or "2026-11-20" and "2026-11-20 14:30".
+            "in 30 minutes", "friday" (the next Friday after today),
+            "next friday" (the Friday of next week), "20 nov",
+            "20 november 2026", "20/11", "20/11/2026" (day first),
+            "end of the week", "end of next week", or "2026-11-20" and
+            "2026-11-20 14:30". A day and month with no year means the next
+            time that date comes round, so in November "20 jan" is next year.
             A time can be added to any of the date words, for example
-            "next friday 5pm", "tomorrow 5:30pm", "20 nov 17:00",
+            "next friday 5pm", "tomorrow 5:30pm" (or 5.30pm), "20 nov 17:00",
             "friday noon" or "friday midnight". With no time, it is due at
             the end of that day (11:59 PM).
         subject: Optional university subject, for example "Machine Learning".
 
     Returns:
         A dict with "status" ("success" or "error") and a "message". On
-        success it also has the saved "deadline". If the date is unclear,
-        does not exist or is in the past, the message explains why, so ask
-        the student to check it.
+        success it also has the saved "deadline", and the message shows the
+        date in full (and points out a date in a later year) so the student
+        can spot a mistake. If the date is unclear, does not exist or is in
+        the past, the message explains why, so ask the student to check it.
+        If the old deadlines file could not be read, the message names the
+        backup copy that was kept, so tell the student about it.
     """
-    title = title.strip()
-    if not title:
-        return {"status": "error", "message": "A deadline needs a title."}
-
+    now = _now()
     try:
-        saved_date = _understand_due_date(due_date, _now())
+        title = _text(title, "title")
+        subject = _text(subject, "subject")
+        if not title:
+            raise ValueError("A deadline needs a title.")
+        saved_date = _understand_due_date(_text(due_date, "due_date"), now)
     except ValueError as error:
         return {"status": "error", "message": str(error)}
 
-    deadlines = _load_deadlines()
-    if _find(deadlines, title) is not None:
-        return {
-            "status": "error",
-            "message": f"You already have a deadline called '{title}'. Pick a different title.",
-        }
+    new_deadline = {"title": title, "due_date": saved_date, "subject": subject, "done": False}
+    with _file_lock:
+        deadlines = _load_deadlines()
+        existing = _find(deadlines, title)
+        if existing is not None:
+            return {
+                "status": "error",
+                "message": f"You already have a deadline called '{existing['title']}'. Pick a different title.",
+            }
+        deadlines.append(new_deadline)
+        try:
+            backup = _save_deadlines(deadlines)
+        except OSError as error:
+            return _not_saved(error)
 
-    new_deadline = {
-        "title": title,
-        "due_date": saved_date,
-        "subject": subject.strip(),
-        "done": False,
-    }
-    deadlines.append(new_deadline)
-    _save_deadlines(deadlines)
-    return {
-        "status": "success",
-        # Show the date in full so the student can spot a mistake
-        "message": f"Saved '{title}', due {_friendly(_parse_due_date(saved_date))}.",
-        "deadline": new_deadline,
-    }
+    # Show the date in full so the student can spot a mistake, like the wrong year
+    due = _parse_due_date(saved_date)
+    message = f"Saved '{title}', due {_friendly(due)}."
+    if due.year > now.year:
+        message += f" That's in {due.year}, not this year."
+    return {"status": "success", "message": message + _backup_note(backup), "deadline": new_deadline}
 
 
 def list_deadlines() -> dict:
@@ -498,8 +650,11 @@ def list_deadlines() -> dict:
     Returns:
         A dict with "status", a "message" and "deadlines", a list where each
         item has "title", "due_date", "subject" and "done" (True if finished).
+        A due_date is Sydney time, either "YYYY-MM-DD HH:MM" or just
+        "YYYY-MM-DD", which means due by 11:59 PM that day.
     """
-    deadlines = _soonest_first(_load_deadlines())
+    with _file_lock:
+        deadlines = _soonest_first(_load_deadlines())
     if not deadlines:
         return {"status": "success", "message": "You have no deadlines saved yet.", "deadlines": []}
     return {
@@ -521,17 +676,21 @@ def next_deadline() -> dict:
         None if nothing is coming up).
     """
     now = _now()
+    with _file_lock:
+        deadlines = _load_deadlines()
     upcoming = [
-        d for d in _load_deadlines()
+        d for d in deadlines
         if not d["done"] and _parse_due_date(d["due_date"]) >= now
     ]
     if not upcoming:
         return {"status": "success", "message": "You have no upcoming deadlines.", "deadline": None}
 
     soonest = _soonest_first(upcoming)[0]
+    # Spell out the weekday and the time (like 11:59 PM), so the model does not have to work them out
+    due = _friendly(_parse_due_date(soonest["due_date"]))
     return {
         "status": "success",
-        "message": f"Your next deadline is '{soonest['title']}', due {soonest['due_date']}.",
+        "message": f"Your next deadline is '{soonest['title']}', due {due}.",
         "deadline": soonest,
     }
 
@@ -540,41 +699,57 @@ def delete_deadline(title: str) -> dict:
     """Permanently deletes a saved deadline.
 
     Args:
-        title: The title of the deadline to delete (upper/lower case is ignored).
+        title: The title of the deadline to delete (upper/lower case and extra spaces are ignored).
 
     Returns:
         A dict with "status" ("success" or "error") and a "message".
     """
-    deadlines = _load_deadlines()
-    found = _find(deadlines, title)
-    if found is None:
-        return _not_found(title)
+    try:
+        title = _text(title, "title")
+    except ValueError as error:
+        return {"status": "error", "message": str(error)}
 
-    deadlines.remove(found)
-    _save_deadlines(deadlines)
-    return {"status": "success", "message": f"Deleted '{found['title']}'."}
+    with _file_lock:
+        deadlines = _load_deadlines()
+        found = _find(deadlines, title)
+        if found is None:
+            return _not_found(title)
+        deadlines.remove(found)
+        try:
+            backup = _save_deadlines(deadlines)
+        except OSError as error:
+            return _not_saved(error)
+    return {"status": "success", "message": f"Deleted '{found['title']}'." + _backup_note(backup)}
 
 
 def mark_done(title: str) -> dict:
     """Marks a saved deadline as finished.
 
     Args:
-        title: The title of the deadline that is done (upper/lower case is ignored).
+        title: The title of the deadline that is done (upper/lower case and extra spaces are ignored).
 
     Returns:
         A dict with "status" ("success" or "error") and a "message".
     """
-    deadlines = _load_deadlines()
-    found = _find(deadlines, title)
-    if found is None:
-        return _not_found(title)
+    try:
+        title = _text(title, "title")
+    except ValueError as error:
+        return {"status": "error", "message": str(error)}
 
-    found["done"] = True
-    _save_deadlines(deadlines)
-    return {"status": "success", "message": f"Marked '{found['title']}' as done."}
+    with _file_lock:
+        deadlines = _load_deadlines()
+        found = _find(deadlines, title)
+        if found is None:
+            return _not_found(title)
+        found["done"] = True
+        try:
+            backup = _save_deadlines(deadlines)
+        except OSError as error:
+            return _not_saved(error)
+    return {"status": "success", "message": f"Marked '{found['title']}' as done." + _backup_note(backup)}
 
 
-def get_reminders(days_ahead: int = 7) -> dict:
+def get_reminders(days_ahead: int = REMINDER_DAYS) -> dict:
     """Finds unfinished deadlines that are overdue, due today or due soon.
 
     Call this when the student asks things like "what's due soon?",
