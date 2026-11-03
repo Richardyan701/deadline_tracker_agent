@@ -18,16 +18,40 @@ echo Step 3 of 4: installing Google ADK. This can take a few minutes...
 if errorlevel 1 goto failed
 
 echo.
-echo Step 4 of 4: creating the agent project.
-echo When asked to choose a backend, type 1 for Google AI and press Enter.
-echo Then paste your Gemini API key and press Enter.
-".venv\Scripts\adk.exe" create deadline_agent --model gemini-3.5-flash
-if errorlevel 1 goto failed
+echo Step 4 of 4: saving your Gemini API key in deadline_agent\.env
+rem The agent is already in deadline_agent, so only the .env file is made here.
+if not exist "deadline_agent\.env" goto ask_key
+set "REPLACE="
+set /p "REPLACE=deadline_agent\.env already exists. Replace it with a new key? (y/N) "
+if /i not "%REPLACE%"=="y" goto keep_key
 
+:ask_key
+set "GEMINI_KEY="
+set /p "GEMINI_KEY=Paste your Gemini API key and press Enter: "
+if not defined GEMINI_KEY goto no_key
+> "deadline_agent\.env" echo GOOGLE_GENAI_USE_ENTERPRISE=0
+>> "deadline_agent\.env" echo GOOGLE_API_KEY=%GEMINI_KEY%
+set "GEMINI_KEY="
+if not exist "deadline_agent\.env" goto failed
+echo Saved.
+goto done
+
+:keep_key
+echo Kept your existing deadline_agent\.env.
+
+:done
 echo.
-echo All done. You can close this window.
+echo All done. To start Groot, run this from the project folder:
+echo   .\.venv\Scripts\adk.exe web --port 8000
+echo Then open http://127.0.0.1:8000 in your browser and choose deadline_agent.
 pause
 exit /b 0
+
+:no_key
+echo.
+echo No key was entered, so nothing was saved. Run this file again when you have your key.
+pause
+exit /b 1
 
 :no_python
 echo.
