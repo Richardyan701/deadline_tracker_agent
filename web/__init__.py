@@ -8,7 +8,7 @@ http://127.0.0.1:8000/dev-ui/ for the chat.
 
     app.py      the routes, the safety checks and build_app()
     pages.py    the HTML of the two pages
-    uploads.py  reads uploaded PDFs into memory, never onto disk
+    uploads.py  reads uploaded files into memory, never onto disk
     preview.py  turns outlines, a timetable and a Canvas feed into review rows
     static/     the CSS and JavaScript the pages load
 """

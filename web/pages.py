@@ -1,15 +1,15 @@
 """The HTML of Groot's two pages: the home page and the outline drop box.
 
-Titles and subjects are typed by the student (or found in a PDF), so they
-can contain anything, even "<script>". Every piece of text that comes from
-a deadline goes through escape(), which turns < > & " ' into HTML codes.
+Titles and subjects are typed by the student (or found in an outline), so
+they can contain anything, even "<script>". Every piece of text that comes
+from a deadline goes through escape(), which turns < > & " ' into HTML codes.
 The browser then shows that text as it is and never runs it as code.
 """
 
 from datetime import datetime
 from html import escape
 
-from deadline_agent import tools
+from deadline_agent import documents, tools
 
 # Opens ADK's chat with Groot already chosen
 CHAT_PATH = "/dev-ui/?app=deadline_agent"
@@ -141,7 +141,11 @@ def _button(action: str, label: str, style: str, title: str) -> str:
 
 
 def import_page(sessions: dict, default_session: str) -> str:
-    """The outline drop box. sessions is uts_calendar.SESSIONS, so the picker always matches the calendar."""
+    """The outline drop box. sessions is uts_calendar.SESSIONS, so the picker always matches the calendar.
+
+    The outline picker accepts every file ending documents.py reads, and the
+    hint lists them, so the page always matches what the reader can do.
+    """
     options = "".join(
         f'<option value="{escape(code)}"{" selected" if code == default_session else ""}>{escape(info["name"])}</option>'
         for code, info in sessions.items()
@@ -155,10 +159,10 @@ def import_page(sessions: dict, default_session: str) -> str:
 <section aria-labelledby="files-heading">
 <h2 id="files-heading">1. Choose your files</h2>
 <div id="drop-zone" class="drop-zone">
-<p class="drop-title">Drag your subject outline PDFs here, or</p>
-<input id="outline-input" class="visually-hidden" type="file" accept=".pdf,application/pdf" multiple>
-<label for="outline-input" class="button">Choose outline PDFs</label>
-<p class="hint">1 to 8 outlines, each up to 10 MB.</p>
+<p class="drop-title">Drag your subject outlines here, or</p>
+<input id="outline-input" class="visually-hidden" type="file" accept="{escape(documents.HTML_ACCEPT)}" multiple aria-describedby="outline-hint">
+<label for="outline-input" class="button">Choose outline files</label>
+<p id="outline-hint" class="hint">1 to 8 outlines, each up to 10 MB. {escape(documents.describe_supported())}</p>
 </div>
 <p id="file-message" class="message" role="status"></p>
 <ul id="outline-list" class="file-list"></ul>

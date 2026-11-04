@@ -14,6 +14,7 @@ Spring 2026 dates used below (from the UTS calendar): week 2 Friday is
 import asyncio
 import json
 import logging
+import mimetypes
 import sys
 import tempfile
 import types
@@ -28,9 +29,10 @@ from google import genai
 from google.genai import errors
 from starlette.datastructures import Headers
 from test_canvas import LINK, SECRET, event, feed
+from test_documents import DOC, FIXTURES, PPT, docx_file, odf_file, ole_file, picture, pptx_file, xlsx_file, zip_file
 from test_timetable import FIXTURE, make_pdf
 
-from deadline_agent import importer, outline, tools
+from deadline_agent import documents, importer, outline, tools
 from web import app as web_app
 from web import preview as web_preview
 from web import uploads
@@ -74,20 +76,23 @@ def no_gemini(monkeypatch):
 
 
 class Calls(list):
-    """The PDFs the fake reader was given, plus the function that gives its answer."""
+    """The outline files the fake reader was given, their names, and the function that gives its answer."""
 
 
 @pytest.fixture
 def reader(app):
     """Make Preview read outlines with a fake instead of Gemini.
 
-    Returns the list of PDFs the fake was given. By default it finds one
-    item per outline. Set reader.answer to a function to change that.
+    Returns the list of files (their bytes) the fake was given, and their
+    names in reader.names. By default it finds one item per outline. Set
+    reader.answer to a function to change that.
     """
     calls = Calls()
+    calls.names = []
 
-    def read(data: bytes):
+    def read(data: bytes, filename: str):
         calls.append(data)
+        calls.names.append(filename)
         return calls.answer(data)
 
     calls.answer = lambda data: [item("Essay", "week", week=3)]
@@ -123,13 +128,14 @@ def item(name, when, code="33130", subject="Mathematics 1", **fields):
 
 
 def pdf(text: str) -> bytes:
-    """Bytes that start like a PDF, which is all the upload check looks at."""
+    """Bytes that start like a PDF, which is all documents.py looks at to know it is one."""
     return b"%PDF-1.4\n" + text.encode() + b"\n%%EOF\n"
 
 
 def preview(client, *outlines, timetable=None, canvas_url=None, session="SPR2026", extra=()):
     """Send the drop box form the way the page does. outlines are (file name, bytes) pairs."""
-    files = [("outlines", (name, data, "application/pdf")) for name, data in outlines]
+    # A browser sends a type it guesses from the name. Groot ignores it and looks at the bytes.
+    files = [("outlines", (name, data, mimetypes.guess_type(name)[0] or "application/octet-stream")) for name, data in outlines]
     if timetable is not None:
         files.append(("timetable", ("timetable.pdf", timetable, "application/pdf")))
     files += list(extra)
@@ -152,11 +158,31 @@ def test_import_page_renders_with_every_input(client):
     assert page.status_code == 200
     text = page.text
     assert '<div id="drop-zone" class="drop-zone">' in text
-    assert '<input id="outline-input" class="visually-hidden" type="file" accept=".pdf,application/pdf" multiple>' in text
-    assert '<label for="outline-input" class="button">Choose outline PDFs</label>' in text
-    assert '<input id="timetable-input" type="file" accept=".pdf,application/pdf"' in text
+    assert (
+        f'<input id="outline-input" class="visually-hidden" type="file" accept="{documents.HTML_ACCEPT}" multiple'
+        ' aria-describedby="outline-hint">'
+    ) in text
+    assert '<label for="outline-input" class="button">Choose outline files</label>' in text
+    assert '<input id="timetable-input" type="file" accept=".pdf,application/pdf"' in text  # the timetable is still a PDF
     assert '<input id="canvas-input" type="url" autocomplete="off"' in text
     assert '<script type="module" src="/groot/static/import.js"></script>' in text
+
+
+def test_the_drop_box_lists_every_kind_of_file_the_reader_reads(client):
+    text = client.get("/groot/import").text
+
+    # Both come straight from documents.py, so the page can never offer less or more than the reader does
+    assert f'<p id="outline-hint" class="hint">1 to 8 outlines, each up to 10 MB. {documents.describe_supported()}</p>' in text
+    assert documents.HTML_ACCEPT == ",".join(documents.SUPPORTED_EXTENSIONS)
+    for ending in documents.SUPPORTED_EXTENSIONS:
+        assert ending in documents.describe_supported()
+
+
+def test_the_page_script_takes_its_file_endings_from_the_picker():
+    # import.js checks dropped files against the picker's accept list, the one documents.py gives
+    code = (web_app.STATIC_DIR / "import.js").read_text(encoding="utf-8")
+    assert 'const ENDINGS = outlineInput.accept.split(",");' in code
+    assert "is not a PDF" not in code
 
 
 def test_the_session_picker_starts_on_spring_2026(client):
@@ -201,7 +227,56 @@ def test_each_outline_is_read_once_in_order(client, reader):
     result = preview(client, ("maths.pdf", pdf("maths")), ("foundation.pdf", pdf("foundation"))).json()
 
     assert reader == [pdf("maths"), pdf("foundation")]  # one Gemini request each
+    assert reader.names == ["maths.pdf", "foundation.pdf"]
     assert [row["title"] for row in result["rows"]] == ["33130 Skills Test 1", "35010 Quiz"]
+
+
+# One file of each kind documents.py reads, made the same way its own tests make them
+EVERY_KIND = [
+    ("maths.pdf", pdf("maths")),
+    ("maths.docx", docx_file("33130 Mathematics 1", "Skills Test 1 is due in week 2")),
+    ("old maths.doc", DOC),
+    ("slides.pptx", pptx_file()),
+    ("old slides.ppt", PPT),
+    ("marks.xlsx", xlsx_file()),
+    ("old marks.xls", (FIXTURES / "assessments.xls").read_bytes()),
+    ("outline.odt", odf_file("text", "<text:p>Quiz 1 is due in week 3</text:p>")),
+    ("slides.odp", odf_file("presentation", '<draw:page draw:name="1"><text:p>Quiz 1 in week 3</text:p></draw:page>')),
+    ("marks.ods", odf_file("spreadsheet", "<table:table><table:table-row><table:table-cell><text:p>Quiz 1</text:p>"
+                                          "</table:table-cell></table:table-row></table:table>")),
+    ("marks.csv", b"Task,Weight,Due\nQuiz 1,10%,Week 3\n"),
+    ("notes.txt", b"Quiz 1 is due in week 3"),
+    ("notes.md", b"# Assessments\n- Quiz 1: week 3\n"),
+    ("outline.html", b"<!DOCTYPE html><p>Quiz 1 is due in week 3</p>"),
+    ("photo.png", picture("PNG")),
+    ("photo.jpg", picture("JPEG")),
+    ("scan.webp", picture("WEBP")),
+]
+
+
+def test_every_kind_of_file_the_reader_reads_is_accepted_with_its_name(client, reader):
+    for start in range(0, len(EVERY_KIND), 8):  # at most 8 outlines in one upload
+        response = preview(client, *EVERY_KIND[start : start + 8])
+        assert response.status_code == 200, response.json()
+
+    # Each file reaches the outline reader exactly as sent, with its name as the hint for documents.py
+    assert reader == [data for _, data in EVERY_KIND]
+    assert reader.names == [name for name, _ in EVERY_KIND]
+    # Every kind documents.py reads is in the list above
+    assert {documents.detect_kind(data, name) for name, data in EVERY_KIND} == set(documents.READERS) | set(documents.FILE_TYPES)
+
+
+@pytest.mark.parametrize(
+    "name, data",
+    [
+        ("outline.pdf", docx_file("Skills Test 1 is due in week 2")),  # a Word file with the wrong ending
+        ("outline.docx", picture("PNG")),  # a picture with the wrong ending
+        ("outline", pdf("maths")),  # no ending at all
+    ],
+)
+def test_the_kind_comes_from_the_contents_not_the_name(client, reader, name, data):
+    assert preview(client, (name, data)).status_code == 200
+    assert reader.names == [name]
 
 
 def test_the_timetable_gives_tutorial_days(client, reader):
@@ -247,6 +322,36 @@ def test_a_refused_canvas_link_is_explained_and_the_preview_goes_on(client, read
     assert requests == []  # a refused link is never fetched
     assert SECRET not in response.text
     assert SECRET not in caplog.text
+
+
+def test_a_damaged_canvas_feed_never_loses_the_outlines_already_read(client, reader, fake_canvas):
+    # The Canvas feed is read after the outlines, so by then the Gemini requests are spent.
+    # A feed the calendar library chokes on must not throw those results away.
+    damaged = feed(event("Quiz [33130_SPR_U_1_S]", start="DTSTART;VALUE=,ATE:20260918"))
+    fake_canvas(lambda request: httpx.Response(200, content=damaged))
+
+    response = preview(client, ("maths.pdf", pdf("maths")), canvas_url=LINK)
+
+    assert response.status_code == 200
+    assert [row["title"] for row in response.json()["rows"]] == ["33130 Essay"]
+    assert response.json()["notes"] == [
+        "Your Canvas calendar was not used, so the preview went on without it. "
+        "The Canvas link did not give a calendar. Copy the link again from Canvas, Calendar, Calendar Feed."
+    ]
+    assert len(reader) == 1
+
+
+def test_a_damaged_timetable_is_explained_before_gemini(client, reader):
+    damaged = make_pdf(FIXTURE.splitlines()).replace(b"trailer\n", b"trailer0", 1)
+
+    response = preview(client, ("maths.pdf", pdf("maths")), timetable=damaged)
+
+    assert (response.status_code, response.headers["content-type"]) == (400, "application/json")
+    assert response.json()["message"] == (
+        "Your timetable could not be used. The timetable could not be read as a PDF. "
+        "Remove it or choose the right file, then try again. Nothing was sent to Gemini."
+    )
+    assert reader == []
 
 
 def test_canvas_that_cannot_be_reached_is_explained(client, reader, fake_canvas):
@@ -361,6 +466,44 @@ def test_preview_with_the_real_outline_reader(client, monkeypatch, no_gemini):
     ]
 
 
+class FakeGeminiForText:
+    """Stands in for google.genai.Client and keeps the outline text each request carried."""
+
+    def __init__(self):
+        self.texts = []
+        self.models = self
+
+    def generate_content(self, *, model, contents, config):
+        self.texts.append(contents[0].text)
+        return types.SimpleNamespace(text=json.dumps({"subject_code": "33130", "subject_name": "Mathematics 1", "items": []}))
+
+
+def test_the_file_name_reaches_the_real_outline_reader(client, monkeypatch, no_gemini):
+    # A CSV file has nothing special in its bytes, so only its name tells documents.py to read it as a sheet
+    fake = FakeGeminiForText()
+    monkeypatch.setattr(outline, "_default_client", lambda: fake)
+    csv_data = b"Task,Weight,Due\nSkills Test 1,10%,Week 2\n"
+
+    result = preview(client, ("marks.csv", csv_data), ("notes.docx", docx_file("Skills Test 2 is in week 5"))).json()
+
+    assert [entry["status"] for entry in result["outlines"]] == ["success", "success"]
+    assert fake.texts == [
+        f"{outline.TEXT_START}\nSheet: 1\nTask | Weight | Due\nSkills Test 1 | 10% | Week 2\n{outline.TEXT_END}",
+        f"{outline.TEXT_START}\nSkills Test 2 is in week 5\n{outline.TEXT_END}",
+    ]
+
+
+def test_an_old_word_file_without_libreoffice_is_explained_without_a_gemini_request(client, monkeypatch, no_gemini):
+    # The upload check only looks at what the file is. Turning a .doc into text needs LibreOffice,
+    # and without it the outline gets documents.py's own sentence and nothing is sent.
+    monkeypatch.setattr(documents.shutil, "which", lambda program: None)
+
+    result = preview(client, ("old outline.doc", DOC)).json()
+
+    assert result["outlines"] == [{"file": "old outline.doc", "status": "error", "message": documents.OLD_OFFICE_MESSAGE}]
+    assert result["rows"] == []
+
+
 def test_a_package_missing_inside_outline_py_is_not_hidden(monkeypatch):
     # Only outline.py itself being absent means "not installed yet". Anything else is a real error.
     def broken_import(name):
@@ -368,7 +511,7 @@ def test_a_package_missing_inside_outline_py_is_not_hidden(monkeypatch):
 
     monkeypatch.setattr(web_preview.importlib, "import_module", broken_import)
     with pytest.raises(ModuleNotFoundError, match="pdfplumber"):
-        web_preview.read_with_gemini(pdf("maths"))
+        web_preview.read_with_gemini(pdf("maths"), "maths.pdf")
 
 
 # ---------- files that are refused before anything is sent to Gemini ----------
@@ -378,16 +521,29 @@ def outlines(count, size=None):
     return [(f"outline {number}.pdf", pdf(f"{number}") if size is None else b"%PDF-" + b"x" * (size - 5)) for number in range(count)]
 
 
+def refused_outline(name, message):
+    return f"{name}: {message} Nothing was sent to Gemini."
+
+
 @pytest.mark.parametrize(
     "outline_files, options, status, message",
     [
-        ([("notes.docx", b"PK\x03\x04 a Word file")], {}, 400, "notes.docx is not a PDF, so nothing was read."),
-        ([("empty.pdf", b"")], {}, 400, "empty.pdf is not a PDF, so nothing was read."),
+        ([("notes.docx", b"PK\x03\x04 a Word file")], {}, 400, refused_outline("notes.docx", documents.DAMAGED_MESSAGE)),
+        ([("empty.pdf", b"")], {}, 400, refused_outline("empty.pdf", documents.EMPTY_MESSAGE)),
+        ([("photo.gif", picture("GIF"))], {}, 400, refused_outline("photo.gif", documents.UNKNOWN_MESSAGE)),
+        ([("files.zip", zip_file({"notes.txt": "Quiz in week 3"}))], {}, 400, refused_outline("files.zip", documents.UNKNOWN_MESSAGE)),
+        ([("outline.docm", docx_file("Quiz 1"))], {}, 400, refused_outline("outline.docm", documents.MACRO_MESSAGE)),
+        ([("locked.docx", ole_file({"EncryptionInfo": b"i", "EncryptedPackage": b"s"}))], {}, 400,
+         refused_outline("locked.docx", documents.LOCKED_MESSAGE)),
+        # One bad file stops the whole upload before any outline is sent, even the good one before it
+        (outlines(1) + [("photo.gif", picture("GIF"))], {}, 400, refused_outline("photo.gif", documents.UNKNOWN_MESSAGE)),
         (outlines(1), {"timetable": b"not a pdf"}, 400, "timetable.pdf is not a PDF, so nothing was read."),
+        (outlines(1), {"timetable": docx_file("Tut1 Tuesday 9:00")}, 400, "timetable.pdf is not a PDF, so nothing was read."),
         ([("big.pdf", b"%PDF-" + b"x" * (10 * MB - 4))], {}, 413, "big.pdf is bigger than 10 MB, so nothing was read."),
+        ([("big.docx", b"PK\x03\x04" + b"x" * (10 * MB - 3))], {}, 413, "big.docx is bigger than 10 MB, so nothing was read."),
         (outlines(1), {"timetable": b"%PDF-" + b"x" * (10 * MB - 4)}, 413, "timetable.pdf is bigger than 10 MB, so nothing was read."),
         (outlines(9), {}, 400, "At most 8 outlines can be read at a time. Remove some, then try again."),
-        ([], {"timetable": pdf("timetable")}, 400, "Add at least one subject outline (a PDF), then try again."),
+        ([], {"timetable": pdf("timetable")}, 400, "Add at least one subject outline, then try again."),
         (outlines(1), {"session": None}, 400, "Choose a session, then try again."),
         (outlines(1), {"session": "SUM2026"}, 400, "Choose the session your outlines are for: Autumn 2026 or Spring 2026."),
         (

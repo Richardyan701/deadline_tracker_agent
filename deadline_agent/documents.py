@@ -15,9 +15,12 @@ limits stop files that would blow up into something huge when unpacked.
 """
 
 import codecs
+import contextlib
 import csv
 import io
+import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import zipfile
@@ -613,15 +616,82 @@ def _read_ppt(data: bytes) -> str:
     return _read_pptx(_converted(data, "ppt", "pptx"))
 
 
-# Settings for a new LibreOffice profile that switch off every kind of macro
-# (Basic, Python and the rest), whatever is inside the file.
-NO_MACROS_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
+# Settings for the new LibreOffice profile made for each conversion. LibreOffice
+# reads them from registrymodifications.xcu, and a version that does not know
+# one of them yet simply ignores it.
+# - Every kind of macro (Basic, Python and the rest) is switched off.
+# - Links to other files and web addresses are never updated when the file is
+#   opened (for Writer, 0 means never), links from untrusted places are
+#   blocked, and embedded objects (OLE) and DDE links stay switched off.
+# - Every web address goes to a proxy at 127.0.0.1 port 9, where nothing
+#   answers, so a picture linked to a web address is never fetched. Tested with
+#   LibreOffice 24.2: without this, a .doc with a linked picture made it fetch
+#   the address while converting.
+SAFE_SETTINGS = """<?xml version="1.0" encoding="UTF-8"?>
 <oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-<item oor:path="/org.openoffice.Office.Common/Security/Scripting">
-<prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop>
-</item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="BlockUntrustedRefererLinks" oor:op="fuse"><value>true</value></prop></item>
+<item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="DisableActiveContent" oor:op="fuse"><value>true</value></prop></item>
+<item oor:path="/org.openoffice.Office.Writer/Content/Update"><prop oor:name="Link" oor:op="fuse"><value>0</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetProxyType" oor:op="fuse"><value>2</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetHTTPProxyName" oor:op="fuse"><value>127.0.0.1</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetHTTPProxyPort" oor:op="fuse"><value>9</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetHTTPSProxyName" oor:op="fuse"><value>127.0.0.1</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetHTTPSProxyPort" oor:op="fuse"><value>9</value></prop></item>
+<item oor:path="/org.openoffice.Inet/Settings"><prop oor:name="ooInetNoProxy" oor:op="fuse"><value></value></prop></item>
 </oor:items>
 """
+
+
+def _libreoffice_environment() -> dict:
+    """Groot's environment variables, without the Gemini key and without any proxy settings.
+
+    LibreOffice never needs the key. The proxy variables are left out because
+    curl inside LibreOffice obeys a NO_PROXY list, which would let a web
+    address skip the proxy that goes nowhere in SAFE_SETTINGS.
+    """
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if not name.upper().startswith(("GOOGLE_", "GEMINI_")) and not name.upper().endswith("_PROXY")
+    }
+
+
+def _stop(process: subprocess.Popen) -> None:
+    """Stop LibreOffice and every program it started, then wait until it has stopped.
+
+    soffice is only a launcher: it starts soffice.bin, which does the work.
+    Stopping the launcher alone would leave soffice.bin running.
+    """
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)  # /T: and its children
+    else:
+        with contextlib.suppress(ProcessLookupError):  # every program in the group has already finished
+            os.killpg(process.pid, signal.SIGKILL)
+    process.wait()
+
+
+def _run_libreoffice(command: list[str], folder: Path) -> None:
+    """Run LibreOffice inside the temporary folder, and stop all of it if it takes longer than the time limit."""
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=folder,
+            env=_libreoffice_environment(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,  # its own process group on Linux and macOS, so _stop can reach every part of it
+        )
+    except OSError as error:  # LibreOffice could not be started
+        raise DocumentError(CONVERT_FAILED_MESSAGE) from error
+    try:
+        process.wait(timeout=CONVERT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as error:
+        raise DocumentError(CONVERT_TIMEOUT_MESSAGE) from error
+    finally:
+        if process.poll() is None:  # still running, because it took too long or Groot is being stopped
+            _stop(process)
 
 
 def _converted(data: bytes, old: str, new: str) -> bytes:
@@ -633,10 +703,10 @@ def _converted(data: bytes, old: str, new: str) -> bytes:
         folder = Path(folder)
         source = folder / f"outline.{old}"  # a fixed name, so nothing from the student's file name reaches the command
         source.write_bytes(data)
-        # A new LibreOffice profile with macros switched off. It also works while LibreOffice is open.
+        # A new LibreOffice profile with the settings above. It also works while LibreOffice is open.
         profile = folder / "profile"
         (profile / "user").mkdir(parents=True)
-        (profile / "user" / "registrymodifications.xcu").write_text(NO_MACROS_SETTINGS, encoding="utf-8")
+        (profile / "user" / "registrymodifications.xcu").write_text(SAFE_SETTINGS, encoding="utf-8")
         command = [
             program,
             f"-env:UserInstallation={profile.as_uri()}",
@@ -648,12 +718,7 @@ def _converted(data: bytes, old: str, new: str) -> bytes:
             str(folder),
             str(source),
         ]
-        try:
-            subprocess.run(command, capture_output=True, timeout=CONVERT_TIMEOUT_SECONDS)
-        except subprocess.TimeoutExpired as error:
-            raise DocumentError(CONVERT_TIMEOUT_MESSAGE) from error
-        except OSError as error:  # LibreOffice could not be started
-            raise DocumentError(CONVERT_FAILED_MESSAGE) from error
+        _run_libreoffice(command, folder)
         # LibreOffice says it succeeded even when it fails, so the new file is the only proof.
         result = folder / f"outline.{new}"
         if not result.is_file():
@@ -716,6 +781,30 @@ READERS = {
 }
 
 
+def _ending(filename: str | None) -> str:
+    """The name's ending in lower case, like ".docx", or "" when there is no name."""
+    return Path(filename).suffix.lower() if filename else ""
+
+
+def detect_kind(data: bytes, filename: str | None = None) -> str:
+    """What kind of file this really is, for example "docx", worked out from its bytes.
+
+    This is the quick first check of read_document. It looks at the first
+    bytes and, inside a zip or an old Office file, at the names of the parts,
+    but it reads no text. The web drop box uses it to refuse a file before
+    any outline is sent to Gemini. filename is only a hint, as in read_document.
+
+    Raises DocumentError, with a message for the student, when Groot cannot use the file.
+    """
+    ending = _ending(filename)  # outside the try, because a name that is not text is a programming mistake
+    try:
+        return _detect_kind(data, ending)
+    except DocumentError:
+        raise
+    except Exception as error:  # every library has its own errors for a damaged file
+        raise DocumentError(DAMAGED_MESSAGE) from error
+
+
 def read_document(data: bytes, filename: str | None = None) -> Document:
     """Work out what kind of file this is and turn it into a Document for Gemini.
 
@@ -724,9 +813,8 @@ def read_document(data: bytes, filename: str | None = None) -> Document:
 
     Raises DocumentError, with a message for the student, when the file cannot be used.
     """
-    ending = Path(filename).suffix.lower() if filename else ""
+    kind = detect_kind(data, filename)
     try:
-        kind = _detect_kind(data, ending)
         if kind in FILE_TYPES:
             if kind == "pdf" and _pdf_needs_password(data):
                 raise DocumentError(LOCKED_MESSAGE)

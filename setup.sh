@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up Agent Groot on Linux or macOS.
 #
-# 1. Checks that Python is 3.10 or newer.
+# 1. Checks that Python is 3.11 or newer.
 # 2. Creates a virtual environment in .venv.
 # 3. Installs the packages in requirements.txt.
 # 4. Saves your Gemini API key in deadline_agent/.env (hidden while you paste it).
@@ -16,12 +16,12 @@ ENV_FILE="deadline_agent/.env"
 
 echo "Step 1 of 4: checking Python..."
 if ! command -v "$PYTHON" > /dev/null; then
-    echo "Could not find $PYTHON. Install Python 3.10 or newer from python.org, then run this script again."
+    echo "Could not find $PYTHON. Install Python 3.11 or newer from python.org, then run this script again."
     exit 1
 fi
 "$PYTHON" --version
-if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
-    echo "This Python is older than 3.10. Install Python 3.10 or newer, then run this script again."
+if ! "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
+    echo "This Python is older than 3.11. Install Python 3.11 or newer, then run this script again."
     echo "If you already have a newer one, point the script at it, for example: PYTHON=python3.12 ./setup.sh"
     exit 1
 fi

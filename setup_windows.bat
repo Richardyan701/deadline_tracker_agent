@@ -4,7 +4,7 @@ cd /d "%~dp0"
 echo Step 1 of 4: checking Python...
 python --version
 if errorlevel 1 goto no_python
-python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
+python -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)"
 if errorlevel 1 goto old_python
 
 echo.
@@ -53,14 +53,14 @@ exit /b 1
 
 :no_python
 echo.
-echo Python was not found. Install Python 3.10 or newer from python.org
+echo Python was not found. Install Python 3.11 or newer from python.org
 echo and tick "Add python.exe to PATH" on the first screen, then run this file again.
 pause
 exit /b 1
 
 :old_python
 echo.
-echo Your Python is older than 3.10. Install a newer version from python.org, then run this file again.
+echo Your Python is older than 3.11. Install a newer version from python.org, then run this file again.
 pause
 exit /b 1
 

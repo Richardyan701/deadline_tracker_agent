@@ -35,6 +35,8 @@ This folder checks how well the outline reader (`deadline_agent/outline.py`) fin
 
 It must be started with `-m eval.run_eval` from the project folder (not `python eval/run_eval.py`), so Python can find the `deadline_agent` folder.
 
+Real dates are worked out with the Spring 2026 calendar unless you say otherwise. For Autumn 2026 outlines, add `--session AUT2026`, for example `.venv/bin/python -m eval.run_eval --session AUT2026`. Every outline in one run is scored with the same session's calendar, so keep the checked answer keys in `eval/answer_key/` to one session for a run. Each run replaces `results.md`, so copy it somewhere first if you want to keep it. A session the calendar does not know is refused before anything is sent to Gemini.
+
 ### The free tier limit
 
 Gemini's free tier only allows a few requests per minute. The script sends one request per outline and waits so that requests start at least 16 seconds apart, which keeps it at no more than 4 requests in any minute (15 seconds would be exactly 4, and the extra second allows for network delays). It prints a line each time it waits. With four outlines the requests start at about 0, 16, 32 and 48 seconds, plus however long Gemini takes to read each one.
@@ -121,17 +123,25 @@ The scores are worked out for each outline, and then for all outlines together b
 | Items found (recall) | Paired items ÷ items in the key |
 | Items not invented (precision) | Paired items ÷ items Gemini found |
 | Weights correct | Paired items whose weights agree ÷ paired items. Weights agree when both are `null`, or when they are at most 0.05 apart, so 3.33 and 3.333 agree. |
-| Dates correct | Paired items whose timing is right ÷ paired items where the key gives a date |
+| Timing correct | Paired items whose timing is right ÷ paired items where the key gives a date |
+| Dates correct | Paired items whose real dates agree ÷ paired items where the key has a real date |
 | Silently wrong dates | Paired items whose timing is wrong but would still be shown with a date. The target is 0. |
 
 Some words used above:
 
 - **Timing is right** when all seven timing fields (`when`, `date`, `week`, `first_week`, `last_week`, `weekday`, `time`) are exactly the same as the key. Two items with the same seven fields always turn into the same day in the calendar.
 - **Gives a date** follows the spec's rules table: `date` with a date, `week` with a week, `tutorial` with a week (with a timetable it gets an exact day), and `recurring` with a first week. A tutorial with no week, `exam_period` and `unknown` are shown with no date, so the student is told to check them and they can never be silently wrong.
+- **Real dates** are the dates the drop box would show. The key item and Gemini's item each go through the same importer (`deadline_agent/importer.py`) and UTS calendar (`deadline_agent/uts_calendar.py`) as the web page, for the session you chose. Most items get one date, a weekly item gets one date for each teaching week (StuVac is skipped), and an item the drop box shows without a date gets none. The real dates agree only when the two lists are exactly the same, to the minute.
 - **Silently wrong** means the app would show the student a wrong date as if it were fine. For example the key says "tutorial, no week" but Gemini said "week 5", or the key says week 2 and Gemini said week 3.
 
-### What this does not measure yet
+Timing and dates are scored side by side because they catch different things. Comparing all seven fields is stricter: if the key says week 7 and Gemini says week 7 and Friday, the timing is wrong, because Gemini added a day the outline does not state, but both land on the same Friday, so the date is right. The other way round never happens, because the same timing always gives the same dates. The importer's clock is frozen at Monday 20 Jul 2026, the week before Spring 2026 starts. The clock only decides which rows count as past, never a row's date, so no score depends on the day you run it.
 
-- **No calendar dates yet.** The UTS calendar (`deadline_agent/uts_calendar.py`) is being built at the same time in another task, so this script compares the timing words instead of real days. Comparing all seven fields is a little stricter than comparing days: if the key says week 7 and Gemini says week 7 and Friday, both might end up on the same Friday, but it still counts as wrong, because Gemini added a day the outline does not state. Because no dates are worked out, the clock does not affect any score. Once the calendar is merged, it could also report the real days.
+Under each outline, `results.md` lists every **Wrong date** too, for example `"Report": key Friday 18 Sep 2026, 11:59 PM, found Friday 2 Oct 2026, 11:59 PM`. A weekly item is shown as how many dates it has and where they start and end.
+
+### What this does not measure
+
+- **One session for each run.** An answer key does not say which session its outline is for, so every outline in a run gets the calendar of the session you chose.
+- **A tutorial in a given week has no real date here.** The drop box needs your timetable to know the day of your tutorial, and the measurement has no timetable, so these items count under "Timing correct" but not under "Dates correct".
+- **Silently wrong dates are counted by the timing fields**, so an added weekday that lands on the right day still counts. This keeps the strict count the spec asks for.
 - **Silently wrong dates only counts paired items.** A made up item is counted under precision instead.
 - **One run is one sample.** Gemini can answer a little differently each time, so small changes between runs are normal.

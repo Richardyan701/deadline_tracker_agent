@@ -239,3 +239,19 @@ def test_reads_a_real_pdf():
 def test_a_file_that_is_not_a_pdf_is_a_clear_error(data):
     with pytest.raises(ValueError, match="could not be read as a PDF"):
         timetable.read_timetable(data, "SPR2026")
+
+
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        # One changed byte each. pypdf 6.21.4 then fails with AttributeError and TypeError,
+        # not its own PyPdfError. Found by changing bytes of a good timetable at random.
+        (b"trailer\n", b"trailer0"),
+        (b"/Length ", b"/Length<"),
+    ],
+)
+def test_a_damaged_pdf_that_trips_up_the_pdf_library_is_a_clear_error(old, new):
+    damaged = make_pdf(FIXTURE.splitlines()).replace(old, new, 1)
+    with pytest.raises(ValueError, match="could not be read as a PDF") as caught:
+        timetable.read_timetable(damaged, "SPR2026")
+    assert caught.value.__cause__ is not None  # the library's own error stays attached for debugging

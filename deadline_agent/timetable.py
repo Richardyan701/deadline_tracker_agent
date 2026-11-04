@@ -48,7 +48,7 @@ def read_timetable(pdf: bytes, session: str) -> dict[str, list[TimetableClass]]:
     try:
         pages = pypdf.PdfReader(io.BytesIO(pdf)).pages
         text = "\n".join(page.extract_text() for page in pages)
-    except pypdf.errors.PyPdfError as error:
+    except Exception as error:  # a damaged PDF can make pypdf raise many kinds of error, not only its own
         raise ValueError("The timetable could not be read as a PDF.") from error
     return parse_timetable(text, session)
 

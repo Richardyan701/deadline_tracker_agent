@@ -8,12 +8,21 @@ tests/fixtures/assessments.xls, a 6.5 KB old Excel file, because no
 maintained Python library can write .xls files.
 """
 
+import http.server
 import io
+import json
+import os
+import shutil
+import socket
 import struct
 import subprocess
+import sys
+import threading
+import time
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from xml.etree import ElementTree
 
 import docx
 import openpyxl
@@ -333,6 +342,35 @@ def test_a_pdf_locked_only_against_editing_still_goes_to_gemini():
 )
 def test_the_kind_comes_from_the_bytes_when_the_name_is_wrong_or_missing(data, name, kind):
     assert read(data, name).kind == kind
+
+
+def test_detect_kind_only_tells_the_kind_and_reads_no_text():
+    # The drop box uses this quick check before anything goes to Gemini. A Word file
+    # with no words is still a Word file, and only the full read finds it has no text.
+    empty_word_file = docx_file()
+    assert documents.detect_kind(empty_word_file, "outline.docx") == "docx"
+    assert str(refusal(empty_word_file, "outline.docx")) == documents.NO_TEXT_MESSAGE
+    assert documents.detect_kind(DOC, "outline.doc") == "doc"  # no LibreOffice needed just to tell the kind
+
+
+@pytest.mark.parametrize(
+    "data, name, message",
+    [
+        (b"", "outline.pdf", documents.EMPTY_MESSAGE),
+        (picture("GIF"), "outline.gif", documents.UNKNOWN_MESSAGE),
+        (docx_file("Quiz 1"), "outline.docm", documents.MACRO_MESSAGE),
+        (b"PK\x03\x04 the start of a zip and nothing else", "outline.docx", documents.DAMAGED_MESSAGE),
+    ],
+)
+def test_detect_kind_refuses_with_the_same_messages_as_read_document(data, name, message):
+    with pytest.raises(DocumentError) as caught:
+        documents.detect_kind(data, name)
+    assert str(caught.value) == message == str(refusal(data, name))
+
+
+def test_detect_kind_with_a_name_that_is_not_text_is_a_programming_mistake():
+    with pytest.raises(TypeError):
+        documents.detect_kind(b"%PDF-1.7", object())
 
 
 @pytest.mark.parametrize(
@@ -795,14 +833,17 @@ def test_a_file_name_that_is_not_text_is_a_programming_mistake_not_a_damaged_fil
 
 
 class FakeLibreOffice:
-    """Stands in for subprocess.run. Each run writes `output` as the converted file, unless it is None."""
+    """Stands in for subprocess.Popen. Each run writes `output` as the converted file, unless it is None.
+
+    error is raised instead of starting LibreOffice, as when it cannot be started.
+    """
 
     def __init__(self, output=None, error=None):
         self.output = output
         self.error = error
         self.calls = []
 
-    def run(self, command, **options):
+    def popen(self, command, **options):
         source = Path(command[-1])
         settings = source.parent / "profile" / "user" / "registrymodifications.xcu"
         self.calls.append(
@@ -815,15 +856,27 @@ class FakeLibreOffice:
             folder = Path(command[command.index("--outdir") + 1])
             new = command[command.index("--convert-to") + 1]
             (folder / f"{source.stem}.{new}").write_bytes(self.output)
-        return subprocess.CompletedProcess(command, 0, b"", b"")  # LibreOffice says 0 even when it fails
+        return FinishedProcess()
+
+
+class FinishedProcess:
+    """A LibreOffice that has already finished. It says 0 (success) even when it made no file, as the real one does."""
+
+    returncode = 0
+
+    def wait(self, timeout=None):
+        return 0
+
+    def poll(self):
+        return 0
 
 
 @pytest.fixture
 def libreoffice(monkeypatch):
-    """LibreOffice installed as "soffice", with subprocess.run replaced by a FakeLibreOffice."""
+    """LibreOffice installed as "soffice", with subprocess.Popen replaced by a FakeLibreOffice."""
     fake = FakeLibreOffice()
     monkeypatch.setattr(documents.shutil, "which", lambda name: "/opt/libreoffice/soffice" if name == "soffice" else None)
-    monkeypatch.setattr(documents.subprocess, "run", fake.run)
+    monkeypatch.setattr(documents.subprocess, "Popen", fake.popen)
     return fake
 
 
@@ -845,13 +898,48 @@ def test_an_old_word_file_is_converted_by_libreoffice_and_then_read(libreoffice)
     source = Path(command[-1])
     assert command[0] == "/opt/libreoffice/soffice"
     assert command[1] == f"-env:UserInstallation={(source.parent / 'profile').as_uri()}"  # a new profile
-    assert call["settings"] == documents.NO_MACROS_SETTINGS  # in which every macro is switched off
-    assert '<prop oor:name="DisableMacrosExecution" oor:op="fuse"><value>true</value></prop>' in call["settings"]
+    assert call["settings"] == documents.SAFE_SETTINGS  # with the safe settings
     assert command[2:6] == ["--headless", "--norestore", "--convert-to", "docx"]
+    assert command[6:] == ["--outdir", str(source.parent), str(source)]  # everything stays in the temporary folder
     assert source.name == "outline.doc"  # a fixed name, never the student's file name
     assert call["source"] == DOC
-    assert call["options"] == {"capture_output": True, "timeout": documents.CONVERT_TIMEOUT_SECONDS}
+    # It runs inside the temporary folder, in its own process group, with nothing to read from or write to
+    options = call["options"]
+    assert options["cwd"] == source.parent
+    assert options["start_new_session"] is True
+    assert (options["stdin"], options["stdout"], options["stderr"]) == (subprocess.DEVNULL,) * 3
     assert not Path(command[-1]).parent.exists()  # the temporary folder is cleaned up
+
+
+def setting(name: str) -> str:
+    """The value one setting has in documents.SAFE_SETTINGS, read with an XML reader."""
+    registry = "{http://openoffice.org/2001/registry}"
+    items = ElementTree.fromstring(documents.SAFE_SETTINGS)
+    [value] = [
+        item.find("prop/value").text or ""
+        for item in items
+        if f"{item.get(registry + 'path')}/{item.find('prop').get(registry + 'name')}" == name
+    ]
+    return value
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("/org.openoffice.Office.Common/Security/Scripting/DisableMacrosExecution", "true"),  # no macros of any kind
+        ("/org.openoffice.Office.Common/Security/Scripting/BlockUntrustedRefererLinks", "true"),
+        ("/org.openoffice.Office.Common/Security/Scripting/DisableActiveContent", "true"),  # no OLE objects or DDE
+        ("/org.openoffice.Office.Writer/Content/Update/Link", "0"),  # 0 is "never" in LibreOffice's code (linkenum.hxx)
+        ("/org.openoffice.Inet/Settings/ooInetProxyType", "2"),  # 2 is a proxy set by hand (proxydecider.cxx)
+        ("/org.openoffice.Inet/Settings/ooInetHTTPProxyName", "127.0.0.1"),
+        ("/org.openoffice.Inet/Settings/ooInetHTTPProxyPort", "9"),
+        ("/org.openoffice.Inet/Settings/ooInetHTTPSProxyName", "127.0.0.1"),
+        ("/org.openoffice.Inet/Settings/ooInetHTTPSProxyPort", "9"),
+        ("/org.openoffice.Inet/Settings/ooInetNoProxy", ""),  # no address skips that proxy
+    ],
+)
+def test_the_new_libreoffice_profile_has_the_safe_settings(name, value):
+    assert setting(name) == value
 
 
 def test_an_old_powerpoint_file_is_converted_by_libreoffice_and_then_read(libreoffice):
@@ -874,7 +962,6 @@ def test_libreoffice_is_also_found_by_its_other_name(libreoffice, monkeypatch):
     [
         (None, None, documents.CONVERT_FAILED_MESSAGE),  # LibreOffice made no file
         (b"not a Word file", None, documents.CONVERT_FAILED_MESSAGE),  # it made something else
-        (None, subprocess.TimeoutExpired("soffice", 60), documents.CONVERT_TIMEOUT_MESSAGE),
         (None, PermissionError("not allowed to run it"), documents.CONVERT_FAILED_MESSAGE),
     ],
 )
@@ -886,3 +973,262 @@ def test_a_failed_conversion_is_a_clear_error(libreoffice, output, error, messag
 def test_the_converted_file_gets_the_same_checks_as_an_upload(libreoffice):
     libreoffice.output = zip_with(docx_file("Assignment 1"), {"word/vbaProject.bin": b"macros"})
     assert str(refusal(DOC, "outline.doc")) == documents.MACRO_MESSAGE
+
+
+# ---------- old files with a stand-in LibreOffice that really runs ----------
+#
+# The real soffice is a small launcher that starts the program doing the work
+# (soffice.bin) and waits for it. This stand-in does the same, so these tests
+# check what Groot does with real processes: where they run, what they can
+# see, and that a timeout stops all of them.
+
+FAKE_SOFFICE = r'''
+import json, os, shutil, subprocess, sys
+from pathlib import Path
+
+args = sys.argv[1:]
+Path(os.environ["FAKE_SOFFICE_RECORD"]).write_text(json.dumps({"args": args, "cwd": os.getcwd(), "env": dict(os.environ)}))
+if os.environ["FAKE_SOFFICE_MODE"] == "convert":
+    folder, new = Path(args[args.index("--outdir") + 1]), args[args.index("--convert-to") + 1]
+    shutil.copyfile(os.environ["FAKE_SOFFICE_OUTPUT"], folder / f"{Path(args[-1]).stem}.{new}")
+else:  # "hang": the worker writes a dot to a file every 50 ms, forever
+    worker = "import os, time\nwhile True:\n    open(os.environ['FAKE_SOFFICE_HEARTBEAT'], 'a').write('.')\n    time.sleep(0.05)"
+    subprocess.run([sys.executable, "-c", worker])
+'''
+
+needs_posix = pytest.mark.skipif(os.name == "nt", reason="the stand-in LibreOffice is a script started by its #! line")
+
+
+@pytest.fixture
+def fake_soffice(tmp_path, monkeypatch):
+    """Install the stand-in as "soffice". Returns a function that reads what it wrote down about its run."""
+    program = tmp_path / "bin" / "soffice"
+    program.parent.mkdir()
+    program.write_text(f"#!{sys.executable}\n{FAKE_SOFFICE}")
+    program.chmod(0o755)
+    record = tmp_path / "record.json"
+    monkeypatch.setattr(documents.shutil, "which", lambda name: str(program) if name == "soffice" else None)
+    monkeypatch.setenv("FAKE_SOFFICE_RECORD", str(record))
+    monkeypatch.setenv("FAKE_SOFFICE_HEARTBEAT", str(tmp_path / "heartbeat"))
+    output = tmp_path / "converted.docx"
+    output.write_bytes(docx_file("Assignment 1"))
+    monkeypatch.setenv("FAKE_SOFFICE_OUTPUT", str(output))
+    monkeypatch.setenv("FAKE_SOFFICE_MODE", "convert")
+    return lambda: json.loads(record.read_text())
+
+
+@needs_posix
+def test_a_conversion_that_takes_too_long_stops_every_program_libreoffice_started(fake_soffice, monkeypatch, tmp_path):
+    monkeypatch.setenv("FAKE_SOFFICE_MODE", "hang")
+    monkeypatch.setattr(documents, "CONVERT_TIMEOUT_SECONDS", 2)
+    heartbeat = tmp_path / "heartbeat"
+
+    assert str(refusal(DOC, "outline.doc")) == documents.CONVERT_TIMEOUT_MESSAGE
+
+    assert heartbeat.exists()  # the worker really ran
+    size = heartbeat.stat().st_size
+    time.sleep(0.5)  # ten of the worker's ticks
+    assert heartbeat.stat().st_size == size  # it was stopped too, not only the launcher
+
+
+@needs_posix
+def test_libreoffice_runs_in_the_temporary_folder_without_the_gemini_key_or_proxy_settings(fake_soffice, monkeypatch):
+    monkeypatch.setenv("GOOGLE_API_KEY", "secret-key-123")
+    monkeypatch.setenv("GEMINI_API_KEY", "secret-key-456")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")  # would let curl skip the proxy that goes nowhere
+    monkeypatch.setenv("https_proxy", "http://proxy.example:3128")
+
+    assert text_of(DOC, "outline.doc") == "Assignment 1"
+
+    run = fake_soffice()
+    assert not {"GOOGLE_API_KEY", "GEMINI_API_KEY", "NO_PROXY", "https_proxy"} & run["env"].keys()
+    assert run["env"]["PATH"] == os.environ["PATH"]  # everything else is passed on as usual
+    folder = Path(run["args"][-1]).parent
+    assert Path(run["cwd"]).resolve() == folder.resolve()  # it started inside the temporary folder,
+    assert not folder.exists()  # which is gone afterwards
+
+
+# ---------- the real LibreOffice, where it is installed ----------
+
+
+class CountedRequests(http.server.BaseHTTPRequestHandler):
+    """A tiny web server for one test, which counts the requests it gets."""
+
+    def do_GET(self):
+        self.server.requests.append(self.path)
+        self.send_error(404)
+
+    do_HEAD = do_OPTIONS = do_GET
+
+    def log_message(self, *args):  # keep the test output quiet
+        pass
+
+
+@pytest.fixture
+def counting_server():
+    """A web server on 127.0.0.1 that counts its requests. Returns it, with .address and .requests."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), CountedRequests)
+    server.requests = []
+    server.address = f"http://127.0.0.1:{server.server_address[1]}"
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+REAL_LIBREOFFICE = shutil.which("soffice") or shutil.which("libreoffice")
+needs_libreoffice = pytest.mark.skipif(REAL_LIBREOFFICE is None, reason="LibreOffice is not installed")
+
+
+@needs_libreoffice
+def test_the_real_libreoffice_never_fetches_a_picture_linked_to_a_web_address(counting_server, tmp_path):
+    # A Writer file with a picture that is only linked, made into an old .doc by LibreOffice itself
+    page = (
+        '<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+        ' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"'
+        ' xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"'
+        ' office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text"><office:body><office:text>'
+        "<text:p>Assignment 1 is due in week 3"
+        '<draw:frame draw:name="Picture" svg:width="1cm" svg:height="1cm">'
+        f'<draw:image xlink:href="{counting_server.address}/picture.png" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>'
+        "</draw:frame></text:p></office:text></office:body></office:document>"
+    )
+    (tmp_path / "linked.fodt").write_text(page, encoding="utf-8")
+    subprocess.run(
+        [REAL_LIBREOFFICE, f"-env:UserInstallation={(tmp_path / 'profile').as_uri()}", "--headless", "--norestore",
+         "--convert-to", "doc", "--outdir", str(tmp_path), str(tmp_path / "linked.fodt")],
+        capture_output=True, timeout=120, env=documents._libreoffice_environment(),
+    )
+    linked_doc = (tmp_path / "linked.doc").read_bytes()
+    assert counting_server.requests  # with LibreOffice's own settings, it fetched the picture
+    counting_server.requests.clear()
+
+    assert read(linked_doc, "outline.doc").text == "Assignment 1 is due in week 3"
+    assert counting_server.requests == []  # with Groot's settings, it never did
+
+
+# ---------- XML tricks and links inside the files ----------
+
+
+def xml_with_entity(xml: bytes, root: bytes, entity: str, replace: bytes) -> bytes:
+    """The XML with a document type that defines the entity &trick; just before the root element, and &trick; in place of replace."""
+    doctype = f"<!DOCTYPE trick [{entity}]>".encode()
+    return xml.replace(b"<" + root, doctype + b"<" + root, 1).replace(replace, b"&trick;", 1)
+
+
+@pytest.fixture
+def secret_file(tmp_path):
+    """A file on this computer that a document must never be able to read into its text."""
+    path = tmp_path / "secret.txt"
+    path.write_text("TOP SECRET 42")
+    return path
+
+
+LAUGHS = '<!ENTITY a "haha"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"><!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;"><!ENTITY trick "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">'
+
+
+def office_files_with_tricks(entity: str) -> list:
+    """A Word, a PowerPoint, an Excel and an OpenDocument file whose main text part uses the entity.
+
+    Each keeps some ordinary text as well, so a reader that leaves the entity out still has text to give back.
+    """
+    return [
+        zip_with(docx_file("Assignment 1", "Quiz 2"),
+                 {"word/document.xml": lambda xml: xml_with_entity(xml, b"w:document", entity, b"Assignment 1")}),
+        zip_with(pptx_file(), {"ppt/slides/slide1.xml": lambda xml: xml_with_entity(xml, b"p:sld", entity, b"Assessment summary")}),
+        zip_with(xlsx_file(), {"xl/worksheets/sheet1.xml": lambda xml: xml_with_entity(xml, b"worksheet", entity, b"<v>0.6</v>")}),
+        zip_with(odf_file("text", "<text:p>Assignment 1</text:p><text:p>Quiz 2</text:p>"),
+                 {"content.xml": lambda xml: xml_with_entity(xml, b"office:document-content", entity, b"Assignment 1")}),
+    ]
+
+
+@pytest.mark.parametrize("kind", ["docx", "pptx", "xlsx", "odt"])
+def test_an_external_entity_never_reads_another_file_into_the_text(secret_file, kind):
+    data = dict(zip(["docx", "pptx", "xlsx", "odt"], office_files_with_tricks(f'<!ENTITY trick SYSTEM "{secret_file.as_uri()}">')))[kind]
+    try:
+        text = read(data).text
+    except DocumentError as error:
+        assert str(error) == documents.DAMAGED_MESSAGE  # refused outright, which is safe too
+    else:
+        assert "TOP SECRET" not in text
+
+
+@pytest.mark.parametrize("kind", ["docx", "pptx", "xlsx", "odt"])
+def test_entities_are_never_expanded_into_a_huge_text(kind):
+    data = dict(zip(["docx", "pptx", "xlsx", "odt"], office_files_with_tricks(LAUGHS)))[kind]
+    try:
+        text = read(data).text
+    except DocumentError as error:
+        assert str(error) == documents.DAMAGED_MESSAGE
+    else:
+        assert "haha" not in text  # 4,000 laughs here, and billions in a real attack
+
+
+def test_the_list_of_parts_with_an_entity_is_refused(secret_file):
+    entity = f'<!ENTITY trick SYSTEM "{secret_file.as_uri()}">'
+    data = zip_with(docx_file("Assignment 1"), {"[Content_Types].xml": lambda xml: xml_with_entity(xml, b"Types", entity, b"xml")})
+    assert str(refusal(data)) == documents.DAMAGED_MESSAGE
+
+
+def test_a_web_page_never_expands_its_own_entities(secret_file):
+    page = (
+        f'<!DOCTYPE html [<!ENTITY trick SYSTEM "{secret_file.as_uri()}"><!ENTITY a "haha"><!ENTITY b "&a;&a;&a;&a;">]>'
+        "<p>Quiz 1 &trick; &b; &amp; Quiz 2</p>"
+    )
+    text = text_of(page.encode(), "outline.html")
+    assert "TOP SECRET" not in text and "haha" not in text
+    # Only the usual HTML codes, like &amp;, become characters. Entities a page defines stay as they are.
+    assert "Quiz 1 &trick; &b; & Quiz 2" in text
+
+
+@pytest.fixture
+def no_network(monkeypatch):
+    """Fail the test if anything tries to connect anywhere."""
+
+    def refuse(self, address):
+        raise AssertionError(f"tried to connect to {address}")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+
+
+REMOTE_LINKS = (
+    '<Relationship Id="rIdRemote1" TargetMode="External" Target="http://attacker.example/template.dotx"'
+    ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate"/>'
+    '<Relationship Id="rIdRemote2" TargetMode="External" Target="http://attacker.example/picture.png"'
+    ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>'
+    '<Relationship Id="rIdRemote3" TargetMode="External" Target="file://attacker.example/share/budget.xlsx"'
+    ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath"/>'
+)
+
+
+def with_remote_links(data: bytes, rels_part: str) -> bytes:
+    """A copy of an Office file whose part also points at a remote template, a remote picture and a shared file."""
+    return zip_with(data, {rels_part: lambda xml: xml.replace(b"</Relationships>", REMOTE_LINKS.encode() + b"</Relationships>")})
+
+
+@pytest.mark.parametrize(
+    "data, text_start",
+    [
+        (with_remote_links(docx_file("Assignment 1"), "word/_rels/document.xml.rels"), "Assignment 1"),
+        (with_remote_links(pptx_file(), "ppt/slides/_rels/slide1.xml.rels"), "Slide 1"),
+        (with_remote_links(xlsx_file(), "xl/_rels/workbook.xml.rels"), "Sheet: Assessments"),
+    ],
+)
+def test_remote_templates_pictures_and_shared_files_are_never_fetched(no_network, data, text_start):
+    assert text_of(data).startswith(text_start)
+
+
+def test_an_embedded_object_is_never_opened(no_network):
+    # Word keeps an embedded object (like a spreadsheet inside the document) as its own part. Only text is read.
+    rel = (
+        '<Relationship Id="rIdObject" Target="embeddings/oleObject1.bin"'
+        ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject"/>'
+    )
+    object_type = '<Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.oleObject"/>'
+    data = zip_with(docx_file("Assignment 1"), {
+        "word/embeddings/oleObject1.bin": ole_file({"Contents": b"TOP SECRET 42"}),
+        "word/_rels/document.xml.rels": lambda xml: xml.replace(b"</Relationships>", rel.encode() + b"</Relationships>"),
+        "[Content_Types].xml": lambda xml: xml.replace(b"</Types>", object_type.encode() + b"</Types>"),
+    })
+    assert text_of(data) == "Assignment 1"
