@@ -298,6 +298,16 @@ def at_least_one(text: str) -> int:
     return number
 
 
+def evaluation_agent():
+    """Groot exactly as students get it, except that Gemini errors are not turned into friendly replies.
+
+    In normal use a limit error becomes a polite message (deadline_agent/friendly_errors.py). Here that
+    message would be scored as if it were Groot's real answer, so the error must reach run_all instead,
+    which stops the run without saving the case, and the next run carries on from there.
+    """
+    return root_agent.model_copy(update={"on_model_error_callback": None})
+
+
 def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Score how well the real Gemini model uses Groot's tools.")
     parser.add_argument("--limit", type=at_least_one, help="only run the first N cases, for a quick check")
@@ -312,7 +322,7 @@ def main(argv=None) -> None:
     all_cases = load_cases(CASES_FILE)
     cases = all_cases[: args.limit]  # [:None] keeps every case
     try:
-        records = asyncio.run(run_all(cases, root_agent, RUNS_DIR, plugins=[Throttle(args.per_minute)]))
+        records = asyncio.run(run_all(cases, evaluation_agent(), RUNS_DIR, plugins=[Throttle(args.per_minute)]))
     except errors.APIError as error:
         # Gemini refused the request. ADK has already printed the full details above,
         # so end with a short note. Any other error is a bug and shows its whole traceback.

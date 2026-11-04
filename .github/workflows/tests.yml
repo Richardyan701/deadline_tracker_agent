@@ -22,8 +22,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The two newest versions listed in the google-adk 2.11.0 package metadata
-        python-version: ["3.13", "3.14"]
+        # The oldest Python every package in requirements.txt supports (python-multipart 0.0.33
+        # needs 3.11, see MIN_PYTHON in deadline_agent/check_setup.py), and the two newest
+        # versions listed in the google-adk 2.11.0 package metadata
+        python-version: ["3.11", "3.13", "3.14"]
 
     steps:
       - name: Check out the code

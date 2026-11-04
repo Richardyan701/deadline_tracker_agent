@@ -418,6 +418,7 @@ def test_instruction_still_starts_with_the_original_text(deadlines_file):
         agent.INSTRUCTION
         + "\nToday is Thursday 5 Nov 2026 in Sydney, Australia (timezone Australia/Sydney)."
         + "\nWhen a student gives a due date, pass their words to add_deadline exactly as typed, do not convert the date yourself."
+        + agent.OUTLINE_RULES
         + agent.REMINDER_RULES
     )
     assert text.endswith("\n</reminders>")

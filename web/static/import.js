@@ -1,6 +1,6 @@
-// The outline drop box: choose outline PDFs, preview the deadlines Groot finds,
+// The outline drop box: choose outline files, preview the deadlines Groot finds,
 // check them, then save the ones you tick. Text from the server always goes on
-// the page with textContent, so a title found in a PDF can never turn into HTML.
+// the page with textContent, so a title found in an outline can never turn into HTML.
 import {answer, element, post, show, showOffline} from "./common.js";
 
 // The same limits the server checks. Checking here as well means a wrong
@@ -39,6 +39,10 @@ const reviewBody = document.getElementById("review-body");
 const saveButton = document.getElementById("save-button");
 const saveMessage = document.getElementById("save-message");
 
+// The file endings Groot reads, like ".pdf" and ".docx". The server puts them in the
+// file picker's accept list. It still checks what each file really is from its contents.
+const ENDINGS = outlineInput.accept.split(",");
+
 let outlines = [];  // the outline files chosen so far
 let tableRows = [];  // one entry for each row of the review table, made by makeRow
 
@@ -47,9 +51,9 @@ let tableRows = [];  // one entry for each row of the review table, made by make
 function addOutlines(files) {
   const problems = [];
   for (const file of files) {
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      problems.push(`${file.name} is not a PDF.`);
+    const name = file.name.toLowerCase();
+    if (!ENDINGS.some((ending) => name.endsWith(ending))) {
+      problems.push(`${file.name} is not a kind of file Groot can read. The kinds it reads are listed above.`);
     } else if (file.size > MAX_FILE_BYTES) {
       problems.push(`${file.name} is bigger than 10 MB.`);
     } else if (outlines.some((chosen) => chosen.name === file.name && chosen.size === file.size)) {
@@ -88,7 +92,7 @@ function sizeText(bytes) {
   return bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Dragging files. Stopping the browser's own handling everywhere means a PDF
+// Dragging files. Stopping the browser's own handling everywhere means a file
 // dropped next to the box is ignored, instead of opening in the browser.
 window.addEventListener("dragover", (event) => {
   event.preventDefault();

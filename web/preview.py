@@ -19,13 +19,14 @@ from deadline_agent import canvas, importer, timetable, tools, uts_calendar
 from deadline_agent.import_types import CanvasEvent, ExtractedItem, PreviewRow, TimetableClass
 
 from . import Refused
-from .uploads import Pdf, Upload
+from .uploads import Upload, UploadedFile
 
 logger = logging.getLogger(__name__)
 
-# Reads one outline PDF and returns what it found. The real one is
-# read_with_gemini below. The tests use a fake, so they never call Gemini.
-OutlineReader = Callable[[bytes], list[ExtractedItem]]
+# Reads one outline file, given its bytes and its name, and returns what it
+# found. The real one is read_with_gemini below. The tests use a fake, so
+# they never call Gemini.
+OutlineReader = Callable[[bytes, str], list[ExtractedItem]]
 
 READER_MISSING = (
     "The outline reader is not installed yet, so Groot cannot read outlines. "
@@ -41,13 +42,15 @@ class OutlineFailed(Exception):
     """Gemini could not read one outline. The message is one clear sentence for the student."""
 
 
-def read_with_gemini(pdf: bytes) -> list[ExtractedItem]:
-    """Read one outline with deadline_agent/outline.py, which sends it to Gemini.
+def read_with_gemini(data: bytes, filename: str) -> list[ExtractedItem]:
+    """Read one outline file with deadline_agent/outline.py, which sends it to Gemini.
 
-    outline.py is imported here, when the first outline is read, instead of
-    when Groot starts, so the rest of Groot works even while it is missing.
-    Raises Refused if outline.py is not there yet, and OutlineFailed with
-    outline.py's own sentence when Gemini could not read the outline.
+    filename, like "33130.docx", goes along as the hint documents.py uses to
+    tell kinds of plain text apart, like .csv and .txt. outline.py is
+    imported here, when the first outline is read, instead of when Groot
+    starts, so the rest of Groot works even while it is missing. Raises
+    Refused if outline.py is not there, and OutlineFailed with outline.py's
+    own sentence when the outline could not be read.
     """
     try:
         outline = importlib.import_module("deadline_agent.outline")
@@ -56,7 +59,7 @@ def read_with_gemini(pdf: bytes) -> list[ExtractedItem]:
             raise  # outline.py is there, but something it imports is missing
         raise Refused(503, READER_MISSING) from None
     try:
-        return outline.extract_items(pdf)
+        return outline.extract_items(data, filename=filename)
     except outline.OutlineError as error:
         raise OutlineFailed(str(error)) from error
 
@@ -78,8 +81,8 @@ def build(upload: Upload, read: OutlineReader) -> dict:
     notes = [] if classes is None else ["Your timetable was read, so tutorial days come from it."]
 
     items, outlines = [], []
-    for pdf in upload.outlines:
-        found, result = _read_outline(pdf, read)
+    for file in upload.outlines:
+        found, result = _read_outline(file, read)
         items += found
         outlines.append(result)
 
@@ -108,27 +111,27 @@ def _read_timetable(upload: Upload) -> dict[str, list[TimetableClass]] | None:
         ) from None
 
 
-def _read_outline(pdf: Pdf, read: OutlineReader) -> tuple[list[ExtractedItem], dict]:
+def _read_outline(file: UploadedFile, read: OutlineReader) -> tuple[list[ExtractedItem], dict]:
     """The items found in one outline, and a short result for the page.
 
     A problem with this outline becomes one sentence in the result, so the
     other outlines are still read and nothing found so far is lost.
     """
     try:
-        found = read(pdf.data)
+        found = read(file.data, file.name)
     except OutlineFailed as error:
-        return [], {"file": pdf.name, "status": "error", "message": str(error)}
+        return [], {"file": file.name, "status": "error", "message": str(error)}
     except Refused:
         raise  # a problem with the whole preview, like the outline reader missing
     except Exception:
         # A bug, or a surprise from Gemini's library. The stack trace goes to
         # the window where Groot runs, never to the page.
-        logger.exception("Reading the outline %s failed", pdf.name)
-        return [], {"file": pdf.name, "status": "error", "message": UNEXPECTED_PROBLEM}
+        logger.exception("Reading the outline %s failed", file.name)
+        return [], {"file": file.name, "status": "error", "message": UNEXPECTED_PROBLEM}
     if not found:
-        return [], {"file": pdf.name, "status": "success", "message": "No assessments were found in this outline."}
+        return [], {"file": file.name, "status": "success", "message": "No assessments were found in this outline."}
     message = f"Found {tools._plural(len(found), 'assessment item')}."
-    return found, {"file": pdf.name, "status": "success", "message": message}
+    return found, {"file": file.name, "status": "success", "message": message}
 
 
 def _canvas_events(link: str) -> tuple[list[CanvasEvent], list[str]]:

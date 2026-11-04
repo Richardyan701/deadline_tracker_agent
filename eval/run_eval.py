@@ -5,24 +5,30 @@ Run it from the project folder:
     .venv/bin/python -m eval.run_eval            (Linux and macOS)
     .\.venv\Scripts\python.exe -m eval.run_eval  (Windows)
 
+Add --session AUT2026 for Autumn outlines. Spring 2026 (SPR2026) is the default.
+
 It reads every checked answer key in eval/answer_key/, sends the outline with
 the same subject code from eval/outlines/ (for example 33130.pdf or
 33130.docx) to Gemini through extract_items, compares the two, and writes the
-scores to eval/results.md. eval/README.md explains the answer key format and
-how every score works.
+scores to eval/results.md. Timing is scored twice: by the timing fields, and
+by the real dates the drop box would show, worked out for the session by the
+same importer and UTS calendar. eval/README.md explains the answer key format
+and how every score works.
 
 Gemini's free tier only allows a few requests a minute, so this waits between
 outlines and never sends more than 4 requests in any minute.
 """
 
+import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from time import monotonic, sleep
 
-from deadline_agent import documents, outline
+from deadline_agent import documents, importer, outline, tools, uts_calendar
 
 EVAL_DIR = Path(__file__).resolve().parent
 OUTLINES_DIR = EVAL_DIR / "outlines"
@@ -31,6 +37,14 @@ RESULTS_FILE = EVAL_DIR / "results.md"
 
 # The made up key that shows the format. It is never scored.
 EXAMPLE_KEY = "EXAMPLE.json"
+
+# Real dates are worked out for this session, unless --session gives another.
+DEFAULT_SESSION = "SPR2026"
+
+# The importer's clock is frozen at Monday 20 Jul 2026, the week before Spring 2026 starts, as the
+# spec says. The clock only decides which rows count as past, never a row's date, so no score
+# depends on the day the measurement is run.
+FROZEN_NOW = datetime(2026, 7, 20, 9, 0)
 
 # At most 4 requests a minute: 60 / 4 = 15 seconds apart, plus 1 spare second for network delays.
 # extract_items sends exactly one request per outline, so one outline is one request.
@@ -231,8 +245,35 @@ def describe_timing(item: dict) -> str:
     return ", ".join(f"{field}={item[field]}" for field in TIMING_FIELDS if item[field] is not None)
 
 
-def score_outline(key_items: list, found_items: list) -> dict:
-    """Compare one outline's answer key with what was extracted. Returns counts and the mistakes."""
+def resolve_dates(item: dict, code: str, session: str) -> tuple:
+    """The due dates the drop box would show for this item, worked out by the real importer and UTS calendar.
+
+    item is a key item or an extracted item. The result is one "YYYY-MM-DD HH:MM" for most items,
+    one for each teaching week of a weekly item, and none when the drop box shows no date or asks
+    the student for one. There is no timetable here, so a tutorial in week N gets no date either.
+    """
+    # A key item only has the fields that are scored, so the importer gets the rest of an ExtractedItem
+    full_item = {"subject_code": code, "subject_name": "", "task_number": None, "quote": "", **item}
+    rows = importer.build_preview([full_item], session, now=FROZEN_NOW)
+    return tuple(row["due_date"] for row in rows if row["due_date"] is not None)
+
+
+def describe_dates(dates: tuple) -> str:
+    """For example "Friday 7 Aug 2026, 11:59 PM", "9 dates, Friday 21 Aug 2026, 11:59 PM to ..." or "no date"."""
+    if not dates:
+        return "no date"
+    shown = [tools._friendly(tools._parse_due_date(due)) for due in dates]
+    if len(shown) == 1:
+        return shown[0]
+    return f"{len(shown)} dates, {shown[0]} to {shown[-1]}"
+
+
+def score_outline(key_items: list, found_items: list, code: str, session: str) -> dict:
+    """Compare one outline's answer key with what was extracted. Returns counts and the mistakes.
+
+    code is the outline's subject code, and session ("SPR2026" or "AUT2026") gives the calendar
+    the real dates are worked out with.
+    """
     pairs = match_items(key_items, found_items)
     paired_keys = {k for k, _ in pairs}
     paired_found = {f for _, f in pairs}
@@ -241,13 +282,16 @@ def score_outline(key_items: list, found_items: list) -> dict:
         "found_items": len(found_items),
         "matched": len(pairs),
         "weights_right": 0,
-        "dated": 0,
+        "timed": 0,  # paired items whose key gives a date, by the timing fields
+        "timing_right": 0,
+        "dated": 0,  # paired items whose key resolves to a real date
         "dates_right": 0,
         "silently_wrong": 0,
         "missed": [item["name"] for k, item in enumerate(key_items) if k not in paired_keys],
         "invented": [item["name"] for f, item in enumerate(found_items) if f not in paired_found],
         "wrong_weights": [],
         "wrong_timings": [],
+        "wrong_dates": [],
     }
     for k, f in pairs:
         key_item, found_item = key_items[k], found_items[f]
@@ -260,9 +304,9 @@ def score_outline(key_items: list, found_items: list) -> dict:
 
         right = same_timing(key_item, found_item)
         if gives_a_date(key_item):
-            score["dated"] += 1
+            score["timed"] += 1
             if right:
-                score["dates_right"] += 1
+                score["timing_right"] += 1
         if not right:
             # If the wrong timing still gives a date, the student sees it with no warning
             silent = gives_a_date(found_item)
@@ -272,12 +316,26 @@ def score_outline(key_items: list, found_items: list) -> dict:
                 f'"{key_item["name"]}": key {describe_timing(key_item)}, found {describe_timing(found_item)}'
                 + (" (silently wrong)" if silent else "")
             )
+
+        key_dates = resolve_dates(key_item, code, session)
+        if key_dates:
+            score["dated"] += 1
+            found_dates = resolve_dates(found_item, code, session)
+            if found_dates == key_dates:
+                score["dates_right"] += 1
+            else:
+                score["wrong_dates"].append(
+                    f'"{key_item["name"]}": key {describe_dates(key_dates)}, found {describe_dates(found_dates)}'
+                )
     return score
 
 
 # ---------- results.md ----------
 
-COUNTS = ["key_items", "found_items", "matched", "weights_right", "dated", "dates_right", "silently_wrong"]
+COUNTS = [
+    "key_items", "found_items", "matched", "weights_right", "timed", "timing_right", "dated", "dates_right",
+    "silently_wrong",
+]
 
 
 def fraction(part: int, whole: int) -> str:
@@ -294,23 +352,27 @@ def table_row(label: str, score: dict) -> str:
         fraction(score["matched"], score["key_items"]),
         fraction(score["matched"], score["found_items"]),
         fraction(score["weights_right"], score["matched"]),
+        fraction(score["timing_right"], score["timed"]),
         fraction(score["dates_right"], score["dated"]),
         str(score["silently_wrong"]),
     ]
     return "| " + " | ".join(cells) + " |"
 
 
-def render(scores: dict, unchecked: list) -> str:
+def render(scores: dict, unchecked: list, session: str) -> str:
     """The whole results.md file."""
     total = {name: sum(score[name] for score in scores.values()) for name in COUNTS}
+    calendar = uts_calendar.session_info(session)["name"]
     lines = [
         "# Outline reader accuracy",
         "",
-        f"Made by `eval/run_eval.py` with {outline.MODEL} on {len(scores)} outline(s)."
+        f"Made by `eval/run_eval.py` with {outline.MODEL} on {len(scores)} outline(s). Real dates are worked out"
+        f" for {calendar} ({session}) with the clock frozen at {tools._friendly_day(FROZEN_NOW)}."
         " eval/README.md explains how each score is worked out.",
         "",
-        "| Outline | Items found (recall) | Items not invented (precision) | Weights correct | Dates correct | Silently wrong dates |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Outline | Items found (recall) | Items not invented (precision) | Weights correct | Timing correct"
+        " | Dates correct | Silently wrong dates |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     lines += [table_row(code, score) for code, score in scores.items()]
     lines.append(table_row("All", total))
@@ -322,6 +384,7 @@ def render(scores: dict, unchecked: list) -> str:
             ("Invented", score["invented"]),
             ("Wrong weight", score["wrong_weights"]),
             ("Wrong timing", score["wrong_timings"]),
+            ("Wrong date", score["wrong_dates"]),
         ]:
             if not mistakes:
                 lines.append(f"- {title}: none")
@@ -337,25 +400,40 @@ def render(scores: dict, unchecked: list) -> str:
 # ---------- running it ----------
 
 
-def evaluate(outlines_dir: Path, keys_dir: Path, client=None) -> str:
-    """Score every checked answer key against its outline and return the text of results.md."""
+def evaluate(outlines_dir: Path, keys_dir: Path, session: str, client=None) -> str:
+    """Score every checked answer key against its outline and return the text of results.md.
+
+    session ("SPR2026" or "AUT2026") is checked first, so a typo never wastes a Gemini request.
+    """
+    try:
+        uts_calendar.session_info(session)
+    except ValueError as error:
+        raise EvalError(str(error)) from None
     keys, unchecked = load_keys(keys_dir)
     for code in unchecked:
         print(f"Skipping {code}: its answer key is not checked yet.")
     if not keys:
         raise EvalError('There are no checked answer keys yet. Set "checked": true in a key once you have checked it.')
     found = read_outlines(list(keys), outlines_dir, client)
-    scores = {code: score_outline(keys[code], found[code]) for code in keys}
-    return render(scores, unchecked)
+    scores = {code: score_outline(keys[code], found[code], code, session) for code in keys}
+    return render(scores, unchecked, session)
 
 
-def main() -> None:
+def main(argv=None) -> None:
+    parser = argparse.ArgumentParser(description="Measure how well the outline reader finds the deadlines in UTS outlines.")
+    parser.add_argument(
+        "--session",
+        choices=list(uts_calendar.SESSIONS),
+        default=DEFAULT_SESSION,
+        help=f"the session of the outlines, whose calendar gives the real dates (default {DEFAULT_SESSION})",
+    )
+    args = parser.parse_args(argv)
     print(
         f"Gemini's free tier allows only a few requests a minute, so this sends at most {REQUESTS_PER_MINUTE}"
         f" a minute ({SECONDS_BETWEEN_REQUESTS:.0f} seconds apart)."
     )
     try:
-        results = evaluate(OUTLINES_DIR, KEYS_DIR)
+        results = evaluate(OUTLINES_DIR, KEYS_DIR, args.session)
     except (EvalError, outline.OutlineError) as error:
         sys.exit(f"Stopped. eval/results.md was not changed.\n{error}")
     RESULTS_FILE.write_text(results, encoding="utf-8", newline="\n")

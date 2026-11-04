@@ -2,14 +2,15 @@
 
 No API key and no internet needed. start_groot.sh is run for real, in a
 temporary copy of the project, where .venv/bin/python is a stand-in that runs
-a tiny web server instead of adk web, and xdg-open and open are stand-ins that
-only write down what they were asked to open. start_groot.bat cannot run here,
-so only its text is checked. The setup checker is tested check by check, with
-temporary files and fake environments.
+a tiny web server instead of Groot's web app, and xdg-open and open are
+stand-ins that only write down what they were asked to open. start_groot.bat
+cannot run here, so only its text is checked. The setup checker is tested
+check by check, with temporary files and fake environments.
 """
 
 import ast
 import http.server
+import io
 import json
 import os
 import shutil
@@ -33,7 +34,7 @@ from deadline_agent.friendly_errors import BAD_KEY
 PROJECT = Path(__file__).resolve().parent.parent
 START_SH = PROJECT / "start_groot.sh"
 START_BAT = PROJECT / "start_groot.bat"
-URL = "http://127.0.0.1:8000"
+URL = "http://127.0.0.1:8000/groot"  # Groot's home page, which the start files open
 FAKE_KEY = "not-a-real-key-123"
 
 needs_bash = pytest.mark.skipif(sys.platform == "win32", reason="start_groot.sh is for Linux and macOS")
@@ -60,22 +61,26 @@ def wait_for(condition, seconds=30):
 # ---------- start_groot.sh, run for real ----------
 
 
-def fake_project(tmp_path, server_command):
+def fake_project(tmp_path, server_command, home_page=True):
     """A temporary project folder with start_groot.sh, a .env and a stand-in .venv/bin/python.
 
-    Asked to start adk web, the stand-in writes down how it was asked in
-    server_command.txt and runs server_command instead. Anything else, like the
-    script asking "is the server answering yet?", goes to the real Python.
+    Asked to start Groot's web app (python -m web), the stand-in writes down
+    how it was asked in server_command.txt and runs server_command instead.
+    Anything else, like the script asking "is Groot's page answering yet?",
+    goes to the real Python. A web server started in the project folder
+    answers /groot with the file called groot, which is only there if home_page is true.
     """
     project = tmp_path / "project"
     (project / ".venv" / "bin").mkdir(parents=True)
     (project / "deadline_agent").mkdir()
     (project / "deadline_agent" / ".env").write_text(f"GOOGLE_API_KEY={FAKE_KEY}\n")
+    if home_page:
+        (project / "groot").write_text("Groot's home page\n")
     shutil.copy(START_SH, project / "start_groot.sh")
     python = project / ".venv" / "bin" / "python"
     python.write_text(
         "#!/usr/bin/env bash\n"
-        'if [ "$1" = "-m" ] && [ "$2" = "google.adk.cli" ]; then\n'
+        'if [ "$1" = "-m" ] && [ "$2" = "web" ]; then\n'
         f'    echo "$*" > "{tmp_path}/server_command.txt"\n'
         f"    {server_command}\n"
         "fi\n"
@@ -141,14 +146,32 @@ def test_start_script_starts_groot_opens_the_browser_and_stops_on_ctrl_c(tmp_pat
 
     assert wait_for(lambda: "Press Ctrl+C to stop it." in output.read_text()), output.read_text()
     assert f"Groot is running at {URL}" in output.read_text()
-    # Started the antivirus safe way, through Python, from the project folder
-    assert (tmp_path / "server_command.txt").read_text() == "-m google.adk.cli web --port 8000\n"
+    # Groot's web app, started the antivirus safe way, through Python, from the project folder
+    assert (tmp_path / "server_command.txt").read_text() == "-m web\n"
     assert wait_for(lambda: (tmp_path / "opened.txt").exists())
-    assert (tmp_path / "opened.txt").read_text() == f"{opener} {URL}\n"
+    assert (tmp_path / "opened.txt").read_text() == f"{opener} {URL}\n"  # the home page, not only the server
 
     os.killpg(process.pid, signal.SIGINT)  # what pressing Ctrl+C in the terminal does
     process.wait(timeout=15)
     assert port_8000_is_free()  # the server stopped too
+
+
+@needs_bash
+def test_start_script_waits_for_groots_home_page_not_just_any_answer(tmp_path, start):
+    if not port_8000_is_free():
+        pytest.skip("port 8000 is in use (is Groot running?), so this test cannot run")
+    # The server answers, but only with "404 Not Found" until the home page is there
+    project = fake_project(tmp_path, f'exec "{sys.executable}" -m http.server 8000 --bind 127.0.0.1', home_page=False)
+    process, output = start(project, fake_commands(tmp_path))
+
+    assert wait_for(lambda: not port_8000_is_free())
+    time.sleep(3)  # several of the script's once a second checks
+    assert "Groot is running" not in output.read_text()
+    assert not (tmp_path / "opened.txt").exists()
+
+    (project / "groot").write_text("Groot's home page\n")  # now /groot answers
+    assert wait_for(lambda: (tmp_path / "opened.txt").exists())
+    assert (tmp_path / "opened.txt").read_text() == f"xdg-open {URL}\n"
 
 
 @needs_bash
@@ -187,10 +210,25 @@ def test_start_bat_uses_windows_line_endings_and_the_antivirus_safe_command():
     data = START_BAT.read_bytes()
     assert data.count(b"\n") == data.count(b"\r\n")  # every line ends with CRLF
     text = data.decode("ascii")
-    assert '".venv\\Scripts\\python.exe" -m google.adk.cli web --port 8000' in text
-    assert 'start "" http://127.0.0.1:8000' in text
+    # Groot's web app, started through Python, never adk.exe or the old chat-only server
+    assert '\r\n".venv\\Scripts\\python.exe" -m web\r\n' in text
+    assert "google.adk.cli" not in text and "adk.exe" not in text
+    # It waits for the home page itself, and an error page from another program does not count
+    curl = next(line for line in text.splitlines() if line.startswith("curl.exe "))
+    assert "--fail" in curl and "--retry-connrefused" in curl
+    assert curl.endswith(f" {URL}")
+    assert f'start "" {URL}\r\n' in text
+    assert f"echo Groot is running at {URL}\r\n" in text
     assert "Groot is not set up yet, so please run setup_windows.bat first." in text
     assert "Press Ctrl+C in this window to stop it." in text
+
+
+def test_the_start_files_and_the_web_app_agree_on_the_address():
+    from web import app as web_app
+
+    assert URL == f"http://{web_app.HOST}:{web_app.PORT}/groot"
+    assert f'URL="{URL}"' in START_SH.read_text(encoding="utf-8")
+    assert ".venv/bin/python -m web &" in START_SH.read_text(encoding="utf-8")
 
 
 # ---------- the setup checker, check by check ----------
@@ -225,16 +263,34 @@ def deadlines_file(tmp_path, monkeypatch):
     return path
 
 
-def test_python_310_or_newer_passes():
-    assert check_setup.check_python((3, 10, 0)) == (True, "Python 3.10.0", "")
+def test_python_311_or_newer_passes():
+    assert check_setup.check_python((3, 11, 0)) == (True, "Python 3.11.0", "")
     assert check_setup.check_python()[0] is True  # the Python running these tests
 
 
-def test_older_python_fails_with_a_fix():
-    passed, found, fix = check_setup.check_python((3, 9, 6))
+@pytest.mark.parametrize("version", [(3, 10, 12), (3, 9, 6)])
+def test_older_python_fails_with_a_fix(version):
+    passed, found, fix = check_setup.check_python(version)
+    shown = ".".join(map(str, version))
 
-    assert (passed, found) == (False, "Python 3.9.6 is too old, Groot needs 3.10 or newer")
-    assert fix == "Install Python 3.10 or newer from python.org, then run the setup script again."
+    assert (passed, found) == (False, f"Python {shown} is too old, Groot needs 3.11 or newer")
+    assert fix == "Install Python 3.11 or newer from python.org, then run the setup script again."
+
+
+def test_the_oldest_python_allowed_is_one_every_pinned_package_supports():
+    # Each installed package says which Pythons it supports. If the setup allowed an older one,
+    # pip would stop half way through the setup (python-multipart 0.0.33 needs 3.11, for example).
+    from packaging.specifiers import SpecifierSet
+
+    oldest = ".".join(map(str, check_setup.MIN_PYTHON))
+    pins = [line.split("==")[0] for line in (PROJECT / "requirements.txt").read_text().split() if "==" in line]
+    for name in pins:
+        supported = metadata.metadata(name).get("Requires-Python") or ""
+        assert SpecifierSet(supported).contains(oldest), f"{name} needs Python {supported}"
+    # The setup scripts check for the same version as the checker
+    check = f"sys.version_info >= {check_setup.MIN_PYTHON}"
+    assert check in (PROJECT / "setup.sh").read_text(encoding="utf-8")
+    assert check in (PROJECT / "setup_windows.bat").read_text(encoding="utf-8")
 
 
 def test_packages_at_the_right_versions_pass(tmp_path, monkeypatch):
@@ -467,6 +523,43 @@ def test_a_failed_check_gives_exit_code_1_and_a_fix(all_good, env_file, capsys):
     assert output.rstrip().endswith("1 problem found. Follow each Fix above, then run this check again.")
 
 
+@pytest.mark.parametrize(
+    "encoding, expected",
+    [
+        ("utf-8", ("✓", "✗")),
+        ("utf-16", ("✓", "✗")),
+        ("cp1252", ("[OK]", "[X]")),  # what Windows uses when the output goes to a file
+        ("cp437", ("[OK]", "[X]")),  # an old Windows console
+        ("ascii", ("[OK]", "[X]")),
+    ],
+)
+def test_marks_fall_back_to_plain_text_where_the_output_cannot_show_them(encoding, expected):
+    stream = io.TextIOWrapper(io.BytesIO(), encoding=encoding)
+    assert check_setup.marks(stream) == expected
+
+
+def test_the_whole_checker_is_readable_on_an_old_windows_console(all_good, env_file, monkeypatch):
+    env_file.unlink()  # so there is a cross as well as ticks
+    console = io.TextIOWrapper(io.BytesIO(), encoding="cp437", newline="\r\n")
+    monkeypatch.setattr(sys, "stdout", console)
+
+    assert check_setup.main([]) == 1
+
+    console.flush()
+    output = console.buffer.getvalue().decode("cp437")
+    assert output.count("[OK] ") == 5
+    assert "[X] deadline_agent/.env is missing\r\n    Fix: " in output
+    assert "?" not in output  # no tick or cross was turned into a question mark
+
+
+def test_the_checker_started_the_real_way_uses_plain_marks_on_an_old_console(tmp_path):
+    result = run_checker(tmp_path, "-S", PYTHONIOENCODING="cp437")
+
+    assert result.returncode == 1, result.stderr
+    assert "[X] Packages: " in result.stdout
+    assert "?" not in result.stdout
+
+
 def test_an_old_python_stops_after_the_first_check(monkeypatch, capsys):
     real_check = check_setup.check_python
     monkeypatch.setattr(check_setup, "check_python", lambda: real_check((3, 9, 6)))
@@ -474,7 +567,7 @@ def test_an_old_python_stops_after_the_first_check(monkeypatch, capsys):
     assert check_setup.main([]) == 1
 
     output = capsys.readouterr().out
-    assert "✗ Python 3.9.6 is too old, Groot needs 3.10 or newer" in output
+    assert "✗ Python 3.9.6 is too old, Groot needs 3.11 or newer" in output
     assert "Packages" not in output  # nothing else was tried
 
 
