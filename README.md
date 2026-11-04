@@ -4,6 +4,12 @@
 
 Agent Groot keeps track of your university assignment and exam deadlines. You can tell it about a deadline in your own words in a chat, like "Quiz 2 due next friday 5pm", add one on Groot's home page, or let Groot find every deadline in your UTS subject outlines. It saves them in a file on your computer, reminds you about anything overdue or due in the next 7 days, and can put them in your calendar. It runs on Google's Agent Development Kit (ADK) with the Gemini 3.5 Flash model. The date maths is done in plain Python code instead of by the model, so a date like "next friday" or "week 7" always follows the same rules. It was built by Richard, a first year artificial intelligence student at UTS in Sydney.
 
+![Groot's home page with example deadlines: a Heads up clash warning, Due soon, All deadlines, Add a deadline and Grades](docs/images/groot-home.png)
+
+*Groot's home page, shown with made-up example deadlines.*
+
+> **Privacy in one line:** your deadlines file stays on your computer, but every chat message and every outline you preview is sent to Google's Gemini, and on the free tier Google may use and review it. Never type or upload anything sensitive, such as your student ID, passwords, health, money or other personal details. See [Security and privacy](#security-and-privacy).
+
 ## Quick start
 
 1. **Run the setup script once.** On Windows, double click `setup_windows.bat`. On Linux or macOS, run `./setup.sh`. It installs everything and asks for your free Gemini API key. [Setup](#setup) says what you need first.
@@ -428,7 +434,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say `1456 passed`. A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say `1457 passed`. A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -495,7 +501,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               1457 tests, no API key needed
+tests/               1458 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -516,12 +522,12 @@ start_groot.sh, start_groot.bat    the start files
 - **Other websites cannot change anything.** Any website open in your browser can send requests to 127.0.0.1, so every request to Groot's pages that changes something must carry Groot's own address in its Origin header, which a web page cannot fake, and the content type the route expects. ADK's own chat routes refuse other websites' Origin headers in the same way. So another site cannot add or delete deadlines or spend your Gemini requests.
 - **Text is always shown as text.** Every title, subject and file name on the pages is escaped or set with `textContent`, so even a title like `<script>` is only shown. The pages only run Groot's own scripts and cannot be shown inside another site's frame.
 - **Uploads stay in memory.** The import page reads your files into memory and never writes them to disk. The one exception is an old `.doc` or `.ppt` file, which LibreOffice needs as a file, so a copy goes into a temporary folder that is deleted straight after.
-- **What goes to Google.** Each chat message goes to Gemini with Groot's instruction, which includes the titles and subjects of anything overdue or due in the next 7 days. Each outline you preview goes to Gemini, as the file itself or as its text. On the free tier, Google's terms allow it to use what you send to improve its products, and people at Google may read it, so do not put anything private in a title or in an outline you upload. See the [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms). Your timetable and your Canvas feed are read on your computer and never sent to Gemini.
+- **What goes to Google.** Each chat message goes to Gemini with Groot's instruction, which includes the titles and subjects of anything overdue or due in the next 7 days. Each outline you preview goes to Gemini, as the file itself or as its text. On the free tier, Google's terms allow it to use what you send to improve its products, and people at Google may read it, so do not put anything private in a title or in an outline you upload. In particular, never send your student ID, your password or login details, health or disability information, bank or money details, your address or phone number, or anyone else's personal details. If an outline or timetable has your name or student ID on it, that is one more reason to check before you preview it. Google's terms can change, so read them yourself. See the [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms). Your timetable and your Canvas feed are read on your computer and never sent to Gemini.
 - **Your key** is only in `deadline_agent/.env`, which git ignores. The setup checker never prints it, and the GitHub Actions check fails if a `.env` file is ever committed.
 
 ## Tests and CI
 
-There are 1457 tests, run with pytest:
+There are 1458 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
