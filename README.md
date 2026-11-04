@@ -305,3 +305,7 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 ## Built with
 
 Python, [Google ADK](https://github.com/google/adk-python) 2.11.0, Gemini 3.5 Flash, pytest and GitHub Actions.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
