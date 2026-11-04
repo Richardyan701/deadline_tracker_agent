@@ -61,6 +61,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <a class="button" href="/groot/import">Import from outlines</a>
 <a class="button" href="{CHAT_PATH}">Chat with Groot</a>
 </div>
+<p class="privacy-note">Your deadlines stay on this computer. Chat messages and previewed outlines go to Google's Gemini, which may use and review them on the free tier, so never send sensitive details such as your student ID.</p>
 <p id="top-message" class="message" role="status"></p>
 </header>
 <main>
@@ -277,6 +278,7 @@ def import_page(sessions: dict, default_session: str) -> str:
 <section aria-labelledby="preview-heading">
 <h2 id="preview-heading">2. Preview</h2>
 <p class="warning">Preview sends each outline to Gemini, and each outline uses one Gemini request. Gemini's free tier allows 20 requests a day, so check your files first. The timetable and the Canvas link do not use Gemini.</p>
+<p class="warning">Privacy: outlines you preview are sent to Google's Gemini, and on the free tier Google may use and review them. Do not upload anything with sensitive personal details, such as your student ID.</p>
 <p id="request-count">Choose at least one outline to preview.</p>
 <button type="button" id="preview-button" disabled>Preview deadlines</button>
 <p id="preview-message" class="message" role="status"></p>

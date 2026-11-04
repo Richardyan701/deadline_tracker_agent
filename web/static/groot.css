@@ -586,3 +586,10 @@ input[type="checkbox"] {
   background: var(--warn-bg);
   color: var(--warn-ink);
 }
+
+/* The short privacy note under the buttons on the home page */
+.privacy-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}

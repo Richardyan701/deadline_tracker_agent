@@ -532,3 +532,11 @@ def test_adks_guard_against_dns_rebinding_also_covers_groots_pages(deadlines_fil
     response = browser.post("/groot/api/add", json={"title": "Essay", "due_date": "friday"}, headers={"Origin": "http://evil.example:8000"})
     assert response.status_code == 403
     assert not deadlines_file.exists()
+
+
+def test_home_and_import_pages_warn_about_what_goes_to_gemini(client):
+    # Students must be told before they use Groot that chats and outlines go to Google.
+    home = client.get("/groot").text
+    assert "go to Google's Gemini" in home and "student ID" in home
+    importer = client.get("/groot/import").text
+    assert "Privacy: outlines you preview are sent to Google's Gemini" in importer
