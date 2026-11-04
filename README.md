@@ -336,9 +336,10 @@ deadline_agent/
   .env.example     example key file (the real .env is never committed)
 tests/             383 tests, no API key needed
 .github/workflows/tests.yml
-requirements.txt   google-adk 2.11.0, httpx 0.28.1, icalendar 7.3.0, pypdf 6.21.4, pytest 9.2.0,
-                   tzdata 2026.6, and for outline files python-docx 1.2.0, python-pptx 1.0.2,
-                   openpyxl 3.1.5, xlrd 2.0.2, olefile 0.47, defusedxml 0.7.1 and pillow 12.3.0
+requirements.txt   google-adk 2.11.0, fastapi 0.141.1, httpx 0.28.1, icalendar 7.3.0, pypdf 6.21.4,
+                   pytest 9.2.0, python-multipart 0.0.32, tzdata 2026.6, uvicorn 0.54.0, and for
+                   outline files python-docx 1.2.0, python-pptx 1.0.2, openpyxl 3.1.5, xlrd 2.0.2,
+                   olefile 0.47, defusedxml 0.7.1 and pillow 12.3.0
 setup.sh           setup for Linux and macOS
 setup_windows.bat  setup for Windows
 ```
