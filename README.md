@@ -4,6 +4,14 @@
 
 Agent Groot is a chat assistant that keeps track of university assignment and exam deadlines. You tell it about a deadline in your own words, like "Quiz 2 due next friday 5pm", and it saves it to a file on your computer. It can list your deadlines, find the next one, mark them done or delete them. When you start a chat, it mentions anything overdue or due in the next 7 days. It runs on Google's Agent Development Kit (ADK) with the Gemini 3.5 Flash model, and the date maths is done in plain Python code instead of by the model, so a date like "next friday" always follows the same rules. It was built by Richard, a first year artificial intelligence student at UTS in Sydney.
 
+## Quick start
+
+1. **Run the setup script once.** On Windows, double click `setup_windows.bat`. On Linux or macOS, run `./setup.sh`. It installs everything and asks for your free Gemini API key. [Setup](#setup) says what you need first.
+2. **Start Groot.** On Windows, double click `start_groot.bat`. On Linux or macOS, run `./start_groot.sh`.
+3. **Chat in the browser tab that opens.** Say hello and Groot suggests a few things to try. If a box asks about sharing usage data with Google, either button is fine. Press Ctrl+C in the start window to stop Groot.
+
+If anything goes wrong, run the setup checker (`.venv\Scripts\python.exe -m deadline_agent.check_setup` on Windows, `.venv/bin/python -m deadline_agent.check_setup` on Linux and macOS) and follow the fix it gives under each cross.
+
 ## What it can do
 
 Groot has seven tools. Gemini reads what you type and decides which tool to call.
@@ -230,21 +238,21 @@ The scripts do not run `adk create`, because the agent already exists in `deadli
 
 ## Running it
 
-From the project folder, start the ADK web app.
+The start files are the easy way. On Windows, double click `start_groot.bat`. On Linux or macOS, run `./start_groot.sh` from the project folder. Each one checks that the setup has been run, starts the ADK web app, waits until <http://127.0.0.1:8000> answers, opens it in your browser and tells you to press Ctrl+C to stop it. On Windows, the window may then ask "Terminate batch job (Y/N)?", and either answer is fine.
 
-On Windows, open Command Prompt or PowerShell in the project folder (in File Explorer you can type `cmd` in the address bar and press Enter), then run:
+To start it by hand instead, open Command Prompt or PowerShell in the project folder on Windows (in File Explorer you can type `cmd` in the address bar and press Enter), then run:
 
 ```
-.\.venv\Scripts\adk.exe web --port 8000
+.\.venv\Scripts\python.exe -m google.adk.cli web --port 8000
 ```
 
 On Linux or macOS:
 
 ```bash
-.venv/bin/adk web --port 8000
+.venv/bin/python -m google.adk.cli web --port 8000
 ```
 
-Then open <http://127.0.0.1:8000> in your browser, choose **deadline_agent** from the list of agents, and say hello. Press Ctrl+C in the terminal to stop it. `adk web` is a local development server with no login, so only run it on your own computer.
+This runs the same program as `adk web --port 8000`, but through Python, because some antivirus programs block `.venv\Scripts\adk.exe`. Then open <http://127.0.0.1:8000> in your browser and say hello. Groot is already chosen, because it is the only agent in the project. Press Ctrl+C in the terminal to stop it. `adk web` is a local development server with no login, so only run it on your own computer.
 
 ## Running the tests
 
@@ -264,14 +272,32 @@ The last line should start with `383 passed`.
 
 ## Troubleshooting
 
-The first three errors show up in the terminal where `adk web` is running.
+Start with the setup checker. It looks at your Python, the packages, your key file, port 8000, the deadlines file and the Sydney time zone, and gives a one line fix for anything that is wrong. It never changes a file and sends nothing over the internet. On Windows:
 
-- **`No API key was provided. Please pass a valid API key.`** Groot could not find your key, usually because `deadline_agent/.env` is missing. Run the setup script again, then restart `adk web`.
-- **`API key not valid. Please pass a valid API key.`** The key in `deadline_agent/.env` is wrong, often because it was not copied in full. Run the setup script again, answer `y` to replace the file, then restart `adk web`.
-- **`429 RESOURCE_EXHAUSTED`** means you have sent more requests than the free tier allows for now. ADK puts a line starting "On how to mitigate this issue, please refer to:" and a link above it. Wait a minute and try again. See the rate limit note under [Limitations](#limitations-and-known-gaps).
+```
+.\.venv\Scripts\python.exe -m deadline_agent.check_setup
+```
+
+On Linux or macOS:
+
+```bash
+.venv/bin/python -m deadline_agent.check_setup
+```
+
+Add `--online` to also send one tiny real request to Gemini, which proves your key works. That uses 1 of your 20 free requests for today, so the checker only sends it when every other check passed.
+
+When Gemini cannot answer, Groot now says why in the chat instead of showing a long red error. The terminal where Groot runs still shows the full error, after a line starting "Gemini failed, so Groot showed a friendly reply instead".
+
+- **"Gemini's free daily limit is used up. It resets in about 5 hours 37 minutes (around 7:00 PM Sydney time). Your saved deadlines are safe."** The free tier allows 20 requests a day for each model, which is roughly 8 to 10 messages that use a tool. Google resets it at midnight Pacific time, which is between 5 PM and 7 PM in Sydney. The wait in the message comes from Google's own reply.
+- **"That was a lot of messages in a minute. Wait about 30 seconds and try again."** The free tier allows 5 requests a minute, and a message that uses a tool needs two of them. Wait as long as it says.
+- **"Gemini's free limit has been reached for now."** Google said a limit was reached but not which one. Wait a minute and try again. If it keeps happening, the daily limit is probably used up.
+- **"I can't find your Gemini API key"** (the terminal shows `No API key was provided`). This usually means `deadline_agent/.env` is missing. Run the setup script again, then restart Groot.
+- **"Gemini says your API key is not valid"** (the terminal shows `API key not valid. Please pass a valid API key.`). The key in `deadline_agent/.env` is wrong, often because it was not copied in full. Run the setup script again, answer `y` to replace the file, then restart Groot.
+- **"Gemini took too long to answer"** (the terminal shows `504 DEADLINE_EXCEEDED`). Send your message again.
+- **Any other error**, such as `503 UNAVAILABLE` when Gemini is overloaded, still shows up as a red error in the chat and in the terminal, the same as before.
 - **`This Python is older than 3.10`** (setup.sh) or **`Your Python is older than 3.10`** (setup_windows.bat). Install Python 3.10 or newer. On Linux or macOS you can then run `PYTHON=python3.12 ./setup.sh`, using the name of your newer Python.
 - **`Could not find python3`** (setup.sh) or **`Python was not found`** (setup_windows.bat). Install Python. On Windows, tick "Add python.exe to PATH" in the installer.
-- **`Access is denied` when you start `adk.exe`** (Windows). Some antivirus programs block `.venv\Scripts\adk.exe`. You can start the same server through Python instead, with `.venv\Scripts\python.exe -m google.adk.cli web --port 8000`. On Linux or macOS the same command is `.venv/bin/python -m google.adk.cli web --port 8000`.
+- **`Access is denied` when you start `adk.exe`** (Windows). Some antivirus programs block `.venv\Scripts\adk.exe`. The start files avoid it by starting the same server through Python, and you can do the same by hand with `.venv\Scripts\python.exe -m google.adk.cli web --port 8000`. On Linux or macOS the same command is `.venv/bin/python -m google.adk.cli web --port 8000`.
 
 ## How it is built
 
@@ -312,7 +338,7 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 ## Limitations and known gaps
 
 - **One user, one local file.** There are no accounts. Everyone using the same copy shares one `deadlines.json`, and nothing syncs between devices.
-- **The Gemini free tier is limited** to about 5 requests per minute. A message that uses a tool costs at least two requests, one to choose the tool and one to reply, so a few quick messages in a row can hit the limit. Google sets these limits and can change them. See [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+- **The Gemini free tier is limited** to about 5 requests per minute and 20 requests per day for each model. A message that uses a tool costs at least two requests, one to choose the tool and one to reply, so the free tier gives you roughly 8 to 10 messages that use a tool each day, and a few quick messages in a row can hit the per minute limit. When a limit is reached, Groot says which one and when to try again (see [Troubleshooting](#troubleshooting)). Google sets these limits and can change them. See [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
 - **Sydney time only.** The time zone is fixed in the code.
 - **English only.** Date words like "friday" and "tomorrow" must be in English.
 - **No editing.** To change a deadline, delete it and add it again.

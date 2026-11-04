@@ -59,6 +59,4 @@ else
 fi
 
 echo
-echo "All done. To start Groot, run this from the project folder:"
-echo "  .venv/bin/adk web --port 8000"
-echo "Then open http://127.0.0.1:8000 in your browser and choose deadline_agent."
+echo "All done. To start Groot, run ./start_groot.sh from the project folder."
