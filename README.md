@@ -6,7 +6,7 @@ Agent Groot is a chat assistant that keeps track of university assignment and ex
 
 ## What it can do
 
-Groot has six tools. Gemini reads what you type and decides which tool to call.
+Groot has seven tools. Gemini reads what you type and decides which tool to call.
 
 | Tool | What it does |
 | --- | --- |
@@ -16,6 +16,7 @@ Groot has six tools. Gemini reads what you type and decides which tool to call.
 | `delete_deadline` | Permanently deletes a deadline. |
 | `mark_done` | Marks a deadline as finished. It stays in the list but no longer shows up in reminders or as your next deadline. |
 | `get_reminders` | Finds unfinished deadlines that are overdue, due today or due soon. "Soon" means the next 7 days unless you ask about a different period, from 1 to 60 days. |
+| `export_calendar` | Saves every unfinished deadline to `deadlines.ics`, a calendar file you can import into Google Calendar, Outlook or your phone. See [Export to your calendar](#export-to-your-calendar). |
 
 Titles are matched as whole titles. Upper and lower case, extra spaces and look alike characters (such as a full width letter from an Asian keyboard) are ignored, so "assignment 1" finds "Assignment 1". Part of a title is not enough, so "Assignment" does not find "Assignment 1".
 
@@ -136,6 +137,23 @@ The `due_date` is Sydney time, either `YYYY-MM-DD` (due by 11:59 PM that day) or
 
 **If the file cannot be read.** A file with broken JSON, missing fields or a date in the wrong form does not stop Groot. It is treated as an empty list, and reading it never changes it. The next time something is saved, the old file is first copied to a new file in the same folder called `deadlines.json.corrupt-YYYYMMDD-HHMMSS`, then a fresh list is saved. If that name is already taken, `-2`, `-3` and so on are added, so an older copy is never overwritten. The success message names the copy, so Groot can tell you about it. If the file cannot even be copied (for example, you are not allowed to open it), the save is refused and the file is left alone, with the message "I couldn't save your deadlines (...), so nothing has changed." A file saved with a byte order mark, which Windows PowerShell 5.1 and older versions of Notepad add, loads normally.
 
+## Export to your calendar
+
+Ask Groot something like "add these to my calendar" or "export my deadlines". The `export_calendar` tool saves every unfinished deadline to `deadlines.ics` in the project folder, next to `deadlines.json`. To save it somewhere else, set the `DEADLINES_ICS_FILE` environment variable to the path you want. It is a standard iCalendar file. Each deadline becomes a one minute event that starts at its due time (11:59 PM when it has no time), with the subject in its notes and a reminder 1 day before. Finished deadlines are left out, and if nothing is unfinished, no file is made. `deadlines.ics` is listed in `.gitignore`, so it is not committed.
+
+To import it:
+
+- **Google Calendar.** On a computer, open Google Calendar. In the top right, click the gear icon and then **Settings**. In the menu on the left, click **Import & export**. Click **Select file from your computer**, pick `deadlines.ics`, choose which calendar to add it to and click **Import**.
+- **Android phone.** Import the file into Google Calendar on a computer as above. The events then show up in the Google Calendar app on any phone signed in to the same Google account.
+- **iPhone.** If you use Google Calendar on your iPhone, do the same as for Android. For Apple's Calendar app, email `deadlines.ics` to yourself, open the email in the Mail app, tap the file and then tap **Add All**.
+- **Outlook.** In Outlook on the web or Outlook.com, open your calendar, click **Add calendar**, then **Upload from file**.
+
+Good to know:
+
+- Each deadline keeps the same ID every time you export, because the ID is made from its title. Calendar apps use this ID to recognise an event they already have, so importing a newer file into the same calendar should update those events instead of adding copies.
+- Importing never deletes anything. A deadline you finish or delete in Groot stays in your calendar until you delete it there.
+- Google Calendar may use your own notification settings instead of the 1 day reminder in the file.
+
 ## Example chats
 
 These two chats are real output from a test run with the real Gemini model.
@@ -253,6 +271,7 @@ The first three errors show up in the terminal where `adk web` is running.
 - **`429 RESOURCE_EXHAUSTED`** means you have sent more requests than the free tier allows for now. ADK puts a line starting "On how to mitigate this issue, please refer to:" and a link above it. Wait a minute and try again. See the rate limit note under [Limitations](#limitations-and-known-gaps).
 - **`This Python is older than 3.10`** (setup.sh) or **`Your Python is older than 3.10`** (setup_windows.bat). Install Python 3.10 or newer. On Linux or macOS you can then run `PYTHON=python3.12 ./setup.sh`, using the name of your newer Python.
 - **`Could not find python3`** (setup.sh) or **`Python was not found`** (setup_windows.bat). Install Python. On Windows, tick "Add python.exe to PATH" in the installer.
+- **`Access is denied` when you start `adk.exe`** (Windows). Some antivirus programs block `.venv\Scripts\adk.exe`. You can start the same server through Python instead, with `.venv\Scripts\python.exe -m google.adk.cli web --port 8000`. On Linux or macOS the same command is `.venv/bin/python -m google.adk.cli web --port 8000`.
 
 ## How it is built
 
@@ -296,7 +315,6 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 - **The Gemini free tier is limited** to about 5 requests per minute. A message that uses a tool costs at least two requests, one to choose the tool and one to reply, so a few quick messages in a row can hit the limit. Google sets these limits and can change them. See [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
 - **Sydney time only.** The time zone is fixed in the code.
 - **English only.** Date words like "friday" and "tomorrow" must be in English.
-- **No calendar export yet.**
 - **No editing.** To change a deadline, delete it and add it again.
 - **No past deadlines.** You cannot add a deadline whose time has already passed.
 - **Reminders only appear in a chat.** Groot does not send notifications.

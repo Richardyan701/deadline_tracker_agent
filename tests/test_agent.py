@@ -1,4 +1,4 @@
-"""Checks Agent Groot's setup: its six tools and its instruction.
+"""Checks Agent Groot's setup: its seven tools and its instruction.
 
 Importing the agent needs no API key. The key is only used when the agent
 actually talks to Gemini, and the last tests here use a scripted stand-in
@@ -37,7 +37,7 @@ def deadlines_file(tmp_path, monkeypatch):
     return path
 
 
-def test_root_agent_has_all_six_tools():
+def test_root_agent_has_all_seven_tools():
     names = {tool.__name__ for tool in root_agent.tools}
 
     assert names == {
@@ -47,6 +47,7 @@ def test_root_agent_has_all_six_tools():
         "delete_deadline",
         "mark_done",
         "get_reminders",
+        "export_calendar",
     }
 
 

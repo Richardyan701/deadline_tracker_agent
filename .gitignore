@@ -6,3 +6,5 @@ __pycache__/
 deadlines.json
 # Backup copies of an unreadable deadlines file, and temporary files made while saving
 deadlines.json.*
+# The calendar file made by export_calendar
+deadlines.ics
