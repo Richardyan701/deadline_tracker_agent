@@ -8,10 +8,14 @@ every byte in memory, and stops as soon as something is too big.
 
 The drop box page sends these form fields:
 
-    outlines    1 to 8 PDF files, each at most 10 MB
+    outlines    1 to 8 files, each at most 10 MB, of any kind documents.py reads
     timetable   optional, one PDF file of at most 10 MB
     canvas_url  optional text, the student's Canvas calendar feed link
     session     text, the session code, like "SPR2026"
+
+What each outline really is comes from its bytes (documents.detect_kind),
+and its name is only a hint. Every file is checked before any outline is
+sent to Gemini, so a wrong file never wastes a request.
 """
 
 from collections.abc import AsyncIterator
@@ -21,9 +25,11 @@ from python_multipart import MultipartParser
 from python_multipart.exceptions import FormParserError
 from python_multipart.multipart import parse_options_header
 
+from deadline_agent import documents
+
 from . import Refused
 
-MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 MB for each PDF
+MAX_FILE_BYTES = documents.MAX_FILE_BYTES  # 10 MB for each file
 MAX_OUTLINES = 8
 MAX_TEXT_BYTES = 2048  # the Canvas link and the session code are short
 # Nothing right can be bigger than 8 outlines and a timetable at their
@@ -35,7 +41,7 @@ FILE_FIELDS = {"outlines": MAX_OUTLINES, "timetable": 1}
 TEXT_FIELDS = {"canvas_url": 1, "session": 1}
 
 TOO_BIG = (
-    f"The upload is too big. Each PDF can be at most {MAX_FILE_BYTES // (1024 * 1024)} MB, "
+    f"The upload is too big. Each file can be at most {MAX_FILE_BYTES // (1024 * 1024)} MB, "
     f"and at most {MAX_OUTLINES} outlines can be read at a time."
 )
 TOO_MANY = {
@@ -45,10 +51,10 @@ TOO_MANY = {
 
 
 @dataclass
-class Pdf:
-    """One uploaded PDF."""
+class UploadedFile:
+    """One uploaded file: an outline of any kind Groot reads, or the timetable PDF."""
 
-    name: str  # the file's name on the student's computer, only ever shown back to them
+    name: str  # the file's name on the student's computer, a hint for documents.py and shown back to them
     data: bytes
 
 
@@ -56,8 +62,8 @@ class Pdf:
 class Upload:
     """Everything the drop box sent, checked and ready to use."""
 
-    outlines: list[Pdf]  # 1 to 8 of them
-    timetable: Pdf | None
+    outlines: list[UploadedFile]  # 1 to 8 of them
+    timetable: UploadedFile | None
     canvas_url: str  # "" when none was given. It works like a password, so never log it.
     session: str  # not checked yet, preview.py checks it is a real session
 
@@ -68,7 +74,8 @@ async def read_upload(content_type: str, body: AsyncIterator[bytes]) -> Upload:
     content_type is the request's Content-Type header, which holds the
     "boundary" text that separates the parts of the form. body gives the
     request's bytes a piece at a time. Raises Refused, with a reason the
-    student can act on, if anything is missing, too big or not a PDF.
+    student can act on, if anything is missing or too big, an outline is a
+    kind of file Groot cannot read, or the timetable is not a PDF.
     """
     _, options = parse_options_header(content_type)
     boundary = options.get(b"boundary")
@@ -175,14 +182,19 @@ def _checked(parts: list[_Part]) -> Upload:
             except UnicodeDecodeError:
                 raise Refused(400, "Some text in the upload is not readable, so it was not read.") from None
         else:
-            files[part.field].append(Pdf(part.filename, bytes(part.data)))
+            files[part.field].append(UploadedFile(part.filename, bytes(part.data)))
 
     if not files["outlines"]:
-        raise Refused(400, "Add at least one subject outline (a PDF), then try again.")
-    for pdf in files["outlines"] + files["timetable"]:
-        # Every PDF file starts with these five bytes
-        if not pdf.data.startswith(b"%PDF-"):
-            raise Refused(400, f"{pdf.name} is not a PDF, so nothing was read. Check you chose the right file.")
+        raise Refused(400, "Add at least one subject outline, then try again.")
+    for outline in files["outlines"]:
+        try:
+            documents.detect_kind(outline.data, outline.name)
+        except documents.DocumentError as error:
+            raise Refused(400, f"{outline.name}: {error} Nothing was sent to Gemini.") from None
+    for timetable in files["timetable"]:
+        # The timetable reader only reads the PDF export of the UTS timetable, and every PDF starts with %PDF-
+        if not timetable.data.startswith(documents.PDF_START):
+            raise Refused(400, f"{timetable.name} is not a PDF, so nothing was read. Check you chose the right file.")
     if "session" not in texts:
         raise Refused(400, "Choose a session, then try again.")
 

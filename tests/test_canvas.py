@@ -136,6 +136,15 @@ def test_event_with_no_start_is_a_clear_error():
         canvas.parse_feed(feed("SUMMARY:Quiz [33130]\nUID:x"))
 
 
+def test_a_damaged_feed_that_trips_up_the_calendar_library_is_a_clear_error():
+    # A comma turns the VALUE setting into a list, and icalendar 7.3.0 then fails with
+    # AttributeError, not ValueError. Found by changing bytes of a good feed at random.
+    damaged = feed(event("Quiz [33130_SPR_U_1_S]", start="DTSTART;VALUE=,ATE:20260918"))
+    with pytest.raises(canvas.CanvasError, match="did not give a calendar") as caught:
+        canvas.parse_feed(damaged)
+    assert caught.value.__cause__ is not None  # the library's own error stays attached for debugging
+
+
 # ---------- check_link ----------
 
 

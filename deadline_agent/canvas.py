@@ -130,7 +130,7 @@ def parse_feed(data: bytes) -> list[CanvasEvent]:
                 "all_day": not isinstance(event.start, datetime),
                 "uid": str(event.get("UID", "")),
             })
-    except ValueError as error:
+    except Exception as error:  # a damaged feed can make icalendar raise many kinds of error, not only ValueError
         raise CanvasError(
             "The Canvas link did not give a calendar. Copy the link again from Canvas, Calendar, Calendar Feed."
         ) from error

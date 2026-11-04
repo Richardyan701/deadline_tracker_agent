@@ -6,14 +6,20 @@ checked without the tests taking minutes.
 """
 
 import json
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
 
+from deadline_agent import tools
 from eval import run_eval
 from eval.run_eval import EvalError
 
 EXAMPLE = run_eval.KEYS_DIR / "EXAMPLE.json"
+
+# Spring 2026 dates used below (from the UTS calendar): week 2 Friday is 7 Aug, week 3 Friday is 14 Aug,
+# week 7 Friday is 11 Sep, and after StuVac week 9 starts on Monday 28 Sep. Autumn 2026 week 2 Friday is 27 Feb.
+SPRING = "SPR2026"
 
 
 class FakeClock:
@@ -184,7 +190,8 @@ def hand_made_score() -> dict:
 
     Skills Test 1: right weight, right week.
     Skills Test 2: wrong weight. Key says tutorial (no date) but week 5 was found, a silently wrong date.
-    Assignment 1: right weight. Key gives a date but week 6 was found, a silently wrong date.
+    Assignment 1: right weight. Key gives a date but week 6 was found, a silently wrong date by the
+        timing fields. Spring week 6 ends on Friday 4 Sep, so the real date is still right.
     Final exam: right weight. Key says exam period but unknown was found. Wrong, but it shows no date.
     Group report: missed. Bonus quiz: invented.
     """
@@ -202,7 +209,7 @@ def hand_made_score() -> dict:
         item("Final exam", 40, "unknown"),
         item("Bonus quiz", 5, "week", week=3),
     ]
-    return run_eval.score_outline(key, found)
+    return run_eval.score_outline(key, found, "11111", SPRING)
 
 
 def test_the_counts_for_a_hand_made_outline():
@@ -213,9 +220,11 @@ def test_the_counts_for_a_hand_made_outline():
         "found_items": 5,
         "matched": 4,  # recall 4 of 5, precision 4 of 5
         "weights_right": 3,  # 3 of 4 matched
-        "dated": 2,  # Skills Test 1 and Assignment 1 have a date in the key
-        "dates_right": 1,  # only Skills Test 1
-        "silently_wrong": 2,  # Skills Test 2 and Assignment 1
+        "timed": 2,  # Skills Test 1 and Assignment 1 have a date in the key
+        "timing_right": 1,  # only Skills Test 1
+        "dated": 2,  # the same two resolve to a real day
+        "dates_right": 2,  # Spring week 6 starts on 31 Aug, so "week 6" lands on Friday 4 Sep, the key's date
+        "silently_wrong": 2,  # Skills Test 2 and Assignment 1, counted by the timing fields
     }
 
 
@@ -229,27 +238,106 @@ def test_the_mistakes_for_a_hand_made_outline_are_listed():
         '"Assignment 1": key when=date, date=2026-09-04, found when=week, week=6 (silently wrong)',
         '"Final exam": key when=exam_period, found when=unknown',
     ]
+    assert score["wrong_dates"] == []  # both dated items land on the key's day
+
+
+# ---------- real dates ----------
+
+
+@pytest.mark.parametrize(
+    "timing, dates",
+    [
+        ({"when": "week", "week": 2}, ("2026-08-07 23:59",)),  # Friday of week 2 assumed
+        ({"when": "week", "week": 9, "weekday": "monday", "time": "09:00"}, ("2026-09-28 09:00",)),  # after StuVac
+        ({"when": "date", "date": "2026-09-04"}, ("2026-09-04 23:59",)),
+        ({"when": "recurring", "first_week": 7, "last_week": 9}, ("2026-09-11 23:59", "2026-09-18 23:59", "2026-10-02 23:59")),
+        ({"when": "tutorial", "week": 5}, ()),  # needs the timetable, which the measurement does not have
+        ({"when": "exam_period"}, ()),
+        ({"when": "unknown"}, ()),
+        ({"when": "week", "week": 14}, ()),  # not a teaching week
+    ],
+)
+def test_items_resolve_to_the_dates_the_drop_box_would_show(timing, dates):
+    assert run_eval.resolve_dates(item("Quiz", 10, **timing), "11111", SPRING) == dates
+
+
+def test_the_session_gives_the_calendar():
+    quiz = item("Quiz", 10, "week", week=2)
+    assert run_eval.resolve_dates(quiz, "11111", "AUT2026") == ("2026-02-27 23:59",)
+    assert run_eval.resolve_dates(quiz, "11111", SPRING) == ("2026-08-07 23:59",)
+
+
+def test_the_dates_never_depend_on_the_day_the_measurement_runs(monkeypatch):
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2030, 1, 1, 12, 0))  # long after both sessions
+    assert run_eval.FROZEN_NOW == datetime(2026, 7, 20, 9, 0)
+    assert run_eval.resolve_dates(item("Quiz", 10, "week", week=2), "11111", SPRING) == ("2026-08-07 23:59",)
+
+
+def test_dates_are_scored_by_the_real_day_alongside_the_timing_fields():
+    key = [
+        item("Quiz 1", 5, "week", week=7),
+        item("Quiz 2", 5, "date", date="2026-09-11"),
+        item("Quiz 3", 5, "week", week=2),
+        item("Weekly quizzes", 20, "recurring", first_week=4, last_week=12, weekday="friday"),
+        item("Report", 30, "week", week=8),
+        item("Skills Test", 10, "tutorial", week=5),
+    ]
+    found = [
+        item("Quiz 1", 5, "week", week=7, weekday="friday"),  # an added weekday: wrong timing, same day
+        item("Quiz 2", 5, "week", week=7),  # Friday of week 7 is 11 Sep: wrong timing, same day
+        item("Quiz 3", 5, "week", week=3),  # a week late: both wrong
+        item("Weekly quizzes", 20, "recurring", first_week=4),  # no end and no day still gives the same Fridays
+        item("Report", 30, "week", week=9),  # week 9 comes after StuVac, so it is two weeks late
+        item("Skills Test", 10, "tutorial", week=5),
+    ]
+
+    score = run_eval.score_outline(key, found, "11111", SPRING)
+
+    assert (score["timed"], score["timing_right"]) == (6, 1)  # only Skills Test has every timing field right
+    assert (score["dated"], score["dates_right"]) == (5, 3)  # the tutorial needs a timetable, so it has no day
+    assert score["wrong_dates"] == [
+        '"Quiz 3": key Friday 7 Aug 2026, 11:59 PM, found Friday 14 Aug 2026, 11:59 PM',
+        '"Report": key Friday 18 Sep 2026, 11:59 PM, found Friday 2 Oct 2026, 11:59 PM',
+    ]
+    assert run_eval.table_row("11111", score) == (
+        "| 11111 | 6 of 6 (100%) | 6 of 6 (100%) | 6 of 6 (100%) | 1 of 6 (17%) | 3 of 5 (60%) | 5 |"
+    )
+
+
+def test_a_weekly_item_with_wrong_weeks_lists_how_many_dates_and_where_they_run():
+    score = run_eval.score_outline(
+        [item("Weekly quizzes", 20, "recurring", first_week=4, last_week=6)],
+        [item("Weekly quizzes", 20, "recurring", first_week=5, last_week=6)],
+        "11111",
+        SPRING,
+    )
+    assert score["wrong_dates"] == [
+        '"Weekly quizzes": key 3 dates, Friday 21 Aug 2026, 11:59 PM to Friday 4 Sep 2026, 11:59 PM,'
+        " found 2 dates, Friday 28 Aug 2026, 11:59 PM to Friday 4 Sep 2026, 11:59 PM"
+    ]
 
 
 def test_a_timing_detail_the_outline_does_not_give_counts_as_wrong():
     # The key copies the outline exactly, so an added weekday was made up
     score = run_eval.score_outline(
-        [item("Quiz", 10, "week", week=2)], [item("Quiz", 10, "week", week=2, weekday="friday")]
+        [item("Quiz", 10, "week", week=2)], [item("Quiz", 10, "week", week=2, weekday="friday")], "11111", SPRING
     )
-    assert (score["dates_right"], score["silently_wrong"]) == (0, 1)
+    assert (score["timing_right"], score["silently_wrong"]) == (0, 1)
 
 
 def test_nothing_found_scores_zero_without_dividing_by_zero():
-    score = run_eval.score_outline([item("Quiz", 10)], [])
-    assert run_eval.table_row("12345", score) == "| 12345 | 0 of 1 (0%) | 0 of 0 | 0 of 0 | 0 of 0 | 0 |"
+    score = run_eval.score_outline([item("Quiz", 10)], [], "12345", SPRING)
+    assert run_eval.table_row("12345", score) == "| 12345 | 0 of 1 (0%) | 0 of 0 | 0 of 0 | 0 of 0 | 0 of 0 | 0 |"
 
 
 def test_results_add_up_every_outline_in_the_all_row():
     scores = {"11111": hand_made_score(), "22222": hand_made_score()}
-    results = run_eval.render(scores, unchecked=["33333"])
+    results = run_eval.render(scores, unchecked=["33333"], session=SPRING)
 
-    assert "| 11111 | 4 of 5 (80%) | 4 of 5 (80%) | 3 of 4 (75%) | 1 of 2 (50%) | 2 |" in results
-    assert "| All | 8 of 10 (80%) | 8 of 10 (80%) | 6 of 8 (75%) | 2 of 4 (50%) | 4 |" in results
+    assert "| 11111 | 4 of 5 (80%) | 4 of 5 (80%) | 3 of 4 (75%) | 1 of 2 (50%) | 2 of 2 (100%) | 2 |" in results
+    assert "| All | 8 of 10 (80%) | 8 of 10 (80%) | 6 of 8 (75%) | 2 of 4 (50%) | 4 of 4 (100%) | 4 |" in results
+    assert "| Weights correct | Timing correct | Dates correct | Silently wrong dates |" in results
+    assert "- Wrong date: none\n" in results
     assert "## 22222" in results
     assert "- Missed:\n  - Group report\n- Invented:\n  - Bonus quiz\n" in results
     assert "- Wrong timing:\n  - \"Skills Test 2\"" in results
@@ -417,11 +505,12 @@ def setup_two_outlines(tmp_path):
 def test_a_whole_run_with_a_fake_gemini(tmp_path, clock):
     keys, outlines, answers = setup_two_outlines(tmp_path)
 
-    results = run_eval.evaluate(outlines, keys, FakeClient(answers, clock))
+    results = run_eval.evaluate(outlines, keys, SPRING, FakeClient(answers, clock))
 
-    assert "| 11111 | 2 of 2 (100%) | 2 of 2 (100%) | 2 of 2 (100%) | 1 of 1 (100%) | 0 |" in results
-    assert "| 22222 | 1 of 2 (50%) | 1 of 1 (100%) | 1 of 1 (100%) | 1 of 1 (100%) | 0 |" in results
-    assert "| All | 3 of 4 (75%) | 3 of 3 (100%) | 3 of 3 (100%) | 2 of 2 (100%) | 0 |" in results
+    assert "| 11111 | 2 of 2 (100%) | 2 of 2 (100%) | 2 of 2 (100%) | 1 of 1 (100%) | 1 of 1 (100%) | 0 |" in results
+    assert "| 22222 | 1 of 2 (50%) | 1 of 1 (100%) | 1 of 1 (100%) | 1 of 1 (100%) | 1 of 1 (100%) | 0 |" in results
+    assert "| All | 3 of 4 (75%) | 3 of 3 (100%) | 3 of 3 (100%) | 2 of 2 (100%) | 2 of 2 (100%) | 0 |" in results
+    assert "Real dates are worked out for Spring 2026 (SPR2026) with the clock frozen at Monday 20 Jul 2026." in results
     assert "## 11111\n\n- Missed: none\n" in results
     assert "## 22222\n\n- Missed:\n  - Final exam\n" in results
 
@@ -431,13 +520,22 @@ def test_a_failed_outline_stops_the_run_instead_of_giving_part_of_the_results(tm
     answers[pdf("22222")] = "not json"  # Gemini's answer for the second outline cannot be read
 
     with pytest.raises(run_eval.outline.OutlineError):
-        run_eval.evaluate(outlines, keys, FakeClient(answers, clock))
+        run_eval.evaluate(outlines, keys, SPRING, FakeClient(answers, clock))
 
 
 def test_no_checked_keys_is_a_clear_error(tmp_path):
     write_key(tmp_path, "11111", [], checked=False)
     with pytest.raises(EvalError, match="no checked answer keys"):
-        run_eval.evaluate(tmp_path, tmp_path)
+        run_eval.evaluate(tmp_path, tmp_path, SPRING)
+
+
+def test_an_unknown_session_stops_the_run_before_any_request(tmp_path, clock):
+    keys, outlines, answers = setup_two_outlines(tmp_path)
+    client = FakeClient(answers, clock)
+
+    with pytest.raises(EvalError, match="Unknown session 'SUM2026'"):
+        run_eval.evaluate(outlines, keys, "SUM2026", client)
+    assert client.starts == []  # no Gemini request was wasted
 
 
 def test_main_stops_without_touching_results_when_something_is_wrong(tmp_path, monkeypatch):
@@ -446,15 +544,32 @@ def test_main_stops_without_touching_results_when_something_is_wrong(tmp_path, m
     monkeypatch.setattr(run_eval, "RESULTS_FILE", results_file)
 
     with pytest.raises(SystemExit, match="results.md was not changed"):
-        run_eval.main()
+        run_eval.main([])
     assert not results_file.exists()
 
 
 def test_main_saves_the_results_with_unix_line_endings(tmp_path, monkeypatch):
     results_file = tmp_path / "results.md"
     monkeypatch.setattr(run_eval, "RESULTS_FILE", results_file)
-    monkeypatch.setattr(run_eval, "evaluate", lambda outlines_dir, keys_dir: "# Results\nline two\n")
+    monkeypatch.setattr(run_eval, "evaluate", lambda outlines_dir, keys_dir, session: "# Results\nline two\n")
 
-    run_eval.main()
+    run_eval.main([])
 
     assert results_file.read_bytes() == b"# Results\nline two\n"
+
+
+@pytest.mark.parametrize("argv, session", [([], "SPR2026"), (["--session", "AUT2026"], "AUT2026")])
+def test_the_session_is_spring_2026_unless_the_option_says_otherwise(tmp_path, monkeypatch, argv, session):
+    used = []
+    monkeypatch.setattr(run_eval, "RESULTS_FILE", tmp_path / "results.md")
+    monkeypatch.setattr(run_eval, "evaluate", lambda outlines_dir, keys_dir, session: used.append(session) or "# Results\n")
+
+    run_eval.main(argv)
+
+    assert used == [session]
+
+
+def test_the_session_option_only_takes_a_real_session(capsys):
+    with pytest.raises(SystemExit):
+        run_eval.main(["--session", "SUM2026"])
+    assert "invalid choice: 'SUM2026'" in capsys.readouterr().err

@@ -5,12 +5,13 @@ Run it from the project folder:
     Windows:          .venv\\Scripts\\python.exe -m deadline_agent.check_setup
     Linux and macOS:  .venv/bin/python -m deadline_agent.check_setup
 
-Each check prints a tick or a cross, and every cross comes with a one line
-fix. It only reads files and never changes them. Nothing leaves your computer
+Each check prints a tick or a cross (or [OK] and [X] where the window cannot
+show those two characters), and every cross comes with a one line fix. It
+only reads files and never changes them. Nothing leaves your computer
 unless you add --online, which sends one tiny real request to Gemini to prove
 your key works. It exits with 0 when every check passes and 1 otherwise.
 
-Only the Python check runs on a Python older than 3.10. So the code at the
+Only the Python check runs on a Python older than 3.11. So the code at the
 top level here sticks to things old Pythons understand, and the other checks
 import what they need inside their own functions.
 """
@@ -27,6 +28,11 @@ REQUIREMENTS = PROJECT / "requirements.txt"
 ENV_FILE = PROJECT / "deadline_agent" / ".env"
 PORT = 8000
 
+# The oldest Python that every package in requirements.txt supports. python-multipart 0.0.33,
+# which reads the drop box's uploads, needs 3.11 (google-adk 2.11.0 itself only needs 3.10).
+# setup.sh and setup_windows.bat check for the same version.
+MIN_PYTHON = (3, 11)
+
 # The pretend key in deadline_agent/.env.example
 EXAMPLE_KEY = "paste-your-gemini-api-key-here"
 
@@ -35,6 +41,10 @@ USE_VENV = "and run this check with the Python in .venv"
 
 TICK = "✓"
 CROSS = "✗"
+# Printed instead when the output cannot show the two above, for example a
+# Windows console using an old code page, or output saved to a file as cp1252
+PLAIN_TICK = "[OK]"
+PLAIN_CROSS = "[X]"
 
 
 # ---------- the checks ----------
@@ -43,14 +53,15 @@ CROSS = "✗"
 
 
 def check_python(version=sys.version_info):
-    """Python 3.10 or newer, the oldest that google-adk 2.11.0 supports."""
+    """Python 3.11 or newer (MIN_PYTHON), the oldest that every package in requirements.txt supports."""
     shown = ".".join(str(part) for part in version[:3])
-    if tuple(version[:2]) >= (3, 10):
+    if tuple(version[:2]) >= MIN_PYTHON:
         return True, f"Python {shown}", ""
+    needed = ".".join(str(part) for part in MIN_PYTHON)
     return (
         False,
-        f"Python {shown} is too old, Groot needs 3.10 or newer",
-        "Install Python 3.10 or newer from python.org, then run the setup script again.",
+        f"Python {shown} is too old, Groot needs {needed} or newer",
+        f"Install Python {needed} or newer from python.org, then run the setup script again.",
     )
 
 
@@ -211,10 +222,20 @@ def check_gemini():
 # ---------- running them ----------
 
 
+def marks(stream):
+    """The tick and the cross to print on stream: ✓ and ✗, or [OK] and [X] if its encoding cannot show them."""
+    try:
+        (TICK + CROSS).encode(stream.encoding)
+    except (UnicodeEncodeError, LookupError):  # LookupError: an encoding Python does not know
+        return PLAIN_TICK, PLAIN_CROSS
+    return TICK, CROSS
+
+
 def show(result):
     """Print one result, with its fix under a cross. Returns True if it passed."""
     passed, found, fix = result
-    print(f"{TICK if passed else CROSS} {found}")
+    tick, cross = marks(sys.stdout)
+    print(f"{tick if passed else cross} {found}")
     if not passed:
         print(f"    Fix: {fix}")
     return passed
@@ -229,7 +250,7 @@ def main(argv=None):
         help="also send one tiny real request to Gemini to prove your key works (uses 1 free request)",
     )
     args = parser.parse_args(argv)
-    # Where the output cannot show a tick or a cross (some Windows setups), show "?" instead of crashing
+    # Any other character the output cannot show, like a letter in a folder name, becomes "?" instead of crashing
     sys.stdout.reconfigure(errors="replace")
 
     print("Checking Agent Groot's setup...\n")

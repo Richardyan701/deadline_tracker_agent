@@ -1,6 +1,7 @@
 defusedxml==0.7.1
 fastapi==0.141.1
 google-adk==2.11.0
+google-genai==2.34.0
 httpx==0.28.1
 icalendar==7.3.0
 olefile==0.47
