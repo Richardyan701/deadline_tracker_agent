@@ -12,8 +12,12 @@ read is copied to a backup before it is replaced.
 Due dates are always saved as "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" in Sydney
 time. Students can type friendlier things like "next friday 5pm", and the
 code below (not the AI model) turns those words into that saved form.
+
+export_calendar also writes the unfinished deadlines to an iCalendar (.ics)
+file, so the student can import them into a calendar app.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -420,9 +424,13 @@ def _replace_file(path: Path, text: str) -> None:
     os.replace puts that file in place of the old one in a single step. A
     crash leaves either the old file or the new one, never a mix. If anything
     fails, the old file is untouched and the temporary file is removed.
+
+    newline="" writes the text exactly as given. Without it, Windows changes
+    every \\n into \\r\\n, which would turn the \\r\\n line endings of a
+    calendar file into \\r\\r\\n.
     """
     temp = tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=path.parent, prefix=f"{path.name}.", suffix=".tmp", delete=False
+        "w", encoding="utf-8", newline="", dir=path.parent, prefix=f"{path.name}.", suffix=".tmp", delete=False
     )
     try:
         with temp:
@@ -573,6 +581,129 @@ def _days_ahead_error(days_ahead):
     if is_number and 1 <= days_ahead <= MAX_DAYS_AHEAD and float(days_ahead).is_integer():
         return None
     return f"days_ahead must be a whole number of days from 1 to {MAX_DAYS_AHEAD}, but I got {days_ahead!r}."
+
+
+# ---------- calendar export ----------
+#
+# An iCalendar (.ics) file is the standard file that Google Calendar, Outlook
+# and phone calendars can import. Its rules come from RFC 5545.
+
+# Every line of an .ics file ends with a carriage return and a line feed.
+CRLF = "\r\n"
+
+# A line can be at most 75 bytes long (not counting CRLF). Longer lines are folded.
+MAX_LINE_BYTES = 75
+
+
+def _calendar_file() -> Path:
+    """Where the calendar file is saved.
+
+    Uses the DEADLINES_ICS_FILE environment variable if it is set. Otherwise it
+    is deadlines.ics in the same folder as the deadlines file.
+    """
+    custom_path = os.environ.get("DEADLINES_ICS_FILE")
+    if custom_path:
+        return Path(custom_path)
+    return _data_file().with_name("deadlines.ics")
+
+
+def _ics_time(moment: datetime) -> str:
+    """A UTC time written the iCalendar way, for example '20261120T125900Z' (Z means UTC)."""
+    return moment.strftime("%Y%m%dT%H%M%SZ")
+
+
+def _ics_text(text: str) -> str:
+    """Make text safe to put in an iCalendar file (RFC 5545 section 3.3.11).
+
+    Backslashes, semicolons and commas have a special meaning in the file, so
+    each one gets a backslash in front. A line break becomes the two
+    characters \\n. Other control characters are not allowed, and a broken
+    character (only possible in a hand-edited deadlines file) cannot be
+    saved, so both become spaces.
+    """
+    text = text.replace("\\", "\\\\")  # first, so the backslashes added below are not doubled
+    text = text.replace(";", "\\;").replace(",", "\\,")
+    text = text.replace("\r\n", "\n").replace("\n", "\\n")
+    # Category "Cc" is control characters and "Cs" is half of a broken character
+    return "".join(" " if unicodedata.category(char) in ("Cc", "Cs") else char for char in text)
+
+
+def _fold(line: str) -> str:
+    """Split a line longer than 75 bytes over several lines (RFC 5545 section 3.1).
+
+    Each extra line starts with a space, which tells calendar apps to join it
+    back on. Bytes are counted in UTF-8, and a character is never cut in
+    half, so letters like é and emoji stay whole.
+    """
+    lines = []
+    current, size = "", 0
+    for char in line:
+        char_size = len(char.encode("utf-8"))
+        if size + char_size > MAX_LINE_BYTES:
+            lines.append(current)
+            current, size = " ", 1  # the space counts towards the next line's 75 bytes
+        current += char
+        size += char_size
+    lines.append(current)
+    return CRLF.join(lines)
+
+
+def _uid(title: str) -> str:
+    """A fixed ID for a deadline's calendar event, made from its title.
+
+    The same title always gives the same ID, so importing the file again
+    updates the event instead of adding a copy. It starts from the
+    normalised title that Groot uses to match titles, so "Essay" and
+    " essay " get the same ID. That is turned into a SHA-256 fingerprint,
+    which is always 64 letters and digits, as the iCalendar rules for IDs allow.
+    """
+    # "replace" turns a broken character (only possible in a hand-edited file) into "?" instead of crashing
+    return hashlib.sha256(_title_key(title).encode("utf-8", "replace")).hexdigest()
+
+
+def _event_lines(deadline: dict, stamp: str) -> list:
+    """The lines of one calendar event for a deadline, with a reminder 1 day before.
+
+    stamp is when the file was made, in UTC.
+    """
+    start = _utc(_parse_due_date(deadline["due_date"]))
+    end = start + timedelta(minutes=1)  # the end must come after the start, so each event lasts 1 minute
+    title = _ics_text(deadline["title"])
+    lines = [
+        "BEGIN:VEVENT",
+        "UID:" + _uid(deadline["title"]),
+        "DTSTAMP:" + stamp,
+        "DTSTART:" + _ics_time(start),
+        "DTEND:" + _ics_time(end),
+        "SUMMARY:" + title,
+    ]
+    if deadline["subject"]:
+        lines.append("DESCRIPTION:" + _ics_text("Subject: " + deadline["subject"]))
+    lines += [
+        "BEGIN:VALARM",  # a pop up reminder
+        "ACTION:DISPLAY",
+        "TRIGGER:-P1D",  # 1 day before the start
+        f"DESCRIPTION:{title} is due tomorrow",
+        "END:VALARM",
+        "END:VEVENT",
+    ]
+    return lines
+
+
+def _calendar_text(deadlines: list, stamp: str) -> str:
+    """The whole .ics file for these deadlines, with long lines folded and CRLF line endings."""
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Agent Groot//Deadline Export//EN",
+        "CALSCALE:GREGORIAN",
+        # PUBLISH means "a copy of some events". It also makes DTSTAMP mean "when this file was made".
+        "METHOD:PUBLISH",
+    ]
+    for deadline in deadlines:
+        lines += _event_lines(deadline, stamp)
+    lines.append("END:VCALENDAR")
+    return "".join(_fold(line) + CRLF for line in lines)
 
 
 # ---------- the tools ----------
@@ -793,3 +924,52 @@ def get_reminders(days_ahead: int = REMINDER_DAYS) -> dict:
     else:
         message = f"Heads up, you have {', '.join(parts[:-1])} and {parts[-1]}."
     return {"status": "success", "message": message, **groups}
+
+
+def export_calendar() -> dict:
+    """Saves every unfinished deadline to a calendar file (deadlines.ics) the student can import.
+
+    Call this when the student asks things like "add these to my calendar",
+    "export my deadlines" or "put my deadlines in Google Calendar, Outlook or
+    my phone". Finished deadlines are left out. Each deadline becomes an
+    event at its due time, with a reminder 1 day before.
+
+    After it works, tell the student where the file is and, in one or two
+    short sentences, how to import it: in Google Calendar on a computer, open
+    Settings, then Import & export, and choose the file, and it then shows up
+    on any iPhone or Android phone signed in to the same Google account. On
+    an iPhone they can also email the file to themselves, tap it in the Mail
+    app and tap Add All.
+
+    Returns:
+        A dict with "status" ("success" or "error") and a "message". On
+        success the message gives the file's location and how many deadlines
+        it holds, and "exported" is that number. When there is nothing
+        unfinished, "exported" is 0 and no file is written.
+    """
+    stamp = _ics_time(_utc(_now()))
+    path = _calendar_file()
+    with _file_lock:
+        unfinished = [d for d in _soonest_first(_load_deadlines()) if not d["done"]]
+        if not unfinished:
+            # A calendar file must hold at least one event, so there is no file to make
+            return {
+                "status": "success",
+                "message": "You have no unfinished deadlines, so there is nothing to put in a calendar yet.",
+                "exported": 0,
+            }
+        try:
+            _replace_file(path, _calendar_text(unfinished, stamp))
+        except OSError as error:
+            reason = error.strerror or type(error).__name__
+            return {
+                "status": "error",
+                "message": f"I couldn't save your calendar file ({reason}). Please check its folder is not "
+                "read only and the file is not open in another program, then try again.",
+            }
+    count = len(unfinished)
+    return {
+        "status": "success",
+        "message": f"I saved {_plural(count, 'unfinished deadline')} to this calendar file: {path}",
+        "exported": count,
+    }

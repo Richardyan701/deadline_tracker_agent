@@ -4,7 +4,7 @@ from google.adk import Agent
 from google.adk.agents.readonly_context import ReadonlyContext
 
 from . import tools
-from .tools import add_deadline, delete_deadline, get_reminders, list_deadlines, mark_done, next_deadline
+from .tools import add_deadline, delete_deadline, export_calendar, get_reminders, list_deadlines, mark_done, next_deadline
 
 INSTRUCTION = """You are Agent Groot, a friendly study assistant for university students.
 You were built by Richard, an artificial intelligence student.
@@ -115,5 +115,5 @@ root_agent = Agent(
     name="agent_groot",
     description="Keeps university students from missing any deadlines for their homework, projects, and assignments.",
     instruction=groot_instruction,
-    tools=[add_deadline, list_deadlines, next_deadline, delete_deadline, mark_done, get_reminders],
+    tools=[add_deadline, list_deadlines, next_deadline, delete_deadline, mark_done, get_reminders, export_calendar],
 )
