@@ -1,0 +1,3 @@
+# Shell scripts must keep Linux line endings, even in a Windows checkout,
+# or bash cannot run them ("bash\r: Permission denied").
+*.sh text eol=lf
