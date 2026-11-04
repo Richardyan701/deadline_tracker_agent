@@ -34,6 +34,7 @@ CHANGES = [
     ("/groot/api/add", {"title": "Quiz", "due_date": "friday", "subject": ""}),
     ("/groot/api/done", {"title": "Essay"}),
     ("/groot/api/delete", {"title": "Essay"}),
+    ("/groot/api/mark", {"title": "Essay", "mark_percent": 80}),
     ("/groot/api/export", {}),
     ("/groot/api/save", {"rows": [{"title": "Quiz", "due_date": "friday", "subject": ""}]}),
 ]
@@ -178,7 +179,11 @@ def test_due_soon_shows_overdue_today_and_this_week_with_friendly_phrases(client
     seed_a_week(deadlines_file)
     due_soon = part(client.get("/groot").text, "due-soon-list")
 
-    assert texts(due_soon, "p") == ["Heads up, you have 1 overdue, 1 due today and 2 due in the next 7 days."]
+    # Reading quiz and Essay, and Project and Exam, are less than 48 hours apart, so the clash sentence is added
+    assert texts(due_soon, "p") == [
+        "Heads up, you have 1 overdue, 1 due today and 2 due in the next 7 days."
+        " I also spotted 2 clashes where deadlines bunch up in the next 7 days."
+    ]
     assert texts(due_soon, "li") == [
         "2 days overdue: Lab report Physics Due Tuesday 3 Nov 2026, 5:00 PM",
         "in 3 hours: Reading quiz Due Thursday 5 Nov 2026, 1:00 PM",
@@ -231,10 +236,13 @@ def test_titles_and_subjects_are_escaped(client, deadlines_file):
     assert [attrs.get("src") for tag, attrs in found if tag == "script"] == ["/groot/static/home.js"]
     assert not [tag for tag, _ in found if tag == "img"]
     assert not [name for _, attrs in found for name in attrs if name.startswith("on")]
-    # The text is shown as it is: in both lists, and on both buttons (data-title and the hidden label)
+    # The text is shown as it is: in both lists, on both buttons (data-title and the hidden label),
+    # and in the Grades section (the mark form's option value and label, the "no weight" warning
+    # and the subject's table)
     escaped_title = "&lt;script&gt;alert(&quot;title&quot;)&lt;/script&gt;&lt;img src=x onerror=alert(1)&gt; &quot; onmouseover=&quot;alert(2)"
-    assert page.count(escaped_title) == 6
-    assert page.count("&lt;/td&gt;&lt;script&gt;alert(&#x27;subject&#x27;)&lt;/script&gt;") == 2
+    assert page.count(escaped_title) == 10
+    # both lists, and the subject's heading in the Grades section
+    assert page.count("&lt;/td&gt;&lt;script&gt;alert(&#x27;subject&#x27;)&lt;/script&gt;") == 3
     # Each button gives the JavaScript back the exact title, and has no extra attributes
     buttons = [attrs for tag, attrs in found if tag == "button" and "data-action" in attrs]
     assert [(attrs["data-action"], attrs["data-title"]) for attrs in buttons] == [("done", EVIL_TITLE), ("delete", EVIL_TITLE)]

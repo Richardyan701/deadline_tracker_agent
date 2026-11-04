@@ -37,7 +37,7 @@ def deadlines_file(tmp_path, monkeypatch):
     return path
 
 
-def test_root_agent_has_all_seven_tools():
+def test_root_agent_has_all_nine_tools():
     names = {tool.__name__ for tool in root_agent.tools}
 
     assert names == {
@@ -48,6 +48,8 @@ def test_root_agent_has_all_seven_tools():
         "mark_done",
         "get_reminders",
         "export_calendar",
+        "set_mark",
+        "grade_needed",
     }
 
 

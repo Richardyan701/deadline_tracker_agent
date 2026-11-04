@@ -36,11 +36,22 @@ ADD_FORM = """<form id="add-form">
 </form>"""
 
 
-def home_page(reminders: dict, deadlines: list[dict], now: datetime) -> str:
+# The honest note under the Grades heading
+GRADES_NOTE = (
+    "Groot works out the average you need on the tasks still to come for each UTS grade band: "
+    "Pass 50, Credit 65, Distinction 75 and High Distinction 85. Some subjects also have minimum rules, "
+    "for example at least 40% on the exam, that Groot cannot check, so read your subject outline too."
+)
+
+BAND_KEYS = ["pass", "credit", "distinction", "high distinction"]
+
+
+def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: list[dict] | None = None) -> str:
     """The home page.
 
     reminders is what tools.get_reminders() returns, deadlines is the list
-    from tools.list_deadlines() (soonest first), and now is Sydney time.
+    from tools.list_deadlines() (soonest first), now is Sydney time and
+    grades is tools._all_grade_reports() (one report per subject).
     """
     body = f"""<header class="top">
 <h1>Agent Groot</h1>
@@ -53,6 +64,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime) -> str:
 <p id="top-message" class="message" role="status"></p>
 </header>
 <main>
+{heads_up(reminders.get("clashes", []))}
 <section aria-labelledby="due-soon-heading">
 <h2 id="due-soon-heading">Due soon</h2>
 {due_soon(reminders)}
@@ -65,6 +77,12 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime) -> str:
 <section aria-labelledby="add-heading">
 <h2 id="add-heading">Add a deadline</h2>
 {ADD_FORM}
+</section>
+<section aria-labelledby="grades-heading">
+<h2 id="grades-heading">Grades</h2>
+<p class="hint">{escape(GRADES_NOTE)}</p>
+<p id="mark-message" class="message" role="status"></p>
+{grades_section(deadlines, grades or [])}
 </section>
 </main>"""
     return _layout("Agent Groot", "home.js", body)
@@ -88,6 +106,80 @@ def _reminder(group: str, item: dict) -> str:
         f'<li class="{group}"><span class="when">{escape(item["when"])}:</span> '
         f'<span class="title">{escape(item["title"])}</span>{subject} '
         f'<span class="due">Due {escape(due)}</span></li>'
+    )
+
+
+def heads_up(clashes: list[dict]) -> str:
+    """The "Heads up" box: deadlines that bunch up, from get_reminders' "clashes".
+
+    It is always on the page so home.js can swap in a fresh copy, but it is
+    hidden while there are no clashes.
+    """
+    hidden = "" if clashes else " hidden"
+    items = "".join(f"<li>{escape(clash['message'])}</li>" for clash in clashes)
+    return (
+        f'<section id="heads-up" class="heads-up" aria-labelledby="heads-up-heading"{hidden}>'
+        '<h2 id="heads-up-heading">Heads up</h2>'
+        f'<ul class="clashes">{items}</ul></section>'
+    )
+
+
+def grades_section(deadlines: list[dict], grades: list[dict]) -> str:
+    """The form to enter a mark or weight, then a summary for each subject."""
+    if not deadlines:
+        return '<div id="grades"><p class="empty">Add some deadlines first, then enter your marks here.</p></div>'
+    options = "".join(
+        f'<option value="{escape(d["title"])}">{escape(d["title"])}</option>' for d in deadlines
+    )
+    form = f"""<form id="mark-form">
+<div class="field">
+<label for="mark-title">Deadline</label>
+<select id="mark-title" name="title">{options}</select>
+</div>
+<div class="field">
+<label for="mark-mark">Your mark in % <span class="optional">(optional)</span></label>
+<input id="mark-mark" name="mark_percent" inputmode="decimal" autocomplete="off">
+</div>
+<div class="field">
+<label for="mark-weight">Worth % of the final mark <span class="optional">(optional)</span></label>
+<input id="mark-weight" name="weight_percent" inputmode="decimal" autocomplete="off" aria-describedby="mark-weight-hint">
+<p id="mark-weight-hint" class="hint">Leave it empty to keep the weight it has. A mark also marks the deadline done.</p>
+</div>
+<button type="submit">Save mark</button>
+</form>"""
+    if grades:
+        summaries = "".join(_grade_summary(report) for report in grades)
+    else:
+        summaries = '<p class="empty">Give your deadlines a subject to see a summary for each subject.</p>'
+    return f'<div id="grades">{form}{summaries}</div>'
+
+
+def _percent_text(value) -> str:
+    return "not set" if value is None else f"{tools._number_text(value)}%"
+
+
+def _grade_summary(report: dict) -> str:
+    """One subject: what is earned, what is still to come, each band, any warnings and each item."""
+    bands = "".join(
+        f'<li class="band {escape(report["bands"][key]["result"])}">{escape(tools._band_sentence(report["bands"][key]))}</li>'
+        for key in BAND_KEYS
+    )
+    warnings = "".join(f'<p class="grade-warning">{escape(warning)}</p>' for warning in report["warnings"])
+    rows = "".join(
+        f'<tr><td><span class="title">{escape(item["title"])}</span></td>'
+        f'<td>{escape(_percent_text(item["weight_percent"]))}</td>'
+        f'<td>{escape(_percent_text(item["mark_percent"]))}</td></tr>'
+        for item in report["items"]
+    )
+    earned = tools._number_text(report["earned_percent"])
+    still = tools._number_text(report["still_to_come_percent"])
+    return (
+        f'<article class="grade-summary"><h3>{escape(report["subject"])}</h3>'
+        f'<p class="summary">Earned so far: {escape(earned)}% of the final mark. Still to come: {escape(still)}%.</p>'
+        f'{warnings}<ul class="bands">{bands}</ul>'
+        '<table><caption class="visually-hidden">Weights and marks for this subject</caption>'
+        '<thead><tr><th scope="col">Task</th><th scope="col">Weight</th><th scope="col">Mark</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table></article>"
     )
 
 

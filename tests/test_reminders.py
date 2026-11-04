@@ -308,6 +308,7 @@ def test_nothing_due_is_cheerful(deadlines_file):
         "overdue": [],
         "due_today": [],
         "due_soon": [],
+        "clashes": [],  # nothing bunches up
     }
 
 
@@ -320,13 +321,21 @@ def test_message_with_one_group(deadlines_file):
 def test_message_with_all_three_groups(deadlines_file):
     save(deadlines_file, ("Essay", "2026-11-03"), ("Quiz", "2026-11-05 13:00"), ("A", "2026-11-06"), ("B", "2026-11-07"))
 
-    assert tools.get_reminders(14)["message"] == "Heads up, you have 1 overdue, 1 due today and 2 due in the next 14 days."
+    # Quiz, A and B are each less than 48 hours apart (two clashes), and all three are in one week (a third)
+    assert tools.get_reminders(14)["message"] == (
+        "Heads up, you have 1 overdue, 1 due today and 2 due in the next 14 days."
+        " I also spotted 3 clashes where deadlines bunch up in the next 7 days."
+    )
 
 
 def test_message_with_two_groups(deadlines_file):
     save(deadlines_file, ("Quiz", "2026-11-05 13:00"), ("A", "2026-11-06"))
 
-    assert tools.get_reminders()["message"] == "Heads up, you have 1 due today and 1 due in the next 7 days."
+    # Quiz and A are less than 48 hours apart, so the clash is mentioned too
+    assert tools.get_reminders()["message"] == (
+        "Heads up, you have 1 due today and 1 due in the next 7 days."
+        " I also spotted 1 clash where deadlines bunch up in the next 7 days."
+    )
 
 
 # ---------- days_ahead checks ----------

@@ -87,8 +87,40 @@ def save_rows(rows: list[PreviewRow]) -> list[dict]:
     checks as usual. Returns add_deadline's result for each row, in the same
     order. A row that cannot be saved (no date, a date in the past, a title
     already used) gets an error result, and the other rows are still saved.
+
+    Each row's weight_percent is saved too, for the grade calculator. A
+    weekly item's rows ("Quiz (week 3)", "Quiz (week 4)", ...) all carry the
+    weight of the whole series, so it is shared equally between the weeks
+    being saved, otherwise a 10% series over 10 weeks would count as 100%.
     """
-    return [tools.add_deadline(row["title"], row["due_date"], row["subject"]) for row in rows]
+    weights = _shared_weights(rows)
+    return [
+        tools.add_deadline(row["title"], row["due_date"], row["subject"], weight)
+        for row, weight in zip(rows, weights)
+    ]
+
+
+def _series_name(title: str) -> str | None:
+    """'33130 Quiz (week 3)' -> '33130 Quiz'. Titles of other rows give None."""
+    match = re.fullmatch(r"(.+) \(week [0-9]{1,2}\)", title)
+    return match[1] if match else None
+
+
+def _shared_weights(rows: list[PreviewRow]) -> list:
+    """The weight to save for each row, with a weekly series' weight split between its rows."""
+    series_sizes = Counter(
+        (_series_name(row["title"]), row["subject"], row.get("weight_percent"))
+        for row in rows
+        if _series_name(row["title"])
+    )
+    weights = []
+    for row in rows:
+        weight = row.get("weight_percent")
+        name = _series_name(row["title"])
+        if name and isinstance(weight, (int, float)) and not isinstance(weight, bool):
+            weight = round(weight / series_sizes[(name, row["subject"], weight)], 2)
+        weights.append(weight)
+    return weights
 
 
 # ---------- one outline item becomes one or more rows ----------

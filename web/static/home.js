@@ -1,4 +1,4 @@
-// Agent Groot's home page: mark done, delete, add a deadline and export to a calendar.
+// Agent Groot's home page: mark done, delete, add a deadline, enter marks and export to a calendar.
 // Each button calls Groot's JSON API, which runs the same tools as the chat.
 // Then the server draws the lists again, so they always match the deadlines file.
 import {answer, post, show, showOffline} from "./common.js";
@@ -8,6 +8,7 @@ const tableMessage = document.getElementById("table-message");
 const addForm = document.getElementById("add-form");
 const addMessage = document.getElementById("add-message");
 const exportButton = document.getElementById("export-button");
+const markMessage = document.getElementById("mark-message");
 
 // Ask the server for this page again and swap in its fresh lists.
 async function refreshLists() {
@@ -16,7 +17,7 @@ async function refreshLists() {
     throw new Error(`the home page answered ${response.status}`);  // shown as "Groot did not answer"
   }
   const fresh = new DOMParser().parseFromString(await response.text(), "text/html");
-  for (const id of ["due-soon-list", "deadline-table"]) {
+  for (const id of ["heads-up", "due-soon-list", "deadline-table", "grades"]) {
     document.getElementById(id).replaceWith(fresh.getElementById(id));
   }
 }
@@ -62,6 +63,35 @@ addForm.addEventListener("submit", async (event) => {
     }
   } catch {
     showOffline(addMessage);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// The Save mark form. It is drawn again after every change, so one listener
+// on the whole page catches it, the same way as the Mark done buttons.
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "mark-form") {
+    return;
+  }
+  event.preventDefault();
+  const form = event.target;
+  const fields = new FormData(form);
+  const button = form.querySelector("button");
+  button.disabled = true;
+  try {
+    // Text is sent as typed. set_mark checks it is a number from 0 to 100 and explains any problem.
+    const result = await answer(await post("/groot/api/mark", {
+      title: fields.get("title"),
+      mark_percent: fields.get("mark_percent"),
+      weight_percent: fields.get("weight_percent"),
+    }));
+    show(markMessage, result);
+    if (result.status === "success") {
+      await refreshLists();  // a fresh form and fresh summaries
+    }
+  } catch {
+    showOffline(markMessage);
   } finally {
     button.disabled = false;
   }
