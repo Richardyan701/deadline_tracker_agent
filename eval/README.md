@@ -9,13 +9,13 @@ This folder checks how well the outline reader (`deadline_agent/outline.py`) fin
 | `run_eval.py` | The script that runs the measurement | Yes |
 | `answer_key/<code>.json` | The right answers for one outline, for example `answer_key/33130.json` | Yes |
 | `answer_key/EXAMPLE.json` | A made up key that shows the format. It is never scored | Yes |
-| `outlines/<code>.pdf` | The outline PDFs, for example `outlines/33130.pdf` | No. They are UTS documents, so `eval/.gitignore` keeps them off GitHub |
+| `outlines/<code>.<ending>` | The outline files, for example `outlines/33130.pdf` or `outlines/35010.docx` | No. They are UTS documents, so `eval/.gitignore` keeps them off GitHub |
 | `results.md` | The scores from the last run | Yes, once you have run it |
 
 ## How to run it
 
 1. Run the setup script once if you have not already (`./setup.sh` on Linux and macOS, `setup_windows.bat` on Windows). It creates `.venv` and saves your Gemini key in `deadline_agent/.env`. The measurement uses that same key.
-2. Make a folder called `outlines` inside `eval`, and copy each outline PDF into it, named after its subject code: `eval/outlines/33130.pdf`, `eval/outlines/35010.pdf` and so on.
+2. Make a folder called `outlines` inside `eval`, and copy each outline into it, named after its subject code: `eval/outlines/33130.pdf`, `eval/outlines/35010.pdf` and so on. An outline can be any kind of file the reader understands (see "Supported file types" in the main README), for example `eval/outlines/31250.docx`. Keep only one file for each subject code, or the script stops and asks you to remove the others.
 3. Make sure each outline has an answer key with the same code, for example `eval/answer_key/33130.json`, and that you have checked it and set `"checked": true` (see below).
 4. From the project folder, run:
 
@@ -41,7 +41,7 @@ Gemini's free tier only allows a few requests per minute. The script sends one r
 
 ### When it stops
 
-If anything goes wrong (a missing PDF, a typo in a key, a wrong API key, Gemini being busy or too slow, or an answer that cannot be read), the script stops, says why, and leaves `results.md` as it was. It never writes scores for only some of the outlines. Fix the problem and run it again.
+If anything goes wrong (a missing outline, a file the reader cannot open, a typo in a key, a wrong API key, Gemini being busy or too slow, or an answer that cannot be read), the script stops, says why, and leaves `results.md` as it was. It never writes scores for only some of the outlines. Fix the problem and run it again.
 
 ## The answer key format
 
@@ -68,7 +68,7 @@ The file has exactly three fields:
 | Field | Meaning |
 | --- | --- |
 | `subject` | The subject code and name, for people reading the file. It is not scored. |
-| `checked` | `false` while the key is a draft. Set it to `true` only after you have compared every item with the PDF yourself. Keys that are not checked are skipped and listed at the bottom of `results.md`. |
+| `checked` | `false` while the key is a draft. Set it to `true` only after you have compared every item with the outline yourself. Keys that are not checked are skipped and listed at the bottom of `results.md`. |
 | `items` | Every separately dated assessment item in the outline, in any order. |
 
 Each item has these fields. The first three are required. The timing fields you leave out count as `null`.
