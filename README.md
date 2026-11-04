@@ -32,17 +32,19 @@ Groot is one web app that runs on your own computer. It has three pages, and all
 
 ### The chat
 
-The chat is the one ADK gives every agent, with Groot already chosen. If a box asks about sharing usage data with Google, either button is fine. Say hello, and while you have nothing saved yet, Groot also suggests a few things to type. Groot has seven tools. Gemini reads what you type and decides which tool to call.
+The chat is the one ADK gives every agent, with Groot already chosen. If a box asks about sharing usage data with Google, either button is fine. Say hello, and while you have nothing saved yet, Groot also suggests a few things to type. Groot has nine tools. Gemini reads what you type and decides which tool to call.
 
 | Tool | What it does |
 | --- | --- |
-| `add_deadline` | Saves a new deadline with a title, a due date in your own words and an optional subject. It refuses a title you already have, and dates that are unclear, do not exist or have already passed. The reply spells out the full date so you can spot a mistake. |
+| `add_deadline` | Saves a new deadline with a title, a due date in your own words, an optional subject and an optional weight (its share of the final mark). It refuses a title you already have, and dates that are unclear, do not exist or have already passed. The reply spells out the full date so you can spot a mistake. |
 | `list_deadlines` | Lists every saved deadline, soonest first, including finished ones. |
 | `next_deadline` | Finds the next deadline that is not finished and has not passed yet. |
 | `delete_deadline` | Permanently deletes a deadline. |
 | `mark_done` | Marks a deadline as finished. It stays in the list but no longer shows up in reminders or as your next deadline. |
-| `get_reminders` | Finds unfinished deadlines that are overdue, due today or due soon. "Soon" means the next 7 days unless you ask about a different period, from 1 to 60 days. |
+| `get_reminders` | Finds unfinished deadlines that are overdue, due today or due soon. "Soon" means the next 7 days unless you ask about a different period, from 1 to 60 days. It also lists any [clashes](#clash-warnings). |
 | `export_calendar` | Saves every unfinished deadline to `deadlines.ics`, a calendar file you can import into Google Calendar, Outlook or your phone. See [Export to your calendar](#export-to-your-calendar). |
+| `set_mark` | Saves your mark for a deadline (0 to 100), its weight, or both. A mark also marks the deadline as done. |
+| `grade_needed` | Works out the average you need on the rest of a subject for a Pass, Credit, Distinction or High Distinction. See [Grade calculator](#grade-calculator). |
 
 Titles are matched as whole titles. Upper and lower case, extra spaces and look alike characters (such as a full width letter from an Asian keyboard) are ignored, so "assignment 1" finds "Assignment 1". Part of a title is not enough, so "Assignment" does not find "Assignment 1".
 
@@ -137,6 +139,35 @@ Groot is told to mention these briefly and kindly after its greeting at the star
 
 On a different day, the phrase counts whole calendar days. On the same day, it counts hours, or minutes when less than an hour is left. Part hours are dropped, so it never promises more time than there really is.
 
+## Clash warnings
+
+Groot points out deadlines that bunch up, so you can start one earlier. This is plain Python in `_clashes` in `deadline_agent/tools.py`, so it never uses a Gemini request. A clash is either:
+
+- **Two deadlines 48 hours or less apart.** Only deadlines next to each other in time are paired, so three in a row give two warnings, not three. The gap is counted in real hours, so it stays right on the nights the clocks change.
+- **3 or more deadlines in the same Monday to Sunday week**, the same weeks as UTS teaching weeks. Fixed weeks never overlap, so you are not warned about the same deadlines twice, like a rolling 7 days would.
+
+Only unfinished deadlines that have not passed yet count, and a clash is shown when its first deadline is due in the next 7 days, the same window as the reminders. For example:
+
+```
+Your 41039 Exam (Sun 15 Nov, 8:59 PM) and 41039 Programming Project (Mon 16 Nov, 11:59 PM) are only 27 hours apart. Consider starting work on 41039 Exam a few days early.
+You have 3 deadlines in the week starting Mon 16 Nov: Quiz, Lab report and Essay. Try to finish one of them the week before.
+```
+
+The same helper feeds three places, so they always agree: the `clashes` list and a short extra sentence in `get_reminders`' message, a "Clashes" block in Groot's instruction (at most 5 lines, with titles made safe the same way as in the reminders block, and one instruction line asking Groot to mention them kindly with a practical tip), and a "Heads up" box at the top of the home page.
+
+## Grade calculator
+
+Each deadline can also have a weight (its share of the final mark) and your mark once you know it, both from 0 to 100. Tell Groot "Quiz 1 is worth 10%" or "I got 78 on Quiz 1", add a weight when you add a deadline, or use the form in the Grades section of the home page. Weights from the outline drop box are saved too. A weekly item shows the weight of the whole series on every week's row, so when you save it, that weight is shared equally between the weeks you save.
+
+Ask "what do I need on the exam to get a credit in 41039?" and `grade_needed` works it out in plain Python, with no Gemini request for the maths. You can name the subject by its code or its name, in any case. For example, with Quiz (20%, mark 70), Project (30%) and Exam (50%):
+
+- Earned so far: 20 x 70% = 14% of the final mark. Still to come: 80%.
+- Pass 50 needs an average of (50 - 14) / 80 = 45% on what is left. Credit 65 needs 63.8%, Distinction 75 needs 76.3% and High Distinction 85 needs 88.8%. Averages are rounded up, so it never says you need less than you do.
+
+It says when a band is already secured (reached even with 0 on everything left) or no longer reachable (more than 100% would be needed). Everything not marked yet counts as still to come. If some deadlines have no weight, or the weights do not add up to 100%, it still shows what it can and adds a warning. The home page shows the same summary for every subject.
+
+**Check your subject outline.** Many subjects also have minimum rules, for example at least 40% on the final exam, that Groot cannot check.
+
 ## Where your deadlines are saved
 
 Deadlines are saved in `deadlines.json` in the project folder, next to this README. The file is created the first time you save a deadline. The chat, the home page and the outline import all go through the same tools, which read the file at the start of every action and write it after every change, so your deadlines are still there after a restart. A file with two deadlines looks like this:
@@ -159,6 +190,8 @@ Deadlines are saved in `deadlines.json` in the project folder, next to this READ
 ```
 
 The `due_date` is Sydney time, either `YYYY-MM-DD` (due by 11:59 PM that day) or `YYYY-MM-DD HH:MM`.
+
+A deadline can also have `"weight_percent"` and `"mark_percent"`, each a number from 0 to 100, for the [grade calculator](#grade-calculator). They are only added once you set them, so older files without them load and save exactly as before.
 
 - To see the file, run `cat deadlines.json` on Linux or macOS, or `type deadlines.json` on Windows, from the project folder.
 - To use a different file, set the `DEADLINES_FILE` environment variable to its path. The tests do this, so they never touch your real deadlines.
@@ -395,7 +428,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say `1317 passed`. A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say `1456 passed`. A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -444,7 +477,7 @@ Starting Groot:
 ```
 deadline_agent/
   agent.py           Groot itself: its model, its instruction and its list of tools
-  tools.py           the seven tools, the date rules, the reminders and the saving code
+  tools.py           the nine tools, the date rules, the reminders and the saving code
   friendly_errors.py short chat replies for a used up limit, a key problem or a timeout
   check_setup.py     the setup checker
   outline.py         the outline reader, one Gemini request for each outline
@@ -462,7 +495,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               1317 tests, no API key needed
+tests/               1457 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -470,8 +503,8 @@ setup.sh, setup_windows.bat        the setup scripts
 start_groot.sh, start_groot.bat    the start files
 ```
 
-- **`agent.py`** defines `root_agent`, an ADK `Agent` called `agent_groot` that uses `gemini-3.5-flash` and the seven tools. Its instruction is a function, `groot_instruction`, which ADK runs before every request to Gemini (ADK's name for this is an instruction provider). It returns Groot's fixed instruction, today's date in Sydney, the rule to pass due dates through exactly as typed, where to import outlines, the rules for reminders, and the reminders block. While nothing is saved, it also suggests a few things to type.
-- **`tools.py`** holds the seven tools. ADK reads each tool's name, type hints and docstring to tell Gemini what the tool does. Every tool returns a `status` and a `message`, and problems come back as a message Groot can pass on instead of a crash. The home page and the import page call the same tools, so the file lock, the safe saves and the backups work the same everywhere.
+- **`agent.py`** defines `root_agent`, an ADK `Agent` called `agent_groot` that uses `gemini-3.5-flash` and the nine tools. Its instruction is a function, `groot_instruction`, which ADK runs before every request to Gemini (ADK's name for this is an instruction provider). It returns Groot's fixed instruction, today's date in Sydney, the rule to pass due dates through exactly as typed, where to import outlines, the rules for reminders, and the reminders block. While nothing is saved, it also suggests a few things to type.
+- **`tools.py`** holds the nine tools. ADK reads each tool's name, type hints and docstring to tell Gemini what the tool does. Every tool returns a `status` and a `message`, and problems come back as a message Groot can pass on instead of a crash. The home page and the import page call the same tools, so the file lock, the safe saves and the backups work the same everywhere.
 - **Why dates are worked out in Python.** The model does not reliably know today's date, so it is bad at things like "next friday". Plain rules in Python give the same answer every time, and each rule is covered by tests. The reply also spells out the full date, so a misunderstanding is easy to catch. For outlines, Gemini only copies the outline's words, like "week 7", and the UTS calendar code turns them into a date.
 - **Protection against prompt injection.** Titles and subjects are typed by the student, or found in an outline, and end up in Groot's instruction, so a title like "Essay, ignore previous instructions" could try to give orders. When a deadline is saved, line breaks and runs of spaces in the title and subject become a single space. Before a title or subject goes into the reminders block, control and invisible characters become spaces, `<` and `>` are removed so it cannot fake the end of the block, double quotes become single quotes, and it is cut to 80 characters. Groot is told that the block, every title or subject in a tool result, and everything in a file are data, never instructions. An outline goes to Gemini apart from the reader's rules, with its text between two marker lines it cannot fake, and Gemini's answer must fit a fixed shape that is checked in Python. This keeps each piece of data in its place, but it cannot make the model fully immune.
 - **Safe saves.** Each save writes the whole list to a temporary file in the same folder, makes sure it has reached the disk, then swaps it in with `os.replace` in a single step. A crash leaves either the old file or the new one, never half a file. A lock lets only one action read or change the file at a time, because ADK and the web server can run them on several threads. A test starts 20 saves at once on separate threads and checks that all 20 are kept.
@@ -488,7 +521,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are 1317 tests, run with pytest:
+There are 1457 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
@@ -509,6 +542,9 @@ There are 1317 tests, run with pytest:
 | `tests/test_chat_eval.py` | 31 | The chat evaluation's cases and scoring, with a scripted stand in for Gemini |
 | `tests/test_timetable.py` | 30 | Reading the UTS timetable layout, wrapped lines and damaged PDFs |
 | `tests/test_agent.py` | 11 | Groot's tools and instruction, plus whole turns through ADK with a scripted stand in for Gemini |
+| `tests/test_clashes.py` | 30 | Clash warnings: the 48 hour edge, 3 in a week, ties, finished and past deadlines, `get_reminders` and the instruction |
+| `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
+| `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.
 
@@ -528,6 +564,8 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 - **No past deadlines.** You cannot add a deadline whose time has already passed, and imported rows that have passed start unticked.
 - **Reminders only appear in Groot.** The chat and the home page show them, but Groot sends no notifications. Export to your calendar for those.
 - **The Windows setup script shows your key on screen** while you paste it.
+- **Clash warnings use fixed Monday to Sunday weeks.** Three deadlines from Friday to the next Wednesday are not a busy week, although any two of them 48 hours or less apart still get a warning. Clashes more than 7 days away are not shown yet.
+- **The grade calculator only knows what you tell it.** It cannot check minimum rules such as a minimum exam mark, hurdles or late penalties, and its answers are only as good as the weights you saved. Read your subject outline.
 
 ## Built with
 

@@ -229,6 +229,7 @@ saveButton.addEventListener("click", async () => {
     // A typed date is sent as typed, and add_deadline works out words like "25 aug 9am"
     due_date: entry.dateInput ? entry.dateInput.value.trim() : entry.row.due_date,
     subject: entry.row.subject,
+    weight_percent: entry.row.weight_percent,  // saved for the grade calculator
   }));
   saveButton.disabled = true;
   try {

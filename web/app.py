@@ -3,14 +3,15 @@
 build_app() makes the FastAPI app that `adk web` runs (the chat at /dev-ui/)
 and adds Groot's routes under /groot:
 
-    GET  /groot               home page: due soon, all deadlines, add form. Never uses Gemini.
+    GET  /groot               home page: heads up, due soon, all deadlines, add form, grades. Never uses Gemini.
     GET  /groot/import        the outline drop box
     POST /groot/api/add       add a deadline          JSON {"title", "due_date", "subject"}
     POST /groot/api/done      mark a deadline done    JSON {"title"}
     POST /groot/api/delete    delete a deadline       JSON {"title"}
+    POST /groot/api/mark      save a mark or weight   JSON {"title", "mark_percent", "weight_percent"}
     POST /groot/api/export    download deadlines.ics  JSON {}
     POST /groot/api/preview   read outlines (Gemini)  multipart form, see uploads.py
-    POST /groot/api/save      save the ticked rows    JSON {"rows": [{"title", "due_date", "subject"}]}
+    POST /groot/api/save      save the ticked rows    JSON {"rows": [{"title", "due_date", "subject", "weight_percent"}]}
 
 Every change goes through the tools in deadline_agent/tools.py, so the file
 lock, the safe saves and the backups work exactly as they do in the chat.
@@ -125,7 +126,8 @@ def _page(html: str) -> HTMLResponse:
 def home() -> HTMLResponse:
     """The home page. It only reads the deadlines file, so it never uses Gemini."""
     deadlines = tools.list_deadlines()["deadlines"]
-    return _page(pages.home_page(tools.get_reminders(), deadlines, tools._now()))
+    grades = tools._all_grade_reports()
+    return _page(pages.home_page(tools.get_reminders(), deadlines, tools._now(), grades))
 
 
 @router.get("/import", response_class=HTMLResponse)
@@ -160,6 +162,12 @@ def delete(data: dict = Depends(json_from_groot)) -> dict:
     return tools.delete_deadline(data.get("title"))
 
 
+@router.post("/api/mark")
+def mark(data: dict = Depends(json_from_groot)) -> dict:
+    """Save a mark, a weight or both with set_mark, which checks each is a number from 0 to 100."""
+    return tools.set_mark(data.get("title"), data.get("mark_percent"), data.get("weight_percent"))
+
+
 @router.post("/api/export", dependencies=[Depends(json_from_groot)])
 def export() -> Response:
     """Save the calendar file with export_calendar, then send it to the browser to download."""
@@ -191,6 +199,7 @@ def save(data: dict = Depends(json_from_groot)) -> dict:
     rows = data.get("rows")
     if not isinstance(rows, list) or not all(isinstance(row, dict) and SAVE_FIELDS <= row.keys() for row in rows):
         raise Refused(400, 'Each row to save needs a "title", a "due_date" and a "subject".')
+    # weight_percent is optional, so rows from an older page without it still save
     results = importer.save_rows(rows)
     saved = sum(result["status"] == "success" for result in results)
     if not rows:

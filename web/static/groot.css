@@ -530,3 +530,59 @@ input[type="checkbox"] {
     font-size: 0.9rem;
   }
 }
+
+/* ---------- heads up (deadline clashes) ---------- */
+
+.heads-up {
+  border-color: #e0b25a;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+}
+
+/* A hidden box must stay hidden, whatever the section rule above says */
+[hidden] {
+  display: none !important;
+}
+
+.clashes {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.clashes li + li {
+  margin-top: 0.4rem;
+}
+
+/* ---------- grades ---------- */
+
+.grade-summary {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.grade-summary h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.bands {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.bands li.secured {
+  color: var(--ok-ink);
+}
+
+.bands li.not_reachable {
+  color: var(--greyed);
+}
+
+.grade-warning {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+}
