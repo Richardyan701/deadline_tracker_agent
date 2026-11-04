@@ -479,11 +479,13 @@ def test_ods_sheets_show_values_never_formulas_and_repeats_are_written_out():
         "<table:table-row><table:table-cell><text:p>Task</text:p></table:table-cell>"
         "<table:table-cell><text:p>Weight</text:p></table:table-cell></table:table-row>"
         '<table:table-row table:number-rows-repeated="3"><table:table-cell><text:p>Quiz</text:p></table:table-cell>'
-        '<table:table-cell table:number-columns-repeated="2"><text:p>5%</text:p></table:table-cell></table:table-row>'
+        '<table:table-cell table:number-columns-repeated="2"><text:p>5%</text:p></table:table-cell>'
+        # LibreOffice saves the empty cells up to the right edge of the sheet like this
+        '<table:table-cell table:number-columns-repeated="16381"/></table:table-row>'
         '<table:table-row><table:table-cell><text:p>Total</text:p></table:table-cell>'
         '<table:table-cell table:formula="of:=SUM([.B2:.B3])" office:value-type="percentage" office:value="0.2">'
         "<text:p>20%</text:p></table:table-cell></table:table-row>"
-        # LibreOffice ends every sheet like this: empty rows repeated to the bottom of the sheet
+        # A million empty rows saved as one repeated row must not be written out
         '<table:table-row table:number-rows-repeated="1048571"><table:table-cell table:number-columns-repeated="1024"/>'
         "</table:table-row></table:table>"
         '<table:table table:name="Notes"><table:table-row><table:table-cell><text:p>Check Canvas</text:p>'
