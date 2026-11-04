@@ -1,0 +1,53 @@
+{
+  "subject": "99999 Example Subject (made up, never scored)",
+  "checked": false,
+  "items": [
+    {
+      "name": "Skills Test 1",
+      "weight_percent": 10,
+      "when": "week",
+      "week": 2,
+      "note": "Outline: \"Skills test 1 is due in week 2\""
+    },
+    {
+      "name": "Skills Test 2",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "Outline: \"Skills Tests 2 and 3 are held during the tutorial classes\""
+    },
+    {
+      "name": "Skills Test 3",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "Same sentence as Skills Test 2, so the same timing"
+    },
+    {
+      "name": "Weekly quizzes",
+      "weight_percent": 20,
+      "when": "recurring",
+      "first_week": 4,
+      "note": "Outline: \"Each week starting from week 4\". No end week is given, so last_week is left out (null)"
+    },
+    {
+      "name": "Assignment 1",
+      "weight_percent": 20,
+      "when": "date",
+      "date": "2026-09-04",
+      "weekday": "friday",
+      "time": "23:59",
+      "note": "Outline: \"Due Friday 4 September 2026 at 11:59pm\""
+    },
+    {
+      "name": "Group report",
+      "weight_percent": 10,
+      "when": "unknown",
+      "note": "Outline only gives the task and its weight. Details are on Canvas"
+    },
+    {
+      "name": "Final exam",
+      "weight_percent": 20,
+      "when": "exam_period",
+      "note": "Outline: \"The final exam is a centrally-conducted exam\""
+    }
+  ]
+}
