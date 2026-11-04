@@ -41,9 +41,7 @@ echo Kept your existing deadline_agent\.env.
 
 :done
 echo.
-echo All done. To start Groot, run this from the project folder:
-echo   .\.venv\Scripts\adk.exe web --port 8000
-echo Then open http://127.0.0.1:8000 in your browser and choose deadline_agent.
+echo All done. To start Groot, double click start_groot.bat in this folder.
 pause
 exit /b 0
 
