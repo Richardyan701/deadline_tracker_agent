@@ -5,10 +5,11 @@ Run it from the project folder:
     .venv/bin/python -m eval.run_eval            (Linux and macOS)
     .\.venv\Scripts\python.exe -m eval.run_eval  (Windows)
 
-It reads every checked answer key in eval/answer_key/, sends the outline PDF
-with the same subject code from eval/outlines/ to Gemini through
-extract_items, compares the two, and writes the scores to eval/results.md.
-eval/README.md explains the answer key format and how every score works.
+It reads every checked answer key in eval/answer_key/, sends the outline with
+the same subject code from eval/outlines/ (for example 33130.pdf or
+33130.docx) to Gemini through extract_items, compares the two, and writes the
+scores to eval/results.md. eval/README.md explains the answer key format and
+how every score works.
 
 Gemini's free tier only allows a few requests a minute, so this waits between
 outlines and never sends more than 4 requests in any minute.
@@ -21,7 +22,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from time import monotonic, sleep
 
-from deadline_agent import outline
+from deadline_agent import documents, outline
 
 EVAL_DIR = Path(__file__).resolve().parent
 OUTLINES_DIR = EVAL_DIR / "outlines"
@@ -56,7 +57,7 @@ DATE_FIELD = {"date": "date", "week": "week", "tutorial": "week", "recurring": "
 
 
 class EvalError(Exception):
-    """A problem with an answer key or a PDF. The message says how to fix it."""
+    """A problem with an answer key or an outline file. The message says how to fix it."""
 
 
 # ---------- answer keys ----------
@@ -122,30 +123,40 @@ def load_keys(keys_dir: Path) -> tuple[dict, list]:
 # ---------- reading the outlines ----------
 
 
+def find_outline(code: str, outlines_dir: Path) -> Path:
+    """The one outline file for this subject code, for example 33130.pdf or 33130.docx."""
+    matches = [
+        path
+        for path in sorted(outlines_dir.glob(f"{code}.*"))
+        if path.is_file() and path.stem == code and path.suffix.lower() in documents.SUPPORTED_EXTENSIONS
+    ]
+    if not matches:
+        raise EvalError(f"There is no outline for {code}. Put it in {outlines_dir}, named like {code}.pdf or {code}.docx")
+    if len(matches) > 1:
+        names = ", ".join(path.name for path in matches)
+        raise EvalError(f"There is more than one outline for {code} ({names}). Keep only one of them in {outlines_dir}")
+    return matches[0]
+
+
 def read_outlines(codes: list, outlines_dir: Path, client=None) -> dict:
-    """Run extract_items on each outline PDF, waiting so there are at most 4 requests a minute.
+    """Run extract_items on each outline file, waiting so there are at most 4 requests a minute.
 
     Returns {code: extracted items}. Any OutlineError stops the whole run.
     """
-    # Find every PDF first, so a missing file does not waste requests
-    pdfs = {}
-    for code in codes:
-        path = outlines_dir / f"{code}.pdf"
-        if not path.is_file():
-            raise EvalError(f"There is no PDF for {code}. Put the outline at {path}")
-        pdfs[code] = path.read_bytes()
+    # Find every outline first, so a missing file does not waste requests
+    paths = {code: find_outline(code, outlines_dir) for code in codes}
 
     found = {}
     last_start = None
-    for code, pdf in pdfs.items():
+    for code, path in paths.items():
         if last_start is not None:
             wait = SECONDS_BETWEEN_REQUESTS - (monotonic() - last_start)
             if wait > 0:
                 print(f"  Waiting {wait:.0f} seconds to stay under {REQUESTS_PER_MINUTE} requests a minute...")
                 sleep(wait)
         last_start = monotonic()
-        print(f"Reading {code}.pdf with {outline.MODEL}...")
-        found[code] = outline.extract_items(pdf, client)
+        print(f"Reading {path.name} with {outline.MODEL}...")
+        found[code] = outline.extract_items(path.read_bytes(), filename=path.name, client=client)
     return found
 
 

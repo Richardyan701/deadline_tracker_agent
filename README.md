@@ -162,6 +162,34 @@ Good to know:
 - Importing never deletes anything. A deadline you finish or delete in Groot stays in your calendar until you delete it there.
 - Google Calendar may use your own notification settings instead of the 1 day reminder in the file.
 
+## Supported file types
+
+The outline reader (`deadline_agent/outline.py`) reads subject outlines in all of these formats. `deadline_agent/documents.py` works out what a file really is from its contents, so a file with the wrong ending is still read the right way. The name only matters for plain text, to tell a `.csv` file from a `.txt` file.
+
+| Format | Endings | What Gemini gets |
+| --- | --- | --- |
+| PDF | `.pdf` | The file itself |
+| Picture | `.png`, `.jpg`, `.jpeg`, `.webp` | The picture itself, for example a photo or screenshot of an outline |
+| Word | `.docx`, `.doc` | The text of every paragraph and every table, in order |
+| PowerPoint | `.pptx`, `.ppt` | The text and tables of every slide under a "Slide 1", "Slide 2" heading, and the speaker notes |
+| Excel | `.xlsx`, `.xls` | Every sheet under a "Sheet: name" heading, one row per line. Only values are read, never formulas, and dates and percentages look the way Excel shows them |
+| OpenDocument | `.odt`, `.odp`, `.ods` | The same as Word, PowerPoint and Excel |
+| CSV | `.csv` | Read like one sheet |
+| Text | `.txt`, `.md` | The text as it is |
+| Web page | `.html`, `.htm` | The words a browser would show, without scripts and styles |
+
+Wherever an outline is sent as text, each table row stays on one line with its cells separated by a vertical bar, like `Skills Test 1 | 10% | Week 2`, because the assessment table is the most important part.
+
+**From Google Docs, Sheets or Slides.** Groot cannot open a Google link, so download a copy first. Open the file and choose **File**, then **Download**, then **Microsoft Word (.docx)** in Docs, **Microsoft Excel (.xlsx)** in Sheets or **Microsoft PowerPoint (.pptx)** in Slides. **PDF Document (.pdf)** works in all three.
+
+**Old .doc and .ppt files need LibreOffice.** Groot turns them into `.docx` or `.pptx` with [LibreOffice](https://www.libreoffice.org), which is free, and then reads that copy. The `soffice` or `libreoffice` command must be on your PATH. On Linux the LibreOffice package adds it for you. On Windows add `C:\Program Files\LibreOffice\program` to PATH, and on macOS add `/Applications/LibreOffice.app/Contents/MacOS`. Without LibreOffice, Groot says "This is an old Word/PowerPoint file. Save it as .docx, .pptx or PDF and try again." Old `.xls` files do not need LibreOffice.
+
+**What is refused.** Nothing inside a file is ever run.
+
+- Files with macros are always refused: `.docm`, `.xlsm` and `.pptm` files, and any Word, Excel or PowerPoint file that holds macros, whatever its name.
+- Files locked with a password, empty files and kinds not in the table get a one sentence message that lists the formats above. A PDF that is only locked against editing or printing still opens without a password, so it is read as usual.
+- A file can be at most 10 MB. Word, PowerPoint, Excel and OpenDocument files are zip files inside, so before one is opened Groot checks that it unpacks to at most 50 MB and has at most 1,000 parts, which stops "zip bombs". Spreadsheets are read up to 5,000 rows and 50,000 cells, and at most 200,000 characters of text are sent to Gemini. When the text is cut, a note at the end tells Gemini.
+
 ## Example chats
 
 These two chats are real output from a test run with the real Gemini model.
@@ -308,7 +336,9 @@ deadline_agent/
   .env.example     example key file (the real .env is never committed)
 tests/             383 tests, no API key needed
 .github/workflows/tests.yml
-requirements.txt   google-adk 2.11.0, pytest 9.2.0, tzdata 2026.6
+requirements.txt   google-adk 2.11.0, httpx 0.28.1, icalendar 7.3.0, pypdf 6.21.4, pytest 9.2.0,
+                   tzdata 2026.6, and for outline files python-docx 1.2.0, python-pptx 1.0.2,
+                   openpyxl 3.1.5, xlrd 2.0.2, olefile 0.47, defusedxml 0.7.1 and pillow 12.3.0
 setup.sh           setup for Linux and macOS
 setup_windows.bat  setup for Windows
 ```

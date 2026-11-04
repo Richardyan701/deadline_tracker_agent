@@ -327,12 +327,43 @@ def test_a_key_must_be_named_after_its_subject_code(tmp_path):
 # ---------- reading the outlines ----------
 
 
-def test_a_missing_pdf_stops_the_run_before_any_request(tmp_path, clock):
+def test_a_missing_outline_stops_the_run_before_any_request(tmp_path, clock):
     (tmp_path / "11111.pdf").write_bytes(pdf("11111"))
     client = FakeClient({}, clock)
-    with pytest.raises(EvalError, match="no PDF for 22222"):
+    with pytest.raises(EvalError, match="no outline for 22222"):
         run_eval.read_outlines(["11111", "22222"], tmp_path, client)
     assert client.starts == []
+
+
+def test_an_outline_can_be_any_kind_of_file_groot_reads(tmp_path, monkeypatch):
+    (tmp_path / "11111.docx").write_bytes(b"a Word outline")
+    (tmp_path / "22222.PDF").write_bytes(pdf("22222"))  # capital letters in the ending are fine
+    calls = []
+
+    def fake_extract_items(data, filename=None, client=None):
+        calls.append((data, filename, client))
+        return []
+
+    monkeypatch.setattr(run_eval.outline, "extract_items", fake_extract_items)
+    run_eval.read_outlines(["11111", "22222"], tmp_path, client="the client")
+
+    # The file name goes along as the hint for documents.py
+    assert calls == [(b"a Word outline", "11111.docx", "the client"), (pdf("22222"), "22222.PDF", "the client")]
+
+
+def test_files_that_are_not_an_outline_for_the_code_are_ignored(tmp_path):
+    (tmp_path / "11111.json").write_text("{}")  # not a kind Groot reads
+    (tmp_path / "11111.old.pdf").write_bytes(pdf("11111"))  # named after something else
+    (tmp_path / "11111.txt").mkdir()  # a folder, not a file
+    with pytest.raises(EvalError, match="no outline for 11111"):
+        run_eval.find_outline("11111", tmp_path)
+
+
+def test_two_outlines_for_one_code_stop_the_run(tmp_path):
+    (tmp_path / "11111.pdf").write_bytes(pdf("11111"))
+    (tmp_path / "11111.docx").write_bytes(b"a Word outline")
+    with pytest.raises(EvalError, match=r"more than one outline for 11111 \(11111.docx, 11111.pdf\)"):
+        run_eval.find_outline("11111", tmp_path)
 
 
 def test_requests_are_spaced_out_to_stay_under_4_a_minute(tmp_path, clock):
