@@ -1,0 +1,357 @@
+r"""Measure how well the outline reader finds the deadlines in real UTS outlines.
+
+Run it from the project folder:
+
+    .venv/bin/python -m eval.run_eval            (Linux and macOS)
+    .\.venv\Scripts\python.exe -m eval.run_eval  (Windows)
+
+It reads every checked answer key in eval/answer_key/, sends the outline PDF
+with the same subject code from eval/outlines/ to Gemini through
+extract_items, compares the two, and writes the scores to eval/results.md.
+eval/README.md explains the answer key format and how every score works.
+
+Gemini's free tier only allows a few requests a minute, so this waits between
+outlines and never sends more than 4 requests in any minute.
+"""
+
+import json
+import re
+import sys
+from difflib import SequenceMatcher
+from pathlib import Path
+from time import monotonic, sleep
+
+from deadline_agent import outline
+
+EVAL_DIR = Path(__file__).resolve().parent
+OUTLINES_DIR = EVAL_DIR / "outlines"
+KEYS_DIR = EVAL_DIR / "answer_key"
+RESULTS_FILE = EVAL_DIR / "results.md"
+
+# The made up key that shows the format. It is never scored.
+EXAMPLE_KEY = "EXAMPLE.json"
+
+# At most 4 requests a minute: 60 / 4 = 15 seconds apart, plus 1 spare second for network delays.
+# extract_items sends exactly one request per outline, so one outline is one request.
+REQUESTS_PER_MINUTE = 4
+SECONDS_BETWEEN_REQUESTS = 60 / REQUESTS_PER_MINUTE + 1
+
+# Two names can be paired when they are at least this alike (0 to 1), as in the spec's Canvas matching.
+MATCH_THRESHOLD = 0.6
+
+# Two weights are the same when they are at most this far apart, so 3.33 equals 3.333.
+WEIGHT_TOLERANCE = 0.05
+
+# The fields that say when an item happens. Two timings are the same only if all of these are.
+TIMING_FIELDS = ["when", "date", "week", "first_week", "last_week", "weekday", "time"]
+
+# The fields an answer key may have. In each item, the timing fields left out count as null.
+KEY_FIELDS = {"subject", "checked", "items"}
+KEY_ITEM_REQUIRED = {"name", "weight_percent", "when"}
+KEY_ITEM_FIELDS = KEY_ITEM_REQUIRED | set(TIMING_FIELDS) | {"note"}
+
+# The field each kind of timing needs before the app can give it a date (spec's rules table).
+# A tutorial with no week, the exam period and unknown never get a date.
+DATE_FIELD = {"date": "date", "week": "week", "tutorial": "week", "recurring": "first_week"}
+
+
+class EvalError(Exception):
+    """A problem with an answer key or a PDF. The message says how to fix it."""
+
+
+# ---------- answer keys ----------
+
+
+def load_key(path: Path) -> dict:
+    """Read one answer key and check it. Returns {"checked": True or False, "items": [...]}.
+
+    Each item goes through the same checks as Gemini's answers, so a typo
+    (like "Friday" instead of "friday") stops the run instead of quietly
+    spoiling the scores.
+    """
+    try:
+        key = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise EvalError(f"{path.name} is not valid JSON: {error}") from error
+    if not isinstance(key, dict) or set(key) != KEY_FIELDS:
+        raise EvalError(f"{path.name} must have exactly these fields: checked, items, subject.")
+    if not isinstance(key["checked"], bool):
+        raise EvalError(f'{path.name}: "checked" must be true or false.')
+    if not isinstance(key["items"], list):
+        raise EvalError(f'{path.name}: "items" must be a list.')
+
+    items = []
+    for number, raw in enumerate(key["items"], start=1):
+        where = f"{path.name} item {number}"
+        if not isinstance(raw, dict):
+            raise EvalError(f"{where} is not an object.")
+        missing = KEY_ITEM_REQUIRED - set(raw)
+        if missing:
+            raise EvalError(f"{where} is missing {', '.join(sorted(missing))}.")
+        unknown = set(raw) - KEY_ITEM_FIELDS
+        if unknown:
+            raise EvalError(f"{where} has unknown fields: {', '.join(sorted(unknown))}. Check the spelling in eval/README.md.")
+        try:
+            checked = outline.check_item(raw, "00000", "")
+        except outline.OutlineError as error:
+            raise EvalError(f"{where} needs a name.") from error
+        # "when" goes last, so a bad date is reported as the date and not as its "when"
+        for field in ["name", "weight_percent", "date", "week", "first_week", "last_week", "weekday", "time", "when"]:
+            if checked[field] != raw.get(field):
+                raise EvalError(f"{where}: {field} {raw.get(field)!r} does not follow the rules in eval/README.md.")
+        items.append({field: checked[field] for field in ["name", "weight_percent", *TIMING_FIELDS]})
+    return {"checked": key["checked"], "items": items}
+
+
+def load_keys(keys_dir: Path) -> tuple[dict, list]:
+    """Read every answer key. Returns ({code: items} for checked keys, [codes] of keys not checked yet)."""
+    checked, unchecked = {}, []
+    for path in sorted(keys_dir.glob("*.json")):
+        if path.name == EXAMPLE_KEY:
+            continue
+        if not re.fullmatch(r"[0-9]{5}", path.stem):
+            raise EvalError(f"{path.name}: an answer key must be named after its five digit subject code, like 33130.json.")
+        key = load_key(path)
+        if key["checked"]:
+            checked[path.stem] = key["items"]
+        else:
+            unchecked.append(path.stem)
+    return checked, unchecked
+
+
+# ---------- reading the outlines ----------
+
+
+def read_outlines(codes: list, outlines_dir: Path, client=None) -> dict:
+    """Run extract_items on each outline PDF, waiting so there are at most 4 requests a minute.
+
+    Returns {code: extracted items}. Any OutlineError stops the whole run.
+    """
+    # Find every PDF first, so a missing file does not waste requests
+    pdfs = {}
+    for code in codes:
+        path = outlines_dir / f"{code}.pdf"
+        if not path.is_file():
+            raise EvalError(f"There is no PDF for {code}. Put the outline at {path}")
+        pdfs[code] = path.read_bytes()
+
+    found = {}
+    last_start = None
+    for code, pdf in pdfs.items():
+        if last_start is not None:
+            wait = SECONDS_BETWEEN_REQUESTS - (monotonic() - last_start)
+            if wait > 0:
+                print(f"  Waiting {wait:.0f} seconds to stay under {REQUESTS_PER_MINUTE} requests a minute...")
+                sleep(wait)
+        last_start = monotonic()
+        print(f"Reading {code}.pdf with {outline.MODEL}...")
+        found[code] = outline.extract_items(pdf, client)
+    return found
+
+
+# ---------- pairing key items with extracted items ----------
+
+
+def normalise(name: str) -> str:
+    """Lower case, with each run of punctuation and spaces turned into one space."""
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", name.lower()).split())
+
+
+def name_similarity(key_name: str, found_name: str) -> float:
+    """How alike two names are, from 0 (nothing alike) to 1 (the same after normalising).
+
+    Every number in the key's name must also be in the found name, otherwise
+    it is 0. So "Skills Test 2" is never paired with "Skills Test 7".
+    """
+    key_name, found_name = normalise(key_name), normalise(found_name)
+    if not set(re.findall(r"[0-9]+", key_name)) <= set(re.findall(r"[0-9]+", found_name)):
+        return 0.0
+    return SequenceMatcher(None, key_name, found_name).ratio()
+
+
+def match_items(key_items: list, found_items: list) -> list[tuple[int, int]]:
+    """Pair each key item with at most one extracted item, best pairs first.
+
+    Returns (key position, found position) pairs, sorted by key position.
+    Pairs below MATCH_THRESHOLD are never made. When two pairs are equally
+    alike, the one that comes first in the key wins, then the one that comes
+    first in Gemini's answer, so the result is the same every run.
+    """
+    candidates = []
+    for k, key_item in enumerate(key_items):
+        for f, found_item in enumerate(found_items):
+            score = name_similarity(key_item["name"], found_item["name"])
+            if score >= MATCH_THRESHOLD:
+                candidates.append((-score, k, f))  # minus, so the most alike sorts first
+
+    pairs = []
+    used_keys, used_found = set(), set()
+    for _, k, f in sorted(candidates):
+        if k not in used_keys and f not in used_found:
+            pairs.append((k, f))
+            used_keys.add(k)
+            used_found.add(f)
+    return sorted(pairs)
+
+
+# ---------- scores ----------
+
+
+def gives_a_date(item: dict) -> bool:
+    """True if the app would show this item with a date (status exact or assumed)."""
+    field = DATE_FIELD.get(item["when"])
+    return field is not None and item[field] is not None
+
+
+def same_timing(key_item: dict, found_item: dict) -> bool:
+    """True if every timing field is the same, so the calendar would turn both into the same day."""
+    return all(key_item[field] == found_item[field] for field in TIMING_FIELDS)
+
+
+def same_weight(key_weight, found_weight) -> bool:
+    """True if both weights are missing, or they are within WEIGHT_TOLERANCE of each other."""
+    if key_weight is None or found_weight is None:
+        return key_weight is None and found_weight is None
+    return abs(key_weight - found_weight) <= WEIGHT_TOLERANCE
+
+
+def describe_timing(item: dict) -> str:
+    """The timing fields that are set, for example "when=week, week=2"."""
+    return ", ".join(f"{field}={item[field]}" for field in TIMING_FIELDS if item[field] is not None)
+
+
+def score_outline(key_items: list, found_items: list) -> dict:
+    """Compare one outline's answer key with what was extracted. Returns counts and the mistakes."""
+    pairs = match_items(key_items, found_items)
+    paired_keys = {k for k, _ in pairs}
+    paired_found = {f for _, f in pairs}
+    score = {
+        "key_items": len(key_items),
+        "found_items": len(found_items),
+        "matched": len(pairs),
+        "weights_right": 0,
+        "dated": 0,
+        "dates_right": 0,
+        "silently_wrong": 0,
+        "missed": [item["name"] for k, item in enumerate(key_items) if k not in paired_keys],
+        "invented": [item["name"] for f, item in enumerate(found_items) if f not in paired_found],
+        "wrong_weights": [],
+        "wrong_timings": [],
+    }
+    for k, f in pairs:
+        key_item, found_item = key_items[k], found_items[f]
+        if same_weight(key_item["weight_percent"], found_item["weight_percent"]):
+            score["weights_right"] += 1
+        else:
+            score["wrong_weights"].append(
+                f'"{key_item["name"]}": key {key_item["weight_percent"]}, found {found_item["weight_percent"]}'
+            )
+
+        right = same_timing(key_item, found_item)
+        if gives_a_date(key_item):
+            score["dated"] += 1
+            if right:
+                score["dates_right"] += 1
+        if not right:
+            # If the wrong timing still gives a date, the student sees it with no warning
+            silent = gives_a_date(found_item)
+            if silent:
+                score["silently_wrong"] += 1
+            score["wrong_timings"].append(
+                f'"{key_item["name"]}": key {describe_timing(key_item)}, found {describe_timing(found_item)}'
+                + (" (silently wrong)" if silent else "")
+            )
+    return score
+
+
+# ---------- results.md ----------
+
+COUNTS = ["key_items", "found_items", "matched", "weights_right", "dated", "dates_right", "silently_wrong"]
+
+
+def fraction(part: int, whole: int) -> str:
+    """For example "9 of 10 (90%)". With nothing to count it is just "0 of 0"."""
+    if whole == 0:
+        return "0 of 0"
+    return f"{part} of {whole} ({part / whole:.0%})"
+
+
+def table_row(label: str, score: dict) -> str:
+    """One row of the results table."""
+    cells = [
+        label,
+        fraction(score["matched"], score["key_items"]),
+        fraction(score["matched"], score["found_items"]),
+        fraction(score["weights_right"], score["matched"]),
+        fraction(score["dates_right"], score["dated"]),
+        str(score["silently_wrong"]),
+    ]
+    return "| " + " | ".join(cells) + " |"
+
+
+def render(scores: dict, unchecked: list) -> str:
+    """The whole results.md file."""
+    total = {name: sum(score[name] for score in scores.values()) for name in COUNTS}
+    lines = [
+        "# Outline reader accuracy",
+        "",
+        f"Made by `eval/run_eval.py` with {outline.MODEL} on {len(scores)} outline(s)."
+        " eval/README.md explains how each score is worked out.",
+        "",
+        "| Outline | Items found (recall) | Items not invented (precision) | Weights correct | Dates correct | Silently wrong dates |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    lines += [table_row(code, score) for code, score in scores.items()]
+    lines.append(table_row("All", total))
+
+    for code, score in scores.items():
+        lines += ["", f"## {code}", ""]
+        for title, mistakes in [
+            ("Missed", score["missed"]),
+            ("Invented", score["invented"]),
+            ("Wrong weight", score["wrong_weights"]),
+            ("Wrong timing", score["wrong_timings"]),
+        ]:
+            if not mistakes:
+                lines.append(f"- {title}: none")
+            else:
+                lines.append(f"- {title}:")
+                lines += [f"  - {mistake}" for mistake in mistakes]  # one mistake per line
+
+    if unchecked:
+        lines += ["", "Not counted, because the answer key is not checked yet: " + ", ".join(unchecked) + "."]
+    return "\n".join(lines) + "\n"
+
+
+# ---------- running it ----------
+
+
+def evaluate(outlines_dir: Path, keys_dir: Path, client=None) -> str:
+    """Score every checked answer key against its outline and return the text of results.md."""
+    keys, unchecked = load_keys(keys_dir)
+    for code in unchecked:
+        print(f"Skipping {code}: its answer key is not checked yet.")
+    if not keys:
+        raise EvalError('There are no checked answer keys yet. Set "checked": true in a key once you have checked it.')
+    found = read_outlines(list(keys), outlines_dir, client)
+    scores = {code: score_outline(keys[code], found[code]) for code in keys}
+    return render(scores, unchecked)
+
+
+def main() -> None:
+    print(
+        f"Gemini's free tier allows only a few requests a minute, so this sends at most {REQUESTS_PER_MINUTE}"
+        f" a minute ({SECONDS_BETWEEN_REQUESTS:.0f} seconds apart)."
+    )
+    try:
+        results = evaluate(OUTLINES_DIR, KEYS_DIR)
+    except (EvalError, outline.OutlineError) as error:
+        sys.exit(f"Stopped. eval/results.md was not changed.\n{error}")
+    RESULTS_FILE.write_text(results, encoding="utf-8", newline="\n")
+    print()
+    print(results)
+    print(f"Saved to {RESULTS_FILE}")
+
+
+if __name__ == "__main__":
+    main()
