@@ -568,7 +568,10 @@ def test_checker_explains_missing_packages_instead_of_crashing(tmp_path):
     result = run_checker(tmp_path, "-S")
 
     assert result.returncode == 1, result.stderr
-    assert "✗ Packages: google-adk is not installed, pytest is not installed, tzdata is not installed" in result.stdout
+    # Every package in requirements.txt is missing, in the same order as that file.
+    names = [line.split("==")[0].strip() for line in (PROJECT / "requirements.txt").read_text().splitlines() if line.strip()]
+    missing = ", ".join(f"{name} is not installed" for name in names)
+    assert f"✗ Packages: {missing}" in result.stdout
 
 
 def test_checker_explains_a_missing_time_zone_database(tmp_path):
