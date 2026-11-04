@@ -514,17 +514,24 @@ def _read_ods(data: bytes) -> str:
 def _ods_rows(sheet):
     """Each row of one OpenDocument sheet.
 
-    A run of identical rows or cells is saved once with a repeat count, which
-    can be huge (for example the empty rows to the end of the sheet). Empty
-    rows are never repeated, and the other repeats stop at the limits.
+    A run of identical cells or rows is saved once with a repeat count.
+    LibreOffice saves the empty cells up to the right edge of the sheet like
+    that, about 16,000 of them, so empty cells at the end of a row are dropped
+    before anything is written out. Empty rows are never repeated, and the
+    other repeats stop at the limits.
     """
     for row in sheet.iter(ODF_ROW):
+        runs = [
+            (" ".join(_odf_lines(cell)), int(cell.get(TABLE + "number-columns-repeated", "1")))
+            for cell in row
+            if cell.tag in ODF_CELLS
+        ]
+        while runs and not runs[-1][0].strip():
+            runs.pop()
         cells = []
-        for cell in row:
-            if cell.tag in ODF_CELLS:
-                repeat = int(cell.get(TABLE + "number-columns-repeated", "1"))
-                cells += [" ".join(_odf_lines(cell))] * min(repeat, MAX_CELLS - len(cells))
-        repeat = int(row.get(TABLE + "number-rows-repeated", "1")) if any(c.strip() for c in cells) else 1
+        for text, repeat in runs:
+            cells += [text] * min(repeat, MAX_CELLS - len(cells))
+        repeat = int(row.get(TABLE + "number-rows-repeated", "1")) if cells else 1
         for _ in range(min(repeat, MAX_ROWS)):
             yield cells
 
