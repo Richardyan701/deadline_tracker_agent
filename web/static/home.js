@@ -1,0 +1,100 @@
+// Agent Groot's home page: mark done, delete, add a deadline and export to a calendar.
+// Each button calls Groot's JSON API, which runs the same tools as the chat.
+// Then the server draws the lists again, so they always match the deadlines file.
+import {answer, post, show, showOffline} from "./common.js";
+
+const topMessage = document.getElementById("top-message");
+const tableMessage = document.getElementById("table-message");
+const addForm = document.getElementById("add-form");
+const addMessage = document.getElementById("add-message");
+const exportButton = document.getElementById("export-button");
+
+// Ask the server for this page again and swap in its fresh lists.
+async function refreshLists() {
+  const response = await fetch("/groot");
+  if (!response.ok) {
+    throw new Error(`the home page answered ${response.status}`);  // shown as "Groot did not answer"
+  }
+  const fresh = new DOMParser().parseFromString(await response.text(), "text/html");
+  for (const id of ["due-soon-list", "deadline-table"]) {
+    document.getElementById(id).replaceWith(fresh.getElementById(id));
+  }
+}
+
+// The Mark done and Delete buttons. One listener for the whole page also
+// works for the buttons in lists that are drawn again later.
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) {
+    return;
+  }
+  const title = button.dataset.title;
+  const action = button.dataset.action;  // "done" or "delete"
+  if (action === "delete" && !confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    show(tableMessage, await answer(await post(`/groot/api/${action}`, {title})));
+    await refreshLists();
+    tableMessage.focus();  // the button is gone now, so keyboard users continue from the message
+  } catch {
+    showOffline(tableMessage);
+    button.disabled = false;
+  }
+});
+
+addForm.addEventListener("submit", async (event) => {
+  event.preventDefault();  // stay on this page instead of sending the form the old way
+  const fields = new FormData(addForm);
+  const button = addForm.querySelector("button");
+  button.disabled = true;
+  try {
+    const result = await answer(await post("/groot/api/add", {
+      title: fields.get("title"),
+      due_date: fields.get("due_date"),
+      subject: fields.get("subject"),
+    }));
+    show(addMessage, result);  // the add_deadline tool's own message, good or bad
+    if (result.status === "success") {
+      addForm.reset();
+      await refreshLists();
+    }
+  } catch {
+    showOffline(addMessage);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+exportButton.addEventListener("click", async () => {
+  exportButton.disabled = true;
+  try {
+    const response = await post("/groot/api/export", {});
+    if ((response.headers.get("Content-Type") || "").startsWith("text/calendar")) {
+      download(await response.blob(), "deadlines.ics");
+      show(topMessage, {
+        status: "success",
+        message: "Downloaded deadlines.ics. Open it to add your unfinished deadlines to Google Calendar, Outlook or your phone.",
+      });
+    } else {
+      show(topMessage, await answer(response));  // for example, nothing to export yet
+    }
+  } catch {
+    showOffline(topMessage);
+  } finally {
+    exportButton.disabled = false;
+  }
+});
+
+// Hand a file to the browser to save, the same as clicking a download link.
+function download(blob, name) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Free the file's memory once the browser has had time to start saving it
+  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+}
