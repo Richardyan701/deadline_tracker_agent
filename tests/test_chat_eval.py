@@ -440,3 +440,14 @@ def test_no_key_stops_before_any_request(monkeypatch):
         run_chat_eval.main(["--limit", "1"])
 
     assert "No Gemini API key found" in str(stopped.value)
+
+
+def test_the_evaluation_turns_off_friendly_error_replies():
+    # A friendly 'daily limit used up' reply must never be scored as Groot's answer,
+    # so the evaluation runs Groot without that callback and everything else unchanged.
+    from eval.chat.run_chat_eval import evaluation_agent
+    agent = evaluation_agent()
+    assert root_agent.on_model_error_callback is not None
+    assert agent.on_model_error_callback is None
+    assert agent.instruction is root_agent.instruction
+    assert {tool.__name__ for tool in agent.tools} == TOOL_NAMES
