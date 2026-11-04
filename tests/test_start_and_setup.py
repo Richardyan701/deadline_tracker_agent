@@ -44,8 +44,14 @@ def port_8000_is_free():
     try:
         with socket.create_connection(("127.0.0.1", 8000), timeout=5):
             return False
-    except ConnectionRefusedError:
+    except (ConnectionRefusedError, ConnectionResetError):
+        # Refused: nothing is listening. Reset: a test server from an earlier test
+        # is still closing (seen on GitHub's Python 3.14 runner). Either way it is free.
         return True
+    except OSError:
+        # Anything else (a timeout, for example) means we cannot tell, so treat it as busy
+        # and let the test skip instead of failing for a reason that has nothing to do with Groot.
+        return False
 
 
 def wait_for(condition, seconds=30):
@@ -687,3 +693,16 @@ def test_checker_explains_a_missing_time_zone_database(tmp_path):
 def test_the_checker_can_start_on_an_old_python():
     # Only the Python check runs on an old Python, but the whole file must still load there
     ast.parse((PROJECT / "deadline_agent" / "check_setup.py").read_text(encoding="utf-8"), feature_version=(3, 9))
+
+
+@pytest.mark.parametrize("error, free", [
+    (ConnectionRefusedError(), True),
+    (ConnectionResetError(), True),  # what GitHub's Python 3.14 runner gave
+    (TimeoutError(), False),
+])
+def test_the_port_check_never_crashes(monkeypatch, error, free):
+    # The check decides whether a test may use port 8000. It must answer, never raise.
+    def refuse(*args, **kwargs):
+        raise error
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    assert port_8000_is_free() is free
