@@ -2,13 +2,31 @@
 
 [![Tests](https://github.com/Richardyan701/deadline_tracker_agent/actions/workflows/tests.yml/badge.svg)](https://github.com/Richardyan701/deadline_tracker_agent/actions/workflows/tests.yml)
 
-Agent Groot keeps track of your university assignment and exam deadlines. You can tell it about a deadline in your own words in a chat, like "Quiz 2 due next friday 5pm", add one on Groot's home page, or let Groot find every deadline in your UTS subject outlines. It saves them in a file on your computer, reminds you about anything overdue or due in the next 7 days, and can put them in your calendar. It runs on Google's Agent Development Kit (ADK) with the Gemini 3.5 Flash model. The date maths is done in plain Python code instead of by the model, so a date like "next friday" or "week 7" always follows the same rules. It was built by Richard, a first year artificial intelligence student at UTS in Sydney.
+**Agent Groot is a free, open-source study assistant that keeps track of your university deadlines.** Drop in your subject outlines and it finds every assessment and its date, then reminds you before anything is due. You can also just tell it, like *"Quiz 2 due next friday 5pm"*.
+
+Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and the Gemini 3.5 Flash model.
+
+### Highlights
+
+- **Reads your subject outlines** (PDF, Word, slides, sheets, images and more) and turns "due in week 7" into the real date using UTS's official calendar, including the mid-semester break.
+- **Measured on 5 real UTS outlines:** 93% of assessments found, none invented, and **0 silently wrong dates**. See [Results so far](#results-so-far).
+- **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
+- **Warns you about clashes** (two deadlines within 48 hours) and works out **what mark you need** on the rest of a subject to pass or get a Credit, Distinction or HD.
+- **A home page that uses no AI at all**, plus a chat with Groot, calendar export (.ics) and Canvas and timetable import.
+- **About 1,460 automated tests**, run on Python 3.11, 3.13 and 3.14 on every change, and a security review covering prompt injection, unsafe files and other websites.
 
 ![Groot's home page with example deadlines: a Heads up clash warning, Due soon, All deadlines, Add a deadline and Grades](docs/images/groot-home.png)
 
 *Groot's home page, shown with made-up example deadlines.*
 
 > **Privacy in one line:** your deadlines file stays on your computer, but every chat message and every outline you preview is sent to Google's Gemini, and on the free tier Google may use and review it. Never type or upload anything sensitive, such as your student ID, passwords, health, money or other personal details. See [Security and privacy](#security-and-privacy).
+
+## Contents
+
+- **Start here:** [Quick start](#quick-start) · [What it can do](#what-it-can-do) · [Example chats](#example-chats)
+- **Features:** [Date phrases](#date-phrases-it-understands) · [Reminders](#reminders-at-the-start-of-a-chat) · [Clash warnings](#clash-warnings) · [Grade calculator](#grade-calculator) · [Calendar export](#export-to-your-calendar) · [Importing outlines](#importing-deadlines-from-your-outlines) · [Supported file types](#supported-file-types)
+- **Setting up:** [Setup](#setup) · [Running it](#running-it) · [The Gemini free tier](#the-gemini-free-tier) · [Troubleshooting](#troubleshooting)
+- **How it works and how well:** [Measuring how well it works](#measuring-how-well-it-works) · [How it is built](#how-it-is-built) · [Security and privacy](#security-and-privacy) · [Tests and CI](#tests-and-ci) · [Limitations](#limitations-and-known-gaps)
 
 ## Quick start
 
@@ -433,7 +451,7 @@ The tests prove the code follows its rules, but they never talk to Gemini. Two e
 
 Four of the five outlines were read perfectly. Every miss was in 31265, and all for one reason: its outline gives a weight for each whole task and then a split inside it ("Draft and Peer Review Process: 5% Final Background Report: 20%" inside a 25% task, and a 15% design review plus a 30% final presentation inside a 45% task). The answer key counts the parts separately, while Gemini kept each task whole, so two parts count as missed and two weights as wrong. Both readings are reasonable, and the result is reported as it is.
 
-**Chat evaluation:** still running on the free tier, a few cases each night. Its scores will be added here when all 63 cases are done.
+**Chat evaluation (in progress):** it runs a few cases each night on Gemini's free tier. As of 7 Nov 2026, **35 of 63 cases are done and all 35 passed**: every date phrase, adding with a subject, the strict date rules, listing and marking done. Deleting, reminders, off-topic messages and prompt-injection attempts are still to come, and the final scores will be added here when all 63 are done.
 
 ## Running the tests
 
@@ -449,7 +467,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say `1457 passed`. A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say that every test passed (about 1,460). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -516,7 +534,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               1458 tests, no API key needed
+tests/               about 1,460 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -542,7 +560,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are 1458 tests, run with pytest:
+There are about 1,460 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
