@@ -1,0 +1,36 @@
+{
+  "subject": "35010 Foundation Mathematics (Spring 2026)",
+  "checked": true,
+  "items": [
+    {
+      "name": "Basic Skills Test 1",
+      "weight_percent": 10,
+      "when": "unknown",
+      "note": "The assessment section gives each test's topics and weight (10%, 15%, 25%) but no week. Elsewhere the outline says \"Each week starting from week 4: 50 min online Basic Skills Tests ... during the allocated time for a computer lab\", but there are only 3 tests, so that sentence does not say which week each test is in. Check this one."
+    },
+    {
+      "name": "Basic Skills Test 2",
+      "weight_percent": 15,
+      "when": "unknown",
+      "note": "Same as Basic Skills Test 1."
+    },
+    {
+      "name": "Basic Skills Test 3",
+      "weight_percent": 25,
+      "when": "unknown",
+      "note": "Same as Basic Skills Test 1."
+    },
+    {
+      "name": "Homework",
+      "weight_percent": 20,
+      "when": "unknown",
+      "note": "\"There is 1 homework set ... The homework is due at the end of semester.\" No week or date."
+    },
+    {
+      "name": "Final Exam",
+      "weight_percent": 30,
+      "when": "exam_period",
+      "note": "\"The final exam is a centrally-conducted restricted open book exam.\""
+    }
+  ]
+}
