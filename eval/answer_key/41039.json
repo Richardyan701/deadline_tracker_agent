@@ -1,0 +1,58 @@
+{
+  "subject": "41039 Programming 1 (Spring 2026)",
+  "checked": true,
+  "items": [
+    {
+      "name": "Lab Assessments",
+      "weight_percent": 30,
+      "when": "unknown",
+      "note": "Task 1, 30%. No timing in the outline."
+    },
+    {
+      "name": "Code Comprehension Session 1",
+      "weight_percent": 5,
+      "when": "tutorial",
+      "week": 4,
+      "note": "\"There will be four sessions, which, timetabling permitting, will be in Weeks 4, 7, 11 and 12. The sessions will be run during the workshop/lab classes.\" Worth \"5%, 5%, 7% and 8% respectively\"."
+    },
+    {
+      "name": "Code Comprehension Session 2",
+      "weight_percent": 5,
+      "when": "tutorial",
+      "week": 7,
+      "note": "Same sentence, second session."
+    },
+    {
+      "name": "Code Comprehension Session 3",
+      "weight_percent": 7,
+      "when": "tutorial",
+      "week": 11,
+      "note": "Same sentence, third session."
+    },
+    {
+      "name": "Code Comprehension Session 4",
+      "weight_percent": 8,
+      "when": "tutorial",
+      "week": 12,
+      "note": "Same sentence, fourth session."
+    },
+    {
+      "name": "Project",
+      "weight_percent": 25,
+      "when": "unknown",
+      "note": "Task 3, 25%. The outline gives no date."
+    },
+    {
+      "name": "Exam",
+      "weight_percent": 20,
+      "when": "unknown",
+      "note": "Task 4, take-home open-book exam, 20%. No date in the outline."
+    },
+    {
+      "name": "Extension",
+      "weight_percent": 0,
+      "when": "unknown",
+      "note": "Task 5, 0%, an optional alternative to the labs. No timing."
+    }
+  ]
+}

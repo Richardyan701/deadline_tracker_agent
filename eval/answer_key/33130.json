@@ -1,0 +1,50 @@
+{
+  "subject": "33130 Mathematics 1 (Spring 2026)",
+  "checked": true,
+  "items": [
+    {
+      "name": "Skills Test 1",
+      "weight_percent": 10,
+      "when": "week",
+      "week": 2,
+      "note": "\"Skills test 1 will be offered online and is due in week 2.\" Each of the 6 tests is 10%."
+    },
+    {
+      "name": "Skills Test 2",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "\"Skills Tests 2-5 are short (30 min) quizzes, to be held during the tutorial classes.\" No week given."
+    },
+    {
+      "name": "Skills Test 3",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "Same sentence as Skills Test 2."
+    },
+    {
+      "name": "Skills Test 4",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "Same sentence as Skills Test 2."
+    },
+    {
+      "name": "Skills Test 5",
+      "weight_percent": 10,
+      "when": "tutorial",
+      "note": "Same sentence as Skills Test 2."
+    },
+    {
+      "name": "Skills Test 6",
+      "weight_percent": 10,
+      "when": "unknown",
+      "note": "\"Skills Test 6 is an online take-home assignment and assesses the final two weeks of the subject.\" That says what it covers, not when it is due."
+    },
+    {
+      "name": "Final Examination",
+      "weight_percent": 40,
+      "when": "tutorial",
+      "week": 12,
+      "note": "\"The duration of the final examination is 90 minutes held in the final tutorial (week 12)\"."
+    }
+  ]
+}

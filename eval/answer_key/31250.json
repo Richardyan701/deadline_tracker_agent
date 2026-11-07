@@ -1,0 +1,24 @@
+{
+  "subject": "31250 Introduction to Data Analytics (Spring 2026)",
+  "checked": true,
+  "items": [
+    {
+      "name": "Quizzes",
+      "weight_percent": 15,
+      "when": "unknown",
+      "note": "\"Multiple choice questions\", 15%. The outline does not say how many quizzes or when."
+    },
+    {
+      "name": "Data Exploration and Preparation",
+      "weight_percent": 35,
+      "when": "unknown",
+      "note": "Report, 35%. No timing in the outline."
+    },
+    {
+      "name": "Data mining in action",
+      "weight_percent": 50,
+      "when": "unknown",
+      "note": "Report and Kaggle competition, 50%. No timing in the outline."
+    }
+  ]
+}

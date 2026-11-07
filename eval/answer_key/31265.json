@@ -1,0 +1,36 @@
+{
+  "subject": "31265 Communication for IT Professionals (Spring 2026)",
+  "checked": true,
+  "items": [
+    {
+      "name": "Draft and Peer Review Process",
+      "weight_percent": 5,
+      "when": "unknown",
+      "note": "Task 1 (25%) is split in the outline: \"Draft and Peer Review Process: 5% Final Background Report: 20%\". No timing given."
+    },
+    {
+      "name": "Final Background Report",
+      "weight_percent": 20,
+      "when": "unknown",
+      "note": "Second part of Task 1. No timing given."
+    },
+    {
+      "name": "EWB Challenge Website",
+      "weight_percent": 30,
+      "when": "unknown",
+      "note": "Task 2, 30%. No timing given."
+    },
+    {
+      "name": "Design review presentation",
+      "weight_percent": 15,
+      "when": "unknown",
+      "note": "Task 3 (45%) lists \"Design review presentation 15%\" and \"Presentation 30%\". No timing given."
+    },
+    {
+      "name": "Final Presentation",
+      "weight_percent": 30,
+      "when": "unknown",
+      "note": "Second part of Task 3. Outline calls it \"Presentation 30%\" and \"Final Presentation 20-minutes\". No timing given."
+    }
+  ]
+}

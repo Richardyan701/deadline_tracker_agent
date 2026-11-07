@@ -418,7 +418,22 @@ The tests prove the code follows its rules, but they never talk to Gemini. Two e
 - **The outline evaluation** (`eval/run_eval.py`) sends real UTS outlines to the outline reader and compares Gemini's items with an answer key you check by hand: items found, items invented, weights, the timing words, the real dates from the UTS calendar, and silently wrong dates (a wrong date shown as if it were fine). Put the outlines in `eval/outlines/` (they stay off GitHub) and the answer keys in `eval/answer_key/`, then run `.venv/bin/python -m eval.run_eval` on Linux and macOS or `.\.venv\Scripts\python.exe -m eval.run_eval` on Windows. Add `--session AUT2026` for Autumn outlines. [eval/README.md](eval/README.md) explains the answer key format and every score.
 - **The chat evaluation** (`eval/chat/run_chat_eval.py`) sends 63 realistic student messages to the real Groot and checks which tools it called and what ended up saved, never its wording. Run `.venv/bin/python -m eval.chat.run_chat_eval --limit 3` first (on Windows, `.\.venv\Scripts\python.exe -m eval.chat.run_chat_eval --limit 3`), then leave out `--limit` for every case. A full run needs at least 121 requests, so on the free tier it takes several days. It saves each finished case and carries on from where it stopped. [eval/chat/README.md](eval/chat/README.md) has the details.
 
-No results are in this repository yet. They appear when you run the evaluations with your own key.
+### Results so far
+
+**Outline evaluation, 6 Nov 2026:** five real Spring 2026 UTS subject outlines (31250, 31265, 33130, 35010 and 41039), each answer key checked by hand, read with Gemini 3.5 Flash. The full table is in [eval/results.md](eval/results.md).
+
+| Measure | Score |
+| --- | --- |
+| Items found | 26 of 28 (93%) |
+| Items not invented | 26 of 26 (100%) |
+| Weights correct | 24 of 26 (92%) |
+| Timing correct ("week 2", "in your tutorial" and so on) | 6 of 6 (100%) |
+| Real dates correct | 1 of 1 (100%) |
+| Silently wrong dates | 0 |
+
+Four of the five outlines were read perfectly. Every miss was in 31265, and all for one reason: its outline gives a weight for each whole task and then a split inside it ("Draft and Peer Review Process: 5% Final Background Report: 20%" inside a 25% task, and a 15% design review plus a 30% final presentation inside a 45% task). The answer key counts the parts separately, while Gemini kept each task whole, so two parts count as missed and two weights as wrong. Both readings are reasonable, and the result is reported as it is.
+
+**Chat evaluation:** still running on the free tier, a few cases each night. Its scores will be added here when all 63 cases are done.
 
 ## Running the tests
 
