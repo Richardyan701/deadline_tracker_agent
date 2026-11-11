@@ -68,6 +68,39 @@ Measured with the real Gemini model, not just claimed:
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
 
+## Why does Groot feel similar to Notion?
+
+Because both give you one place to keep your study life in order: a list of tasks with due dates, grouped by subject, with reminders and an AI helper you can talk to. If you have used a Notion assignment tracker, Groot's home page will feel familiar.
+
+**What is similar**
+
+- A list of deadlines with a due date, a subject and a done tick.
+- Reminders for what is overdue or due soon.
+- An AI assistant that adds and finds things when you ask in plain English.
+- Your deadlines can go into a calendar.
+
+**What is different**
+
+| | Groot | Notion |
+| --- | --- | --- |
+| What it is for | One job: university deadlines | A general workspace for notes, documents and databases |
+| Where your data lives | A file on your own computer | Notion's cloud, in your account |
+| Setting up a tracker | Nothing to build | You build one or pick a template |
+| Phones and sharing | No. One computer, one user | Yes. Syncs across devices and works for teams |
+| Notes, documents and wikis | No | Yes |
+| Cost | Free and open source, with Gemini's free tier | Free plan, with paid plans for more AI use |
+
+**What Groot does that Notion does not do out of the box**
+
+- **Knows the UTS calendar.** "Due in week 7" becomes the real date, with the mid-session break and public holidays handled. In Notion, you or the AI have to work that date out.
+- **Works dates out in tested code, not by AI.** The same phrase always gives the same date, and unclear dates are refused instead of guessed.
+- **Shows how sure it is.** Every imported row is marked exact, assumed or needing your date, and nothing is saved until you tick it.
+- **Warns about clashes and works out the mark you need** with no formulas to write.
+- **Publishes its accuracy.** The results above come from real outlines and real chats, including the mistakes.
+- **Runs without an account**, and the home page works with no AI at all.
+
+**Where Notion is better:** it works on your phone, syncs everywhere, lets you edit anything, handles notes and group work, and has a polished design. Groot is not trying to replace it. This comparison is based on Notion's public help pages in November 2026, and Notion changes quickly.
+
 ## Things to know
 
 - **The Gemini free tier is small:** about 5 requests a minute and 20 a day, which is roughly 8 to 10 chat messages that use a tool. Groot says so politely when you hit a limit. The home page never uses Gemini.
