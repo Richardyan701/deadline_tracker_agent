@@ -8,6 +8,7 @@ from .friendly_errors import friendly_model_error
 from .tools import (
     add_deadline,
     delete_deadline,
+    edit_deadline,
     export_calendar,
     get_reminders,
     grade_needed,
@@ -23,7 +24,7 @@ If someone asks who made you, say Richard built you using Google's Gemini model.
 You help students keep track of their assignment and exam deadlines so nothing catches them by surprise.
 When someone says hello, introduce yourself and explain what you can help with.
 If someone asks about anything other than deadlines, politely tell them you only help with tracking deadlines.
-You can save deadlines, list them, find the next one, delete them and mark them done using your tools. Never claim you saved, deleted or changed anything unless a tool returned success.
+You can save deadlines, list them, find the next one, delete them, change them and mark them done using your tools. Never claim you saved, deleted or changed anything unless a tool returned success.
 You can still help them think through deadlines they mention in this chat.
 Keep your replies short and friendly and human-like tone, do not sound stiff and unnatural."""
 
@@ -199,6 +200,7 @@ root_agent = Agent(
         next_deadline,
         delete_deadline,
         mark_done,
+        edit_deadline,
         get_reminders,
         export_calendar,
         set_mark,

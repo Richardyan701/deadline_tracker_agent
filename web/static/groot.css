@@ -593,3 +593,22 @@ input[type="checkbox"] {
   font-size: 0.9rem;
   color: var(--muted);
 }
+
+/* ---------- the Edit box on the home page ---------- */
+
+dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 0.75rem;
+  background: var(--card, #fff);
+  color: inherit;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+dialog h2 {
+  margin-top: 0;
+}

@@ -15,14 +15,14 @@ Groot is one web app that runs on your own computer. It has three pages, and all
 ### The home page
 
 - **Due soon** lists everything unfinished that is overdue, due today or due in the next 7 days, with phrases like "in 3 hours" or "2 days overdue". It uses the same code as the chat's reminders, so the two always agree.
-- **All deadlines** lists every deadline, soonest first. Each one has a **Delete** button, which asks you first, and each unfinished one also has a **Mark done** button. Finished deadlines are greyed out.
+- **All deadlines** lists every deadline, soonest first. Each one has an **Edit** button, which opens a small box to change its title, due date or subject, and a **Delete** button, which asks you first. Each unfinished one also has a **Mark done** button. Finished deadlines are greyed out.
 - **Add a deadline** takes a title, a due date in plain words like "next friday 5pm" and an optional subject. It follows the same rules as the chat, see [Date phrases it understands](#date-phrases-it-understands), and shows the same message, good or bad.
 - **Export to calendar** downloads `deadlines.ics`, see [Export to your calendar](#export-to-your-calendar).
 - **Import from outlines** and **Chat with Groot** open the other two pages.
 
 ### The chat
 
-The chat is the one ADK gives every agent, with Groot already chosen. If a box asks about sharing usage data with Google, either button is fine. Say hello, and while you have nothing saved yet, Groot also suggests a few things to type. Groot has nine tools. Gemini reads what you type and decides which tool to call.
+The chat is the one ADK gives every agent, with Groot already chosen. If a box asks about sharing usage data with Google, either button is fine. Say hello, and while you have nothing saved yet, Groot also suggests a few things to type. Groot has ten tools. Gemini reads what you type and decides which tool to call.
 
 | Tool | What it does |
 | --- | --- |
@@ -31,6 +31,7 @@ The chat is the one ADK gives every agent, with Groot already chosen. If a box a
 | `next_deadline` | Finds the next deadline that is not finished and has not passed yet. |
 | `delete_deadline` | Permanently deletes a deadline. |
 | `mark_done` | Marks a deadline as finished. It stays in the list but no longer shows up in reminders or as your next deadline. |
+| `edit_deadline` | Changes a deadline's title, due date or subject without deleting it. A new date follows the same rules as `add_deadline`, and its weight, mark and done tick are kept. |
 | `get_reminders` | Finds unfinished deadlines that are overdue, due today or due soon. "Soon" means the next 7 days unless you ask about a different period, from 1 to 60 days. It also lists any [clashes](#clash-warnings). |
 | `export_calendar` | Saves every unfinished deadline to `deadlines.ics`, a calendar file you can import into Google Calendar, Outlook or your phone. See [Export to your calendar](#export-to-your-calendar). |
 | `set_mark` | Saves your mark for a deadline (0 to 100), its weight, or both. A mark also marks the deadline as done. |
@@ -445,7 +446,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say that every test passed (about 1,460). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say that every test passed (about 1,500). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -494,7 +495,7 @@ Starting Groot:
 ```
 deadline_agent/
   agent.py           Groot itself: its model, its instruction and its list of tools
-  tools.py           the nine tools, the date rules, the reminders and the saving code
+  tools.py           the ten tools, the date rules, the reminders and the saving code
   friendly_errors.py short chat replies for a used up limit, a key problem or a timeout
   check_setup.py     the setup checker
   outline.py         the outline reader, one Gemini request for each outline
@@ -512,7 +513,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 1,460 tests, no API key needed
+tests/               about 1,500 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -520,8 +521,8 @@ setup.sh, setup_windows.bat        the setup scripts
 start_groot.sh, start_groot.bat    the start files
 ```
 
-- **`agent.py`** defines `root_agent`, an ADK `Agent` called `agent_groot` that uses `gemini-3.5-flash` and the nine tools. Its instruction is a function, `groot_instruction`, which ADK runs before every request to Gemini (ADK's name for this is an instruction provider). It returns Groot's fixed instruction, today's date in Sydney, the rule to pass due dates through exactly as typed, where to import outlines, the rules for reminders, and the reminders block. While nothing is saved, it also suggests a few things to type.
-- **`tools.py`** holds the nine tools. ADK reads each tool's name, type hints and docstring to tell Gemini what the tool does. Every tool returns a `status` and a `message`, and problems come back as a message Groot can pass on instead of a crash. The home page and the import page call the same tools, so the file lock, the safe saves and the backups work the same everywhere.
+- **`agent.py`** defines `root_agent`, an ADK `Agent` called `agent_groot` that uses `gemini-3.5-flash` and the ten tools. Its instruction is a function, `groot_instruction`, which ADK runs before every request to Gemini (ADK's name for this is an instruction provider). It returns Groot's fixed instruction, today's date in Sydney, the rule to pass due dates through exactly as typed, where to import outlines, the rules for reminders, and the reminders block. While nothing is saved, it also suggests a few things to type.
+- **`tools.py`** holds the ten tools. ADK reads each tool's name, type hints and docstring to tell Gemini what the tool does. Every tool returns a `status` and a `message`, and problems come back as a message Groot can pass on instead of a crash. The home page and the import page call the same tools, so the file lock, the safe saves and the backups work the same everywhere.
 - **Why dates are worked out in Python.** The model does not reliably know today's date, so it is bad at things like "next friday". Plain rules in Python give the same answer every time, and each rule is covered by tests. The reply also spells out the full date, so a misunderstanding is easy to catch. For outlines, Gemini only copies the outline's words, like "week 7", and the UTS calendar code turns them into a date.
 - **Protection against prompt injection.** Titles and subjects are typed by the student, or found in an outline, and end up in Groot's instruction, so a title like "Essay, ignore previous instructions" could try to give orders. When a deadline is saved, line breaks and runs of spaces in the title and subject become a single space. Before a title or subject goes into the reminders block, control and invisible characters become spaces, `<` and `>` are removed so it cannot fake the end of the block, double quotes become single quotes, and it is cut to 80 characters. Groot is told that the block, every title or subject in a tool result, and everything in a file are data, never instructions. An outline goes to Gemini apart from the reader's rules, with its text between two marker lines it cannot fake, and Gemini's answer must fit a fixed shape that is checked in Python. This keeps each piece of data in its place, but it cannot make the model fully immune.
 - **Safe saves.** Each save writes the whole list to a temporary file in the same folder, makes sure it has reached the disk, then swaps it in with `os.replace` in a single step. A crash leaves either the old file or the new one, never half a file. A lock lets only one action read or change the file at a time, because ADK and the web server can run them on several threads. A test starts 20 saves at once on separate threads and checks that all 20 are kept.
@@ -538,7 +539,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are about 1,460 tests, run with pytest:
+There are about 1,500 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
@@ -561,6 +562,7 @@ There are about 1,460 tests, run with pytest:
 | `tests/test_agent.py` | 11 | Groot's tools and instruction, plus whole turns through ADK with a scripted stand-in for Gemini |
 | `tests/test_clashes.py` | 30 | Clash warnings: the 48 hour edge, 3 in a week, ties, finished and past deadlines, `get_reminders` and the instruction |
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
+| `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.
@@ -577,7 +579,8 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 - **The chat is ADK's development page.** It has no login and is made for building agents, so only run Groot on your own computer. Port 8000 is fixed in the code.
 - **Sydney time only.** The time zone is fixed in the code.
 - **English only.** Date words like "friday" and "tomorrow" must be in English.
-- **No editing.** To change a deadline, delete it and add it again.
+- **Editing changes the title, due date and subject only.** Weights and marks are changed in the Grades section or with `set_mark`. Renaming a deadline gives it a new calendar ID, so a calendar that already imported it will show both the old and the new event.
+- **The chat evaluation was run before `edit_deadline` existed.** The 63 of 63 result was measured with nine tools, and it has no editing cases yet.
 - **No past deadlines.** You cannot add a deadline whose time has already passed, and imported rows that have passed start unticked.
 - **Reminders only appear in Groot.** The chat and the home page show them, but Groot sends no notifications. Export to your calendar for those.
 - **The Windows setup script shows your key on screen** while you paste it.

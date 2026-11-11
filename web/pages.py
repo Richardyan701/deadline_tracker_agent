@@ -36,6 +36,33 @@ ADD_FORM = """<form id="add-form">
 </form>"""
 
 
+# The Edit box. It sits outside the lists, so it stays when they are drawn again.
+# home.js fills it in from the Edit button that was clicked.
+EDIT_DIALOG = """<dialog id="edit-dialog" aria-labelledby="edit-heading">
+<form id="edit-form" method="dialog">
+<h2 id="edit-heading">Edit deadline</h2>
+<div class="field">
+<label for="edit-title">Title</label>
+<input id="edit-title" name="new_title" autocomplete="off">
+</div>
+<div class="field">
+<label for="edit-when">When is it due?</label>
+<input id="edit-when" name="due_date" autocomplete="off" aria-describedby="edit-when-hint">
+<p id="edit-when-hint" class="hint">Leave it as it is to keep the date, or type plain words like "next friday 5pm".</p>
+</div>
+<div class="field">
+<label for="edit-subject">Subject <span class="optional">(optional)</span></label>
+<input id="edit-subject" name="subject" autocomplete="off">
+</div>
+<div class="row-actions">
+<button type="submit">Save changes</button>
+<button type="button" class="secondary" id="edit-cancel">Cancel</button>
+</div>
+<p id="edit-message" class="message" role="status"></p>
+</form>
+</dialog>"""
+
+
 # The honest note under the Grades heading
 GRADES_NOTE = (
     "Groot works out the average you need on the tasks still to come for each UTS grade band: "
@@ -74,6 +101,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <h2 id="all-heading">All deadlines</h2>
 <p id="table-message" class="message" role="status" tabindex="-1"></p>
 {deadline_table(deadlines, now)}
+{EDIT_DIALOG}
 </section>
 <section aria-labelledby="add-heading">
 <h2 id="add-heading">Add a deadline</h2>
@@ -185,7 +213,7 @@ def _grade_summary(report: dict) -> str:
 
 
 def deadline_table(deadlines: list[dict], now: datetime) -> str:
-    """Every deadline, soonest first, with Mark done and Delete buttons. Finished ones are greyed."""
+    """Every deadline, soonest first, with Mark done, Edit and Delete buttons. Finished ones are greyed."""
     if not deadlines:
         return (
             '<div id="deadline-table"><p class="empty">You have no deadlines saved yet. Add one below, '
@@ -210,6 +238,7 @@ def _deadline_row(deadline: dict, now: datetime) -> str:
         status = tools._time_phrase(due, now)  # the same phrases as the reminders
     subject = f'<span class="subject">{escape(deadline["subject"])}</span>' if deadline["subject"] else ""
     buttons = "" if deadline["done"] else _button("done", "Mark done", "secondary", deadline["title"])
+    buttons += _edit_button(deadline)
     buttons += _button("delete", "Delete", "danger", deadline["title"])
     return (
         f'<tr class="{state}">'
@@ -230,6 +259,16 @@ def _button(action: str, label: str, style: str, title: str) -> str:
     return (
         f'<button type="button" class="{style}" data-action="{action}" data-title="{title}">'
         f'{label}<span class="visually-hidden">: {title}</span></button>'
+    )
+
+
+def _edit_button(deadline: dict) -> str:
+    """The Edit button for one deadline. It carries what the Edit box starts with, escaped like _button."""
+    title = escape(deadline["title"])
+    return (
+        f'<button type="button" class="secondary" data-edit data-title="{title}" '
+        f'data-due="{escape(deadline["due_date"])}" data-subject="{escape(deadline["subject"])}">'
+        f'Edit<span class="visually-hidden">: {title}</span></button>'
     )
 
 

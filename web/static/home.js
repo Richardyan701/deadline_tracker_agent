@@ -1,4 +1,4 @@
-// Agent Groot's home page: mark done, delete, add a deadline, enter marks and export to a calendar.
+// Agent Groot's home page: mark done, edit, delete, add a deadline, enter marks and export to a calendar.
 // Each button calls Groot's JSON API, which runs the same tools as the chat.
 // Then the server draws the lists again, so they always match the deadlines file.
 import {answer, post, show, showOffline} from "./common.js";
@@ -41,6 +41,57 @@ document.addEventListener("click", async (event) => {
     tableMessage.focus();  // the button is gone now, so keyboard users continue from the message
   } catch {
     showOffline(tableMessage);
+    button.disabled = false;
+  }
+});
+
+// The Edit box. An Edit button opens it filled in with that deadline.
+const editDialog = document.getElementById("edit-dialog");
+const editForm = document.getElementById("edit-form");
+const editMessage = document.getElementById("edit-message");
+let editing = null;  // the deadline being edited: its title, due date and subject as saved
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-edit]");
+  if (!button) {
+    return;
+  }
+  editing = {title: button.dataset.title, due: button.dataset.due, subject: button.dataset.subject};
+  editForm.elements.new_title.value = editing.title;
+  editForm.elements.due_date.value = editing.due;
+  editForm.elements.subject.value = editing.subject;
+  show(editMessage, {status: "", message: ""});
+  editDialog.showModal();
+});
+
+document.getElementById("edit-cancel").addEventListener("click", () => editDialog.close());
+
+editForm.addEventListener("submit", async (event) => {
+  event.preventDefault();  // keep the box open until Groot says it worked
+  const fields = new FormData(editForm);
+  const button = editForm.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    // A date left as it was is sent empty, which means "keep it". So a deadline
+    // that is already overdue can still be renamed without its old date being refused.
+    const due = fields.get("due_date").trim();
+    const result = await answer(await post("/groot/api/edit", {
+      title: editing.title,
+      new_title: fields.get("new_title"),
+      due_date: due === editing.due ? "" : due,
+      subject: fields.get("subject"),
+    }));
+    if (result.status === "success") {
+      editDialog.close();
+      show(tableMessage, result);
+      await refreshLists();
+      tableMessage.focus();
+    } else {
+      show(editMessage, result);  // edit_deadline's own message, for example an unclear date
+    }
+  } catch {
+    showOffline(editMessage);
+  } finally {
     button.disabled = false;
   }
 });
