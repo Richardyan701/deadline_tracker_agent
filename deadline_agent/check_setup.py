@@ -192,7 +192,7 @@ def check_deadlines_file():
         return (
             False,
             f"{path} cannot be read or is not a valid list of deadlines",
-            "Fix it by hand, or rename it so Groot starts a fresh list (see the README, Where your deadlines are saved).",
+            "Fix it by hand, or rename it so Groot starts a fresh list (see docs/reference.md, Where your deadlines are saved).",
         )
     if not path.exists():
         return True, f"No deadlines saved yet ({path.name} is made when you add your first one)", ""
