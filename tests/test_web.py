@@ -34,6 +34,7 @@ CHANGES = [
     ("/groot/api/add", {"title": "Quiz", "due_date": "friday", "subject": ""}),
     ("/groot/api/done", {"title": "Essay"}),
     ("/groot/api/delete", {"title": "Essay"}),
+    ("/groot/api/edit", {"title": "Essay", "new_title": "Final Essay"}),
     ("/groot/api/mark", {"title": "Essay", "mark_percent": 80}),
     ("/groot/api/export", {}),
     ("/groot/api/save", {"rows": [{"title": "Quiz", "due_date": "friday", "subject": ""}]}),
@@ -236,13 +237,13 @@ def test_titles_and_subjects_are_escaped(client, deadlines_file):
     assert [attrs.get("src") for tag, attrs in found if tag == "script"] == ["/groot/static/home.js"]
     assert not [tag for tag, _ in found if tag == "img"]
     assert not [name for _, attrs in found for name in attrs if name.startswith("on")]
-    # The text is shown as it is: in both lists, on both buttons (data-title and the hidden label),
+    # The text is shown as it is: in both lists, on all three buttons (data-title and the hidden label),
     # and in the Grades section (the mark form's option value and label, the "no weight" warning
     # and the subject's table)
     escaped_title = "&lt;script&gt;alert(&quot;title&quot;)&lt;/script&gt;&lt;img src=x onerror=alert(1)&gt; &quot; onmouseover=&quot;alert(2)"
-    assert page.count(escaped_title) == 10
-    # both lists, and the subject's heading in the Grades section
-    assert page.count("&lt;/td&gt;&lt;script&gt;alert(&#x27;subject&#x27;)&lt;/script&gt;") == 3
+    assert page.count(escaped_title) == 12
+    # both lists, the Edit button's data-subject, and the subject's heading in the Grades section
+    assert page.count("&lt;/td&gt;&lt;script&gt;alert(&#x27;subject&#x27;)&lt;/script&gt;") == 4
     # Each button gives the JavaScript back the exact title, and has no extra attributes
     buttons = [attrs for tag, attrs in found if tag == "button" and "data-action" in attrs]
     assert [(attrs["data-action"], attrs["data-title"]) for attrs in buttons] == [("done", EVIL_TITLE), ("delete", EVIL_TITLE)]

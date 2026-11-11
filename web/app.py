@@ -8,6 +8,7 @@ and adds Groot's routes under /groot:
     POST /groot/api/add       add a deadline          JSON {"title", "due_date", "subject"}
     POST /groot/api/done      mark a deadline done    JSON {"title"}
     POST /groot/api/delete    delete a deadline       JSON {"title"}
+    POST /groot/api/edit      change a deadline       JSON {"title", "new_title", "due_date", "subject"}
     POST /groot/api/mark      save a mark or weight   JSON {"title", "mark_percent", "weight_percent"}
     POST /groot/api/export    download deadlines.ics  JSON {}
     POST /groot/api/preview   read outlines (Gemini)  multipart form, see uploads.py
@@ -160,6 +161,23 @@ def done(data: dict = Depends(json_from_groot)) -> dict:
 @router.post("/api/delete")
 def delete(data: dict = Depends(json_from_groot)) -> dict:
     return tools.delete_deadline(data.get("title"))
+
+
+@router.post("/api/edit")
+def edit(data: dict = Depends(json_from_groot)) -> dict:
+    """Change a deadline's title, due date or subject with edit_deadline.
+
+    The form always sends the subject, so an empty one means "remove the subject".
+    An empty title or due date means "keep it".
+    """
+    subject = data.get("subject")
+    return tools.edit_deadline(
+        data.get("title"),
+        data.get("new_title"),
+        data.get("due_date"),
+        subject,
+        remove_subject=isinstance(subject, str) and not subject.strip(),
+    )
 
 
 @router.post("/api/mark")

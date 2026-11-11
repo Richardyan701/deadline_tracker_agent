@@ -1208,6 +1208,94 @@ def mark_done(title: str) -> dict:
     return {"status": "success", "message": f"Marked '{found['title']}' as done." + _backup_note(backup)}
 
 
+def edit_deadline(
+    title: str,
+    new_title: str = "",
+    new_due_date: str = "",
+    new_subject: str = "",
+    remove_subject: bool = False,
+) -> dict:
+    """Changes a saved deadline's title, due date or subject, without deleting it.
+
+    Call this when the student wants to rename a deadline, move it to another
+    date or change its subject, like "move Quiz 2 to next monday 5pm" or
+    "rename Essay to Final Essay". Only give the things that change, and
+    leave the rest out. Its weight, its mark and whether it is done stay as
+    they are (use set_mark or mark_done for those).
+
+    Args:
+        title: The current title of the deadline (upper/lower case and extra spaces are ignored).
+        new_title: The new title. Leave it out to keep the title. It must not
+            be the title of another deadline.
+        new_due_date: The new due date in the student's own words exactly as
+            they typed them, the same forms as add_deadline, for example
+            "next monday 5pm". Do not convert it yourself. Leave it out to
+            keep the date.
+        new_subject: The new subject. Leave it out to keep the subject.
+        remove_subject: True only if the student asks to remove the subject.
+
+    Returns:
+        A dict with "status" ("success" or "error"), a "message" and, on
+        success, the updated "deadline". A new date is shown in full so the
+        student can spot a mistake. If the new date is unclear, does not
+        exist or is in the past, nothing is changed and the message says why.
+    """
+    now = _now()
+    try:
+        title = _text(title, "title")
+        new_title = _text(new_title, "new_title")
+        new_subject = _text(new_subject, "new_subject")
+        date_words = _text(new_due_date, "new_due_date")
+        if not isinstance(remove_subject, bool):
+            raise ValueError(f"remove_subject must be true or false, but I got {remove_subject!r}.")
+        new_date = _understand_due_date(date_words, now) if date_words else None
+    except ValueError as error:
+        return {"status": "error", "message": str(error)}
+    if new_subject and remove_subject:
+        return {"status": "error", "message": "Give a new subject or ask to remove it, not both."}
+    if not (new_title or new_date or new_subject or remove_subject):
+        return {"status": "error", "message": "Tell me what to change: the title, the due date or the subject."}
+
+    with _file_lock:
+        deadlines = _load_deadlines()
+        found = _find(deadlines, title)
+        if found is None:
+            return _not_found(title)
+        old_title = found["title"]
+        changes = []
+        if new_title and new_title != found["title"]:
+            other = _find(deadlines, new_title)
+            if other is not None and other is not found:  # only a change of upper/lower case finds itself
+                return {
+                    "status": "error",
+                    "message": f"You already have a deadline called '{other['title']}'. Pick a different title.",
+                }
+            found["title"] = new_title
+            changes.append(f"renamed it to '{new_title}'")
+        if new_date and new_date != found["due_date"]:
+            found["due_date"] = new_date
+            due = _parse_due_date(new_date)
+            change = f"moved it to {_friendly(due)}"
+            if due.year > now.year:
+                change += f" (that's in {due.year}, not this year)"
+            changes.append(change)
+        if remove_subject and found["subject"]:
+            found["subject"] = ""
+            changes.append("removed its subject")
+        elif new_subject and new_subject != found["subject"]:
+            found["subject"] = new_subject
+            changes.append(f"set its subject to '{new_subject}'")
+        if not changes:
+            return {"status": "success", "message": f"'{old_title}' already looks like that, so nothing changed.", "deadline": found}
+        try:
+            backup = _save_deadlines(deadlines)
+        except OSError as error:
+            return _not_saved(error)
+
+    listed = changes[0] if len(changes) == 1 else ", ".join(changes[:-1]) + " and " + changes[-1]
+    return {"status": "success", "message": f"Updated '{old_title}': {listed}." + _backup_note(backup), "deadline": found}
+
+
 def get_reminders(days_ahead: int = REMINDER_DAYS) -> dict:
     """Finds unfinished deadlines that are overdue, due today or due soon.
 

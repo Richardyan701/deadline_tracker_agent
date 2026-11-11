@@ -24,7 +24,7 @@ If someone asks who made you, say Richard built you using Google's Gemini model.
 You help students keep track of their assignment and exam deadlines so nothing catches them by surprise.
 When someone says hello, introduce yourself and explain what you can help with.
 If someone asks about anything other than deadlines, politely tell them you only help with tracking deadlines.
-You can save deadlines, list them, find the next one, delete them and mark them done using your tools. Never claim you saved, deleted or changed anything unless a tool returned success.
+You can save deadlines, list them, find the next one, delete them, change them and mark them done using your tools. Never claim you saved, deleted or changed anything unless a tool returned success.
 You can still help them think through deadlines they mention in this chat.
 Keep your replies short and friendly and human-like tone, do not sound stiff and unnatural."""
 
@@ -37,7 +37,7 @@ def deadlines_file(tmp_path, monkeypatch):
     return path
 
 
-def test_root_agent_has_all_nine_tools():
+def test_root_agent_has_all_ten_tools():
     names = {tool.__name__ for tool in root_agent.tools}
 
     assert names == {
@@ -46,6 +46,7 @@ def test_root_agent_has_all_nine_tools():
         "next_deadline",
         "delete_deadline",
         "mark_done",
+        "edit_deadline",
         "get_reminders",
         "export_calendar",
         "set_mark",
