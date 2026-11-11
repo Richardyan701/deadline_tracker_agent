@@ -15,7 +15,7 @@ This folder checks how well the outline reader (`deadline_agent/outline.py`) fin
 ## How to run it
 
 1. Run the setup script once if you have not already (`./setup.sh` on Linux and macOS, `setup_windows.bat` on Windows). It creates `.venv` and saves your Gemini key in `deadline_agent/.env`. The measurement uses that same key.
-2. Make a folder called `outlines` inside `eval`, and copy each outline into it, named after its subject code: `eval/outlines/33130.pdf`, `eval/outlines/35010.pdf` and so on. An outline can be any kind of file the reader understands (see "Supported file types" in the main README), for example `eval/outlines/31250.docx`. Keep only one file for each subject code, or the script stops and asks you to remove the others.
+2. Make a folder called `outlines` inside `eval`, and copy each outline into it, named after its subject code: `eval/outlines/33130.pdf`, `eval/outlines/35010.pdf` and so on. An outline can be any kind of file the reader understands (see "Supported file types" in [docs/reference.md](../docs/reference.md#supported-file-types)), for example `eval/outlines/31250.docx`. Keep only one file for each subject code, or the script stops and asks you to remove the others.
 3. Make sure each outline has an answer key with the same code, for example `eval/answer_key/33130.json`, and that you have checked it and set `"checked": true` (see below).
 4. From the project folder, run:
 
