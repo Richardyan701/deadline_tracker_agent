@@ -32,7 +32,7 @@ from . import Refused
 MAX_FILE_BYTES = documents.MAX_FILE_BYTES  # 10 MB for each file
 MAX_OUTLINES = 8
 MAX_TEXT_BYTES = 2048  # the Canvas link and the session code are short
-# Nothing right can be bigger than 8 outlines and a timetable at their
+# No proper upload can be bigger than 8 outlines and a timetable at their
 # biggest, plus a little room for the lines between the parts of the form.
 MAX_UPLOAD_BYTES = (MAX_OUTLINES + 1) * MAX_FILE_BYTES + 64 * 1024
 

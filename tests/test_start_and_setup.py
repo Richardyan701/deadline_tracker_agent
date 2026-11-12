@@ -113,7 +113,7 @@ def fake_commands(tmp_path, system="Linux"):
 
 @pytest.fixture
 def start(tmp_path):
-    """Runs a project's start_groot.sh from another folder, like a double click does.
+    """Runs a project's start_groot.sh from another folder, like a double-click does.
 
     Returns (process, output file). Anything still running is stopped afterwards.
     """
@@ -152,7 +152,7 @@ def test_start_script_starts_groot_opens_the_browser_and_stops_on_ctrl_c(tmp_pat
 
     assert wait_for(lambda: "Press Ctrl+C to stop it." in output.read_text()), output.read_text()
     assert f"Groot is running at {URL}" in output.read_text()
-    # Groot's web app, started the antivirus safe way, through Python, from the project folder
+    # Groot's web app, started the antivirus-safe way, through Python, from the project folder
     assert (tmp_path / "server_command.txt").read_text() == "-m web\n"
     assert wait_for(lambda: (tmp_path / "opened.txt").exists())
     assert (tmp_path / "opened.txt").read_text() == f"{opener} {URL}\n"  # the home page, not only the server
@@ -171,7 +171,7 @@ def test_start_script_waits_for_groots_home_page_not_just_any_answer(tmp_path, s
     process, output = start(project, fake_commands(tmp_path))
 
     assert wait_for(lambda: not port_8000_is_free())
-    time.sleep(3)  # several of the script's once a second checks
+    time.sleep(3)  # several of the script's once-a-second checks
     assert "Groot is running" not in output.read_text()
     assert not (tmp_path / "opened.txt").exists()
 
@@ -285,7 +285,7 @@ def test_older_python_fails_with_a_fix(version):
 
 def test_the_oldest_python_allowed_is_one_every_pinned_package_supports():
     # Each installed package says which Pythons it supports. If the setup allowed an older one,
-    # pip would stop half way through the setup (python-multipart 0.0.33 needs 3.11, for example).
+    # pip would stop halfway through the setup (python-multipart 0.0.33 needs 3.11, for example).
     from packaging.specifiers import SpecifierSet
 
     oldest = ".".join(map(str, check_setup.MIN_PYTHON))
@@ -662,7 +662,7 @@ def run_checker(tmp_path, *python_options, **env):
 
 
 def test_checker_explains_missing_packages_instead_of_crashing(tmp_path):
-    # -S starts Python without its installed packages, as if the setup stopped half way.
+    # -S starts Python without its installed packages, as if the setup stopped halfway.
     # The checker must still start and say so, which is why deadline_agent/__init__.py imports nothing.
     result = run_checker(tmp_path, "-S")
 

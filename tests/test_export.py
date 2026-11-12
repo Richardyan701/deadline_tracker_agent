@@ -252,7 +252,7 @@ def test_uid_stays_the_same_when_the_date_or_subject_changes(deadlines_file, ics
     assert first == second == [hashlib.sha256(b"essay").hexdigest()]
 
 
-@pytest.mark.parametrize("same_title", ["ESSAY", "  essay ", "Ｅssay"])  # the last one starts with a full width E
+@pytest.mark.parametrize("same_title", ["ESSAY", "  essay ", "Ｅssay"])  # the last one starts with a full-width E
 def test_titles_that_look_the_same_get_the_same_uid(same_title, deadlines_file, ics_file):
     save(deadlines_file, ("Essay", "2026-11-20"))
     first = values(export_text(ics_file), "UID")
@@ -409,7 +409,7 @@ def test_a_failed_save_is_a_clear_error_and_keeps_the_old_file(deadlines_file, i
     assert result == {
         "status": "error",
         "message": "I couldn't save your calendar file (Access is denied). Please check its folder is not "
-        "read only and the file is not open in another program, then try again.",
+        "read-only and the file is not open in another program, then try again.",
     }
     assert ics_file.read_bytes() == before
     assert sorted(p.name for p in ics_file.parent.iterdir()) == ["deadlines.ics", "deadlines.json"]  # no temporary file left
@@ -545,7 +545,7 @@ def test_round_trip_through_a_strict_parser(deadlines_file, ics_file):
 
 
 def test_the_strict_parser_catches_broken_files():
-    # Make sure the parser really is strict, so the round trip test means something
+    # Make sure the parser really is strict, so the round-trip test means something
     good = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n"
     assert parse(good.encode("utf-8"))["props"] == {"VERSION": ["2.0"]}
 

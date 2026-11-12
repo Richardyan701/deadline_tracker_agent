@@ -282,7 +282,7 @@ def _weekday(value):
 
 
 def _time(value):
-    """A real 24 hour time written as "HH:MM", otherwise None."""
+    """A real 24-hour time written as "HH:MM", otherwise None."""
     if not isinstance(value, str):
         return None
     match = re.fullmatch(r"([0-9]{2}):([0-9]{2})", value)
@@ -292,10 +292,10 @@ def _time(value):
 
 
 def _subject_code(value) -> str:
-    """The five digit subject code. Without one the outline cannot be used, so this is an error."""
+    """The five-digit subject code. Without one the outline cannot be used, so this is an error."""
     code = value.strip() if isinstance(value, str) else ""
     if not re.fullmatch(r"[0-9]{5}", code):
-        raise OutlineError("Gemini did not find a five digit subject code. Is this a UTS subject outline?")
+        raise OutlineError("Gemini did not find a five-digit subject code. Is this a UTS subject outline?")
     return code
 
 

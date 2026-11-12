@@ -1,6 +1,6 @@
 @echo off
 rem Starts Agent Groot on Windows and opens its home page in your browser.
-rem Double click this file, or run it from Command Prompt. Press Ctrl+C to stop Groot.
+rem Double-click this file, or run it from Command Prompt. Press Ctrl+C to stop Groot.
 cd /d "%~dp0"
 rem This file also runs a second copy of itself in the background, to open the browser (see below)
 if "%~1"=="open_browser" goto open_browser

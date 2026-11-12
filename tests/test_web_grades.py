@@ -155,7 +155,7 @@ def test_grades_summary_for_each_subject(client, deadlines_file):
 
 
 def test_grades_summary_shows_secured_and_not_reachable(client, deadlines_file):
-    # 70 x 75% = 52.5 earned, so a Pass is safe, but a HD needs (85 - 52.5) / 30 = 108.4% on the exam
+    # 70 x 75% = 52.5 earned, so a Pass is safe, but an HD needs (85 - 52.5) / 30 = 108.4% on the exam
     save(deadlines_file, deadline("Assignments", weight_percent=70, mark_percent=75), deadline("Exam", weight_percent=30))
     page = client.get("/groot").text
 

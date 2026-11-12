@@ -10,7 +10,7 @@ Every line of `cases.jsonl` is one case. For each case, `run_chat_eval.py`:
 
 1. Makes a fresh temporary deadlines file and fills it with the case's starting deadlines, if it has any. It points Groot at that file with the `DEADLINES_FILE` variable, so your real `deadlines.json` is never touched.
 2. Freezes Groot's clock at the case's "now" (Sydney time) by replacing `deadline_agent.tools._now`. So "next friday" always means the same day, whenever you run it. Gemini sees the frozen date too, because Groot's instruction is built from the same clock.
-3. Starts a brand new chat with the real `root_agent` through ADK's runner and sends the one message.
+3. Starts a brand-new chat with the real `root_agent` through ADK's runner and sends the one message.
 4. Records every tool call with its arguments, what each tool gave back, Groot's final reply and the saved file afterwards.
 
 ## How a case is scored
@@ -41,7 +41,7 @@ Gemini words its replies differently every time, and a reply can sound right whi
 
 | Category | Cases | What it tries |
 | --- | --- | --- |
-| `add_dates` | 19 | Date phrases from the main README's table, such as "today", "in 3 days", "next friday 5pm", "20 jan", "end of next week", "tomorrow 5.30pm" and "due on Friday at 5pm" |
+| `add_dates` | 19 | Date phrases from the table in docs/reference.md, such as "today", "in 3 days", "next friday 5pm", "20 jan", "end of next week", "tomorrow 5.30pm" and "due on Friday at 5pm" |
 | `add_subject` | 5 | Adding with a subject, written in different ways |
 | `strict_rules` | 9 | "5:30" with no am or pm, past dates, "30 feb", "31/11", "next week", "blursday" and a title that already exists |
 | `list` | 3 | Listing everything, including an empty list |

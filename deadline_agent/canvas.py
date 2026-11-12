@@ -110,7 +110,7 @@ def parse_feed(data: bytes) -> list[CanvasEvent]:
 
     Canvas titles end with the course in square brackets, like
     "Assignment 2 [33130_SPR_U_1_S]". The tag is removed from the title, and
-    the subject code is the first five digit number in the title or the tag
+    the subject code is the first five-digit number in the title or the tag
     ("" if there is none, for example a personal event).
     Raises CanvasError if the data is not a calendar.
     """

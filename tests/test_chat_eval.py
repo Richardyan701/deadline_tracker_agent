@@ -129,7 +129,7 @@ def test_ids_and_messages_are_unique():
 
 
 def test_ids_are_safe_file_names():
-    # Each id becomes a file name in runs/, so only lower case letters, digits and dashes (no ":" for Windows)
+    # Each id becomes a file name in runs/, so only lower-case letters, digits and dashes (no ":" for Windows)
     for case in CASES:
         assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", case["id"]), case["id"]
 

@@ -202,7 +202,7 @@ def _split_time(text: str):
 
     Returns (hour, minute) or None, and the rest of the text without the time.
     """
-    # 12 hour time with am/pm: "5pm", "5 pm", "5:30pm", or "5.30pm" as Australians often write it
+    # 12-hour time with am/pm: "5pm", "5 pm", "5:30pm", or "5.30pm" as Australians often write it
     match = re.search(r"\b([0-9]{1,2})(?:[:.]([0-9]{2}))? ?(am|pm)\b", text)
     if match:
         hour, minute = int(match[1]), int(match[2] or 0)
@@ -214,14 +214,14 @@ def _split_time(text: str):
             hour = 12 if hour == 12 else hour + 12  # 12pm is noon
         return (hour, minute), _cut(text, match)
 
-    # 24 hour time: "17:00" or "09:30"
+    # 24-hour time: "17:00" or "09:30"
     match = re.search(r"\b([0-9]{1,2}):([0-9]{2})\b", text)
     if match:
         if len(match[1]) == 1:
             # "5:30" could be morning or evening, so ask instead of guessing
             raise ValueError(
                 f"Is '{match[0]}' in the morning or evening? Add am or pm (like 5:30pm) "
-                "or use 24 hour time (like 17:30)."
+                "or use 24-hour time (like 17:30)."
             )
         hour, minute = int(match[1]), int(match[2])
         if hour > 23 or minute > 59:
@@ -397,7 +397,7 @@ def _percent(value, name: str):
 
 
 def _looks_valid(deadlines) -> bool:
-    """True if the loaded data is a list of well formed deadlines."""
+    """True if the loaded data is a list of well-formed deadlines."""
     if not isinstance(deadlines, list):
         return False
     for deadline in deadlines:
@@ -476,7 +476,7 @@ def _keep_copy(path: Path) -> Path:
 
 
 def _replace_file(path: Path, text: str) -> None:
-    """Swap the whole file for new text in one step, so it is never left half written.
+    """Swap the whole file for new text in one step, so it is never left half-written.
 
     The text goes into a temporary file in the same folder first, then
     os.replace puts that file in place of the old one in a single step. A
@@ -516,14 +516,14 @@ def _not_saved(error: OSError) -> dict:
     return {
         "status": "error",
         "message": f"I couldn't save your deadlines ({reason}), so nothing has changed. "
-        "Please check the deadlines file and its folder are not read only or open in another program, then try again.",
+        "Please check the deadlines file and its folder are not read-only or open in another program, then try again.",
     }
 
 
 def _title_key(title: str) -> str:
     """The form of a title used to compare titles, so titles that look the same match.
 
-    NFKC turns look-alike characters into one standard form (a full width A
+    NFKC turns look-alike characters into one standard form (a full-width A
     from an Asian keyboard becomes a plain A, and an accent typed as a separate
     mark joins its letter), casefold ignores upper and lower case, and
     split/join ignores extra spaces.
@@ -752,7 +752,7 @@ def _clash_sentence(count: int) -> str:
 def _subject_parts(subject: str):
     """'41039 Programming Fundamentals' -> ('41039', 'Programming Fundamentals').
 
-    A subject with no 5 digit UTS code in front gives (None, the whole subject).
+    A subject with no 5-digit UTS code in front gives (None, the whole subject).
     """
     match = re.fullmatch(r"([0-9]{5}) +(.+)", subject.strip())
     if match:
@@ -1002,7 +1002,7 @@ def _event_lines(deadline: dict, stamp: str) -> list:
     if deadline["subject"]:
         lines.append("DESCRIPTION:" + _ics_text("Subject: " + deadline["subject"]))
     lines += [
-        "BEGIN:VALARM",  # a pop up reminder
+        "BEGIN:VALARM",  # a pop-up reminder
         "ACTION:DISPLAY",
         "TRIGGER:-P1D",  # 1 day before the start
         f"DESCRIPTION:{title} is due tomorrow",
@@ -1507,7 +1507,7 @@ def export_calendar() -> dict:
             return {
                 "status": "error",
                 "message": f"I couldn't save your calendar file ({reason}). Please check its folder is not "
-                "read only and the file is not open in another program, then try again.",
+                "read-only and the file is not open in another program, then try again.",
             }
     count = len(unfinished)
     return {

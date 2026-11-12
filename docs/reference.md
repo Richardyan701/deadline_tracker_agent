@@ -135,7 +135,7 @@ On a different day, the phrase counts whole calendar days. On the same day, it c
 Groot points out deadlines that bunch up, so you can start one earlier. This is plain Python in `_clashes` in `deadline_agent/tools.py`, so it never uses a Gemini request. A clash is either:
 
 - **Two deadlines 48 hours or less apart.** Only deadlines next to each other in time are paired, so three in a row give two warnings, not three. The gap is counted in real hours, so it stays right on the nights the clocks change.
-- **3 or more deadlines in the same Monday to Sunday week**, the same weeks as UTS teaching weeks. Fixed weeks never overlap, so you are not warned about the same deadlines twice, like a rolling 7 days would.
+- **3 or more deadlines in the same Monday to Sunday week**, the same weeks as UTS teaching weeks. Fixed weeks never overlap, so you are never warned about the same deadlines twice (a rolling 7 days could do that).
 
 Only unfinished deadlines that have not passed yet count, and a clash is shown when its first deadline is due in the next 7 days, the same window as the reminders. For example:
 
@@ -206,7 +206,7 @@ Good to know:
 
 - Each deadline keeps the same ID every time you export, because the ID is made from its title. Calendar apps use this ID to recognise an event they already have, so importing a newer file into the same calendar should update those events instead of adding copies.
 - Importing never deletes anything. A deadline you finish or delete in Groot stays in your calendar until you delete it there.
-- Google Calendar may use your own notification settings instead of the 1 day reminder in the file.
+- Google Calendar may use your own notification settings instead of the 1-day reminder in the file.
 
 ## Importing deadlines from your outlines
 
@@ -334,7 +334,7 @@ Both setup scripts do the same four things. They check your Python version, crea
 
 1. Install Python 3.11 or newer from python.org and tick "Add python.exe to PATH" on the first screen.
 2. Download or clone this project.
-3. Double click `setup_windows.bat` and paste your key when it asks. The key shows on screen while you paste it.
+3. Double-click `setup_windows.bat` and paste your key when it asks. The key shows on screen while you paste it.
 
 ### Linux and macOS
 
@@ -394,7 +394,7 @@ What uses a request:
 | The outline evaluation | 1 for each outline |
 | The chat evaluation | At least 121 for a full run |
 
-Nothing else ever uses a request: not the home page, adding or changing deadlines there, the calendar export, opening the import page, reading your timetable or Canvas feed, saving ticked rows, the setup checker without `--online`, or the tests. A failed request is never retried on its own. So the free tier gives you roughly 8 to 10 chat messages that use a tool each day, and a few quick messages in a row can hit the per minute limit. When a limit is reached, Groot says which one and when to try again (see [Troubleshooting](#troubleshooting)).
+Nothing else ever uses a request: not the home page, adding or changing deadlines there, the calendar export, opening the import page, reading your timetable or Canvas feed, saving ticked rows, the setup checker without `--online`, or the tests. A failed request is never retried on its own. So the free tier gives you roughly 8 to 10 chat messages that use a tool each day, and a few quick messages in a row can hit the per-minute limit. When a limit is reached, Groot says which one and when to try again (see [Troubleshooting](#troubleshooting)).
 
 ## Measuring how well it works
 
@@ -560,7 +560,7 @@ There are about 1,500 tests, run with pytest:
 | `tests/test_chat_eval.py` | 31 | The chat evaluation's cases and scoring, with a scripted stand-in for Gemini |
 | `tests/test_timetable.py` | 30 | Reading the UTS timetable layout, wrapped lines and damaged PDFs |
 | `tests/test_agent.py` | 11 | Groot's tools and instruction, plus whole turns through ADK with a scripted stand-in for Gemini |
-| `tests/test_clashes.py` | 30 | Clash warnings: the 48 hour edge, 3 in a week, ties, finished and past deadlines, `get_reminders` and the instruction |
+| `tests/test_clashes.py` | 30 | Clash warnings: the 48-hour edge, 3 in a week, ties, finished and past deadlines, `get_reminders` and the instruction |
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
 | `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |

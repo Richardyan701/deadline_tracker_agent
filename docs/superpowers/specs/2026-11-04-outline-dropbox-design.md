@@ -61,7 +61,7 @@ The shared data shapes live in `deadline_agent/import_types.py` as `TypedDict`s.
 | `week` | int or null | Teaching week, when `when` is `week` or `tutorial`. |
 | `first_week`, `last_week` | int or null | For `recurring`, for example 4 and 12 for "each week from week 4". |
 | `weekday` | str or null | `"monday"` to `"sunday"`, only if the outline names a day. |
-| `time` | str or null | `"HH:MM"` 24 hour, only if the outline names a time. |
+| `time` | str or null | `"HH:MM"` 24-hour, only if the outline names a time. |
 | `quote` | str | The outline's own words for the timing, at most 200 characters, so the student can check it. |
 
 Gemini is asked to fill only what the outline actually says. It never works out calendar dates itself.
@@ -118,7 +118,7 @@ The UTS timetable export lists each class as a block: time range, `<code>_SPR_U_
 ## Canvas feed
 
 - The student pastes the link from Canvas, Calendar, Calendar Feed.
-- The server fetches it once over HTTPS only, from `canvas.uts.edu.au` or `*.instructure.com` only (any other host is refused), with a 10 second timeout and a 2 MB size limit. The link is never stored, logged or echoed back.
+- The server fetches it once over HTTPS only, from `canvas.uts.edu.au` or `*.instructure.com` only (any other host is refused), with a 10-second timeout and a 2 MB size limit. The link is never stored, logged or echoed back.
 - Events are read with a calendar library. Times are converted to Sydney time. The subject code is the first five-digit number in the event title or its course tag.
 - Matching to outline items is plain code: same subject code, then the most similar name (normalised, case-insensitive, `difflib` ratio at least 0.6, with task numbers like "Assignment 2" counting as a strong hint). A match that is not clearly better than the next best candidate is not merged; both rows stay and are flagged. Canvas events with no match become extra rows with source `canvas` and status `exact`.
 
