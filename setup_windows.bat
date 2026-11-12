@@ -41,7 +41,7 @@ echo Kept your existing deadline_agent\.env.
 
 :done
 echo.
-echo All done. To start Groot, double click start_groot.bat in this folder.
+echo All done. To start Groot, double-click start_groot.bat in this folder.
 pause
 exit /b 0
 

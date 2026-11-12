@@ -35,7 +35,7 @@ OUTLINES_DIR = EVAL_DIR / "outlines"
 KEYS_DIR = EVAL_DIR / "answer_key"
 RESULTS_FILE = EVAL_DIR / "results.md"
 
-# The made up key that shows the format. It is never scored.
+# The made-up key that shows the format. It is never scored.
 EXAMPLE_KEY = "EXAMPLE.json"
 
 # Real dates are worked out for this session, unless --session gives another.
@@ -125,7 +125,7 @@ def load_keys(keys_dir: Path) -> tuple[dict, list]:
         if path.name == EXAMPLE_KEY:
             continue
         if not re.fullmatch(r"[0-9]{5}", path.stem):
-            raise EvalError(f"{path.name}: an answer key must be named after its five digit subject code, like 33130.json.")
+            raise EvalError(f"{path.name}: an answer key must be named after its five-digit subject code, like 33130.json.")
         key = load_key(path)
         if key["checked"]:
             checked[path.stem] = key["items"]

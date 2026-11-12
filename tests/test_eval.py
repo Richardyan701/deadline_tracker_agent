@@ -1,7 +1,7 @@
 """Tests for the accuracy measurement (eval/run_eval.py).
 
 No API key and no internet needed. A fake client stands in for Gemini, and a
-fake clock stands in for real waiting, so the 4 requests a minute limit is
+fake clock stands in for real waiting, so the limit of 4 requests a minute is
 checked without the tests taking minutes.
 """
 
@@ -408,7 +408,7 @@ def test_keys_are_split_into_checked_and_not_checked_and_the_example_is_skipped(
 
 def test_a_key_must_be_named_after_its_subject_code(tmp_path):
     write_key(tmp_path, "maths", [])
-    with pytest.raises(EvalError, match="five digit subject code"):
+    with pytest.raises(EvalError, match="five-digit subject code"):
         run_eval.load_keys(tmp_path)
 
 

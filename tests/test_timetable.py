@@ -86,7 +86,7 @@ def block(time="9:00 - 11:00", code="33130_SPR_U_1_S", name=("Mathematics 1",), 
 
 
 def make_pdf(lines: list[str]) -> bytes:
-    """A small one page PDF that shows each line of text on its own line.
+    """A small one-page PDF that shows each line of text on its own line.
 
     PDF files are text instructions plus a table (the "xref") that says
     where each numbered object starts, so this builds the objects and then

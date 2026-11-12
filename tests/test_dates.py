@@ -332,7 +332,7 @@ def test_later_today_is_fine(monkeypatch, phrase, expected):
         "the day after tomorrow",
         "fri 20 nov",
         "nov 20",
-        "20/11/26",  # two digit year
+        "20/11/26",  # two-digit year
         "20-11-2026",
         "in -3 days",
         "in 1000 days",

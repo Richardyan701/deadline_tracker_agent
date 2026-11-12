@@ -198,8 +198,8 @@ def odf_file(kind: str, body: str, locked=False) -> bytes:
 def ole_file(streams: dict) -> bytes:
     """A tiny OLE2 "compound file", the container that old .doc, .xls and .ppt files use.
 
-    It works like a small disk inside one file: a 512 byte header, then 512
-    byte sectors holding the streams, a directory with their names, and a
+    It works like a small disk inside one file: a 512-byte header, then 512-byte
+    sectors holding the streams, a directory with their names, and a
     table (the FAT) saying which sector comes next in each stream. Each stream
     is padded to 4096 bytes, the smallest size kept in ordinary sectors, so no
     "mini stream" is needed. Up to three streams fit in the one directory sector.
@@ -244,7 +244,7 @@ PPT = ole_file({"PowerPoint Document": b"", "Current User": b""})
 
 
 def pdf_file(**lock) -> bytes:
-    """A one page PDF, locked with pypdf's encrypt(**lock) when lock is given."""
+    """A one-page PDF, locked with pypdf's encrypt(**lock) when lock is given."""
     writer = PdfWriter()
     writer.add_blank_page(width=200, height=200)
     if lock:
@@ -705,7 +705,7 @@ def locked_zip_part() -> bytes:
 @pytest.mark.parametrize(
     "data, name",
     [
-        # Word, Excel and PowerPoint put a locked file inside an old style container
+        # Word, Excel and PowerPoint put a locked file inside an old-style container
         (ole_file({"EncryptionInfo": b"info", "EncryptedPackage": b"secret"}), "outline.docx"),
         (ole_file({"EncryptionInfo": b"info", "EncryptedPackage": b"secret"}), None),
         (odf_file("text", "<text:p>Assignment 1</text:p>", locked=True), "outline.odt"),
@@ -800,7 +800,7 @@ def test_a_file_with_no_text_is_refused(data):
         zip_file({"mimetype": "application/epub+zip", "META-INF/container.xml": "<a/>"}),  # an e-book
         zip_with(docx_file("Assignment 1"), {"[Content_Types].xml": lambda xml: xml.replace(
             b"document.main+xml", b"template.main+xml")}),  # a Word template (.dotx)
-        ole_file({"Contents": b"something else"}),  # an old style container that is not .doc, .xls or .ppt
+        ole_file({"Contents": b"something else"}),  # an old-style container that is not .doc, .xls or .ppt
     ],
 )
 def test_kinds_groot_cannot_read_are_refused_with_the_list_of_formats(data):
@@ -813,7 +813,7 @@ def test_kinds_groot_cannot_read_are_refused_with_the_list_of_formats(data):
     "data",
     [
         b"PK\x03\x04 the start of a zip and nothing else",
-        docx_file("Assignment 1")[:3000],  # cut off half way
+        docx_file("Assignment 1")[:3000],  # cut off halfway
         zip_with(docx_file("Assignment 1"), {"word/document.xml": b"<w:document"}),  # broken XML
         documents.OLE_START + b"rubbish" * 100,
         b"%PDF-1.7\n/Encrypt but nothing else",

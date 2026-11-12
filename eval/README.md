@@ -8,7 +8,7 @@ This folder checks how well the outline reader (`deadline_agent/outline.py`) fin
 | --- | --- | --- |
 | `run_eval.py` | The script that runs the measurement | Yes |
 | `answer_key/<code>.json` | The right answers for one outline, for example `answer_key/33130.json` | Yes |
-| `answer_key/EXAMPLE.json` | A made up key that shows the format. It is never scored | Yes |
+| `answer_key/EXAMPLE.json` | A made-up key that shows the format. It is never scored | Yes |
 | `outlines/<code>.<ending>` | The outline files, for example `outlines/33130.pdf` or `outlines/35010.docx` | No. They are UTS documents, so `eval/.gitignore` keeps them off GitHub |
 | `results.md` | The scores from the last run | Yes, once you have run it |
 
@@ -84,7 +84,7 @@ Each item has these fields. The first three are required. The timing fields you 
 | `week` | The teaching week number, only if the outline gives one. |
 | `first_week`, `last_week` | The first and last week of a weekly series. If the outline gives no last week, leave `last_week` out. |
 | `weekday` | `"monday"` to `"sunday"` in lower case, only if the outline names the day. |
-| `time` | `"HH:MM"` in 24 hour time, only if the outline names a time. 11:59 PM is `"23:59"`. |
+| `time` | `"HH:MM"` in 24-hour time, only if the outline names a time. 11:59 PM is `"23:59"`. |
 | `note` | Optional. Anything that helps you check the item later, like the page or the outline's words. It is not scored. |
 
 How to choose `when` (take the first one that fits):
@@ -143,5 +143,5 @@ Under each outline, `results.md` lists every **Wrong date** too, for example `"R
 - **One session for each run.** An answer key does not say which session its outline is for, so every outline in a run gets the calendar of the session you chose.
 - **A tutorial in a given week has no real date here.** The drop box needs your timetable to know the day of your tutorial, and the measurement has no timetable, so these items count under "Timing correct" but not under "Dates correct".
 - **Silently wrong dates are counted by the timing fields**, so an added weekday that lands on the right day still counts. This keeps the strict count the spec asks for.
-- **Silently wrong dates only counts paired items.** A made up item is counted under precision instead.
+- **Silently wrong dates only counts paired items.** A made-up item is counted under precision instead.
 - **One run is one sample.** Gemini can answer a little differently each time, so small changes between runs are normal.

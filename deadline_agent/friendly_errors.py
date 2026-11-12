@@ -5,7 +5,7 @@ it to Groot as its on_model_error_callback). For the problems a student can fix
 or wait out, it returns a short reply, and ADK shows that in the chat instead
 of a long red error:
 
-- 429 RESOURCE_EXHAUSTED: a free tier limit is used up, per day or per minute
+- 429 RESOURCE_EXHAUSTED: a free-tier limit is used up, per day or per minute
 - no API key, or a key that Google says is not valid
 - 504 DEADLINE_EXCEEDED: Gemini took too long to answer
 
@@ -134,14 +134,14 @@ def _retry_seconds(details: list) -> float | None:
     return float(match[1]) if match else None
 
 
-# ---------- the reply for a used up limit (429) ----------
+# ---------- the reply for a used-up limit (429) ----------
 
 
 def _limit_message(details: list) -> str:
     """The reply for a 429, worked out from which limit ran out and how long to wait.
 
     The daily limit is checked first, because when it is used up, waiting a
-    minute does not help even if a per minute limit ran out too.
+    minute does not help even if a per-minute limit ran out too.
     """
     quota_ids = _quota_ids(details)
     seconds = _retry_seconds(details)

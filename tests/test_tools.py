@@ -190,7 +190,7 @@ def test_delete_and_mark_done_with_odd_titles_change_nothing(tool, title, deadli
         ("Assignment 1", "ASSIGNMENT 1"),
         ("Assignment 1", "assignment  1"),  # two spaces
         ("Assignment 1", "Assignment 1"),  # a non-breaking space, common when copying from a web page
-        ("Assignment 1", "Ａssignment １"),  # a full width A and 1, from an Asian keyboard
+        ("Assignment 1", "Ａssignment １"),  # a full-width A and 1, from an Asian keyboard
         ("Café quiz", "Café quiz"),  # the same e with an accent, typed as one character and as two
         ("Straße essay", "STRASSE ESSAY"),  # German sharp s
     ],

@@ -6,7 +6,7 @@ Run it from the project folder:
     Linux and macOS:  .venv/bin/python -m deadline_agent.check_setup
 
 Each check prints a tick or a cross (or [OK] and [X] where the window cannot
-show those two characters), and every cross comes with a one line fix. It
+show those two characters), and every cross comes with a one-line fix. It
 only reads files and never changes them. Nothing leaves your computer
 unless you add --online, which sends one tiny real request to Gemini to prove
 your key works. It exits with 0 when every check passes and 1 otherwise.

@@ -57,7 +57,7 @@ def error_body(code, status, *details):
 
 
 def quota_failure(*quota_ids):
-    """Which free tier limits ran out."""
+    """Which free-tier limits ran out."""
     return {
         "@type": "type.googleapis.com/google.rpc.QuotaFailure",
         "violations": [

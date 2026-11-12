@@ -23,7 +23,7 @@ class ExtractedItem(TypedDict):
     first_week: int | None  # for "recurring", for example 4 ...
     last_week: int | None  # ... and 12 for "each week from week 4"
     weekday: str | None  # "monday" to "sunday", only if the outline names a day
-    time: str | None  # "HH:MM" 24 hour, only if the outline names a time
+    time: str | None  # "HH:MM" 24-hour, only if the outline names a time
     quote: str  # the outline's own words for the timing, at most 200 characters
 
 
@@ -32,14 +32,14 @@ class TimetableClass(TypedDict):
 
     activity: str  # for example "Tut1", "Wrk1" or "Cmp1"
     weekday: str  # "monday" to "sunday", from the first date the class runs
-    start: str  # "HH:MM" 24 hour, for example "09:00"
-    end: str  # "HH:MM" 24 hour, for example "11:00"
+    start: str  # "HH:MM" 24-hour, for example "09:00"
+    end: str  # "HH:MM" 24-hour, for example "11:00"
 
 
 class CanvasEvent(TypedDict):
     """One event from the student's Canvas calendar feed."""
 
-    subject_code: str  # the first five digit number in the title, or "" if there is none
+    subject_code: str  # the first five-digit number in the title, or "" if there is none
     title: str  # the event's title, without the course tag in square brackets
     due: str  # Sydney time, "YYYY-MM-DD HH:MM"
     all_day: bool  # True if Canvas has a date but no time

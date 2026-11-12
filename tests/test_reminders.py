@@ -545,8 +545,8 @@ def test_injected_newline_cannot_add_a_line(deadlines_file):
         "\u2029",  # paragraph separator
         "\x00",  # null
         "\x1b[31m",  # terminal colour code
-        "\u200b",  # zero width space
-        "\u202e",  # right to left override
+        "\u200b",  # zero-width space
+        "\u202e",  # right-to-left override
         "\t",
     ],
 )

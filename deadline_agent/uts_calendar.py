@@ -90,10 +90,10 @@ def week_start(session: str, week: int) -> date:
 
 
 def _clock(time: str) -> tuple[int, int]:
-    """'17:30' -> (17, 30). Raises ValueError unless it is a real 24 hour 'HH:MM' time."""
+    """'17:30' -> (17, 30). Raises ValueError unless it is a real 24-hour 'HH:MM' time."""
     match = re.fullmatch(r"([01][0-9]|2[0-3]):([0-5][0-9])", time)
     if not match:
-        raise ValueError(f"The time must be 24 hour 'HH:MM', like '17:30', but I got {time!r}.")
+        raise ValueError(f"The time must be 24-hour 'HH:MM', like '17:30', but I got {time!r}.")
     return int(match[1]), int(match[2])
 
 
@@ -101,7 +101,7 @@ def week_date(session: str, week: int, weekday: str, time: str) -> datetime:
     """The date and time for a weekday in a teaching week.
 
     For example ("SPR2026", 7, "friday", "23:59") is Friday 11 Sep 2026 at 23:59.
-    weekday is "monday" to "sunday" and time is 24 hour "HH:MM".
+    weekday is "monday" to "sunday" and time is 24-hour "HH:MM".
     Raises ValueError if any of them is not valid.
     """
     if weekday not in WEEKDAY_NAMES:
