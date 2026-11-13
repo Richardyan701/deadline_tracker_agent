@@ -1,8 +1,8 @@
 # Chat evaluation
 
-The tests in `tests/` prove that Groot's tools and date rules work. They never talk to Gemini, so they cannot tell you how well the real model *uses* those tools. This evaluation does that. It sends 63 realistic student messages to the real Groot (Gemini 3.5 Flash plus Groot's tools) and checks what actually happened.
+The tests in `tests/` prove that Groot's tools and date rules work. They never talk to Gemini, so they cannot tell you how well the real model *uses* those tools. This evaluation does that. It sends 63 realistic student messages to the real Groot (Gemini Flash plus Groot's tools) and checks what actually happened.
 
-No real results are in this folder yet. `results.md` appears after you run it with your own key.
+The latest results are in [`results.md`](results.md): all 63 cases passed in the run finished on 11 Nov 2026. Groot asks for `gemini-3.5-flash`, but Gemini reported that it answered with `gemini-3.6-flash`, so that is the model `results.md` names. Running the evaluation again with your own key replaces `results.md` with your results.
 
 ## What happens in each case
 
