@@ -90,12 +90,14 @@ def reader(app):
     calls = Calls()
     calls.names = []
 
-    def read(data: bytes, filename: str):
+    def read(data: bytes, filename: str, removed: list):
         calls.append(data)
+        removed += calls.removed
         calls.names.append(filename)
         return calls.answer(data)
 
     calls.answer = lambda data: [item("Essay", "week", week=3)]
+    calls.removed = []  # what the fake says it took out before sending
     app.dependency_overrides[web_app.outline_reader] = lambda: read
     return calls
 
@@ -858,3 +860,40 @@ def test_no_endpoint_uses_gemini_unless_preview_is_used(client, reader, no_gemin
 
     preview(client, ("maths.pdf", pdf("maths")), ("foundation.pdf", pdf("foundation")))
     assert reader == [pdf("maths"), pdf("foundation")]  # one request for each outline, and only now
+
+
+# ---------- sensitive details ----------
+
+
+def test_preview_says_when_sensitive_details_were_taken_out_of_an_outline(client, reader):
+    reader.removed = ["card number", "card number", "password"]
+
+    response = preview(client, ("notes.txt", b"Quiz in week 3"))
+
+    assert response.json()["outlines"] == [{
+        "file": "notes.txt",
+        "status": "success",
+        "message": (
+            "Found 1 assessment item. Before sending it to Gemini, Groot took out what looked like "
+            "a card number and a password, so check this outline's rows carefully."
+        ),
+    }]  # fmt: skip
+
+
+def test_a_row_with_a_sensitive_title_is_not_saved_and_the_others_are(client, deadlines_file):
+    rows = [
+        {"title": "33130 Essay", "due_date": "2026-08-07 23:59", "subject": "33130 Mathematics 1"},
+        {"title": "Pay with 4111 1111 1111 1111", "due_date": "2026-08-07 23:59", "subject": "33130 Mathematics 1"},
+    ]
+    response = client.post("/groot/api/save", json={"rows": rows}, headers={"Origin": ORIGIN})
+
+    results = response.json()["results"]
+    assert [result["status"] for result in results] == ["success", "error"]
+    assert "looks like it contains a card number, so it was not saved" in results[1]["message"]
+    assert "4111" not in deadlines_file.read_text(encoding="utf-8")
+
+
+def test_the_import_page_says_what_groot_holds_back_and_what_it_cannot(client):
+    text = client.get("/groot/import").text
+    assert "Groot takes out card numbers, tax file numbers, passwords and similar details it spots before sending" in text
+    assert "it cannot check a photo or a scanned page" in text

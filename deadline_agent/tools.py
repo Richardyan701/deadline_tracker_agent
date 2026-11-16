@@ -34,6 +34,8 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import privacy
+
 # The four things we store for every deadline.
 REQUIRED_KEYS = {"title", "due_date", "subject", "done"}
 
@@ -135,6 +137,22 @@ def _utc(moment: datetime) -> datetime:
     overdue", are worked out in UTC to stay right on those nights.
     """
     return moment.replace(tzinfo=SYDNEY).astimezone(timezone.utc)
+
+
+def _nothing_sensitive(value: str, name: str) -> str:
+    """The value as it is, unless it holds something like a card number or a password.
+
+    Groot never needs details like those (privacy.py lists them), so a
+    title or subject that has one is never saved. This raises ValueError
+    with a message that says why, for the chat and the web page alike.
+    """
+    found = privacy.kinds(value)
+    if found:
+        raise ValueError(
+            f"That {name} looks like it contains {privacy.describe(found)}, so it was not saved. "
+            "Groot never needs details like that. Take it out and try again."
+        )
+    return value
 
 
 def _text(value, name: str) -> str:
@@ -1072,8 +1090,8 @@ def add_deadline(title: str, due_date: str, subject: str = "", weight_percent: f
     """
     now = _now()
     try:
-        title = _text(title, "title")
-        subject = _text(subject, "subject")
+        title = _nothing_sensitive(_text(title, "title"), "title")
+        subject = _nothing_sensitive(_text(subject, "subject"), "subject")
         weight = _percent(weight_percent, "weight_percent")
         if not title:
             raise ValueError("A deadline needs a title.")
@@ -1248,8 +1266,8 @@ def edit_deadline(
     now = _now()
     try:
         title = _text(title, "title")
-        new_title = _text(new_title, "new_title")
-        new_subject = _text(new_subject, "new_subject")
+        new_title = _nothing_sensitive(_text(new_title, "new_title"), "title")
+        new_subject = _nothing_sensitive(_text(new_subject, "new_subject"), "subject")
         date_words = _text(new_due_date, "new_due_date")
         if not isinstance(remove_subject, bool):
             raise ValueError(f"remove_subject must be true or false, but I got {remove_subject!r}.")

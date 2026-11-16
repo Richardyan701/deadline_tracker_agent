@@ -15,7 +15,7 @@ import importlib
 import logging
 from collections.abc import Callable
 
-from deadline_agent import calendars, canvas, importer, timetable, tools
+from deadline_agent import calendars, canvas, importer, privacy, timetable, tools
 from deadline_agent.import_types import CanvasEvent, ExtractedItem, PreviewRow, TimetableClass
 
 from . import Refused
@@ -23,10 +23,11 @@ from .uploads import Upload, UploadedFile
 
 logger = logging.getLogger(__name__)
 
-# Reads one outline file, given its bytes and its name, and returns what it
-# found. The real one is read_with_gemini below. The tests use a fake, so
-# they never call Gemini.
-OutlineReader = Callable[[bytes, str], list[ExtractedItem]]
+# Reads one outline file, given its bytes, its name and a list to add to, and
+# returns what it found. The kinds of sensitive detail it took out before
+# sending (like "card number") are added to the list. The real one is
+# read_with_gemini below. The tests use a fake, so they never call Gemini.
+OutlineReader = Callable[[bytes, str, list], list[ExtractedItem]]
 
 READER_MISSING = (
     "The outline reader is not installed yet, so Groot cannot read outlines. "
@@ -42,7 +43,7 @@ class OutlineFailed(Exception):
     """Gemini could not read one outline. The message is one clear sentence for the student."""
 
 
-def read_with_gemini(data: bytes, filename: str) -> list[ExtractedItem]:
+def read_with_gemini(data: bytes, filename: str, removed: list | None = None) -> list[ExtractedItem]:
     """Read one outline file with deadline_agent/outline.py, which sends it to Gemini.
 
     filename, like "33130.docx", goes along as the hint documents.py uses to
@@ -59,7 +60,7 @@ def read_with_gemini(data: bytes, filename: str) -> list[ExtractedItem]:
             raise  # outline.py is there, but something it imports is missing
         raise Refused(503, READER_MISSING) from None
     try:
-        return outline.extract_items(data, filename=filename)
+        return outline.extract_items(data, filename=filename, removed=removed)
     except outline.OutlineError as error:
         raise OutlineFailed(str(error)) from error
 
@@ -123,8 +124,9 @@ def _read_outline(file: UploadedFile, read: OutlineReader) -> tuple[list[Extract
     A problem with this outline becomes one sentence in the result, so the
     other outlines are still read and nothing found so far is lost.
     """
+    removed = []  # the kinds of sensitive detail taken out of this outline before it was sent
     try:
-        found = read(file.data, file.name)
+        found = read(file.data, file.name, removed)
     except OutlineFailed as error:
         return [], {"file": file.name, "status": "error", "message": str(error)}
     except Refused:
@@ -135,8 +137,15 @@ def _read_outline(file: UploadedFile, read: OutlineReader) -> tuple[list[Extract
         logger.exception("Reading the outline %s failed", file.name)
         return [], {"file": file.name, "status": "error", "message": UNEXPECTED_PROBLEM}
     if not found:
-        return [], {"file": file.name, "status": "success", "message": "No assessments were found in this outline."}
-    message = f"Found {tools._plural(len(found), 'assessment item')}."
+        message = "No assessments were found in this outline."
+    else:
+        message = f"Found {tools._plural(len(found), 'assessment item')}."
+    if removed:
+        kinds = privacy.describe(list(dict.fromkeys(removed)))
+        message += (
+            f" Before sending it to Gemini, Groot took out what looked like {kinds}, "
+            "so check this outline's rows carefully."
+        )
     return found, {"file": file.name, "status": "success", "message": message}
 
 
