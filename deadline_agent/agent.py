@@ -4,6 +4,7 @@ from google.adk import Agent
 from google.adk.agents.readonly_context import ReadonlyContext
 
 from . import tools
+from .chat_privacy import keep_sensitive_details_from_gemini
 from .friendly_errors import friendly_model_error
 from .tools import (
     add_deadline,
@@ -207,6 +208,9 @@ root_agent = Agent(
         set_mark,
         grade_needed,
     ],
+    # Before every request to Gemini, take out anything like a card number or a password,
+    # and do not send the student's message at all if it has one (chat_privacy.py).
+    before_model_callback=keep_sensitive_details_from_gemini,
     # When Gemini fails with a limit, key or timeout error, show a short friendly reply
     # instead of a long red error. Every other error is still raised as before.
     on_model_error_callback=friendly_model_error,

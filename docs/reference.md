@@ -470,7 +470,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say that every test passed (about 1,900). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say that every test passed (about 2,000). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -523,6 +523,8 @@ deadline_agent/
   agent.py           Groot itself: its model, its instruction and its list of tools
   tools.py           the ten tools, the date rules, the reminders and the saving code
   friendly_errors.py short chat replies for a used up limit, a key problem or a timeout
+  privacy.py         spots card numbers, passwords and other sensitive details, in plain code
+  chat_privacy.py    keeps those details in a chat message away from Gemini
   check_setup.py     the setup checker
   outline.py         the outline reader, one Gemini request for each outline
   documents.py       turns an outline file of any supported kind into what Gemini gets
@@ -539,7 +541,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 1,900 tests, no API key needed
+tests/               about 2,000 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -561,11 +563,29 @@ start_groot.sh, start_groot.bat    the start files
 - **Text is always shown as text.** Every title, subject and file name on the pages is escaped or set with `textContent`, so even a title like `<script>` is only shown. The pages only run Groot's own scripts and cannot be shown inside another site's frame.
 - **Uploads stay in memory.** The import page reads your files into memory and never writes them to disk. The one exception is an old `.doc` or `.ppt` file, which LibreOffice needs as a file, so a copy goes into a temporary folder that is deleted straight after.
 - **What goes to Google.** Each chat message goes to Gemini with Groot's instruction, which includes the titles and subjects of anything overdue or due in the next 7 days. Each outline you preview goes to Gemini, as the file itself or as its text. On the free tier, Google's terms allow it to use what you send to improve its products, and people at Google may read it, so do not put anything private in a title or in an outline you upload. In particular, never send your student ID, your password or login details, health or disability information, bank or money details, your address or phone number, or anyone else's personal details. If an outline or timetable has your name or student ID on it, that is one more reason to check before you preview it. Google's terms can change, so read them yourself. See the [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms). Your timetable and your Canvas feed are read on your computer and never sent to Gemini.
+- **Sensitive details are held back, on your computer.** Groot only needs titles, dates, subjects and marks. Before anything is sent or saved, plain Python code (`deadline_agent/privacy.py`, no AI) looks for:
+
+  | What | How it is recognised |
+  | --- | --- |
+  | Card number | 13 to 19 digits that start like a real card and pass the Luhn check every card passes |
+  | Tax file number | 9 digits that pass the Tax Office's check, or 8 to 9 digits after "TFN" or "tax file number" |
+  | Medicare number | 10 or 11 digits that pass Medicare's check, written like the card (4, 5, 1) or after "Medicare" |
+  | Password or PIN | What follows "password is", "password:", "PIN is" and so on, when it has a digit or symbol in it |
+  | API key | Google (`AIza...`), OpenAI and Anthropic (`sk-...`) and GitHub (`ghp_...`) keys |
+  | Bank details | A BSB, and the account number after it, after the word "BSB" |
+  | Student ID | 7 to 9 digits after "student ID", "student number", "SID" or "zID" |
+
+  What happens then depends on where it was found:
+  - **In a chat message:** the message is not sent to Gemini at all. Groot replies that it did not send it and asks you to send it again without the detail. If you carry on chatting, the detail is replaced by `[removed]` in the chat history that goes with later messages. Your own words still show in the chat window, which is on your computer.
+  - **In an outline:** the detail is replaced by `[removed]` before the outline is sent, and the preview says what was taken out. A PDF cannot be edited, so a PDF with such a detail is sent as its text instead of the file, which loses the layout of tables, so check its rows carefully.
+  - **In a title or subject:** it is not saved, in the chat, on the home page or from the import page, and the message says why.
+
+  **What this cannot do.** It only knows patterns and does not understand meaning. It cannot spot health, money or family details written in ordinary words, a password made only of letters, your name, address or phone number, or anything inside a photo or a scanned page. Now and then it will also flag an ordinary number, for example about 1 in 11 nine-digit numbers passes the tax file number check. So the advice above still stands: do not send anything private.
 - **Your key** is only in `deadline_agent/.env`, which git ignores. The setup checker never prints it, and the GitHub Actions check fails if a `.env` file is ever committed.
 
 ## Tests and CI
 
-There are about 1,900 tests, run with pytest:
+There are about 2,000 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
@@ -581,6 +601,7 @@ There are about 1,900 tests, run with pytest:
 | `tests/test_importer.py` | 68 | Every row of the date rules, Canvas matching, public holidays, past dates and saving |
 | `tests/test_start_and_setup.py` | 55 | The start files (`start_groot.sh` is run for real) and every part of the setup checker |
 | `tests/test_friendly_errors.py` | 50 | The chat's replies for limits, key problems and timeouts |
+| `tests/test_privacy.py` | 90 | Every kind of sensitive detail, ordinary text that must be left alone, whole chat turns that prove nothing is sent to Google, outlines and saving |
 | `tests/test_canvas.py` | 49 | Reading Canvas feeds, time zones, refused links, the size and time limits, and the link never logged |
 | `tests/test_export.py` | 48 | The calendar file: its exact text, folded lines, escaping, IDs, daylight saving and failed saves |
 | `tests/test_chat_eval.py` | 31 | The chat evaluation's cases and scoring, with a scripted stand-in for Gemini |

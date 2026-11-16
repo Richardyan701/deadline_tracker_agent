@@ -22,6 +22,7 @@ docs/superpowers/specs/2026-11-04-outline-dropbox-design.md):
     date, week, first_week, last_week, weekday, time, quote
 """
 
+import dataclasses
 import json
 import re
 from datetime import date
@@ -32,7 +33,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
 
-from . import documents
+from . import documents, privacy
 from .tools import ISO_DATE, SUBJECT_CODE, WEEKDAY_NAMES
 
 # The same model as Groot (agent.py).
@@ -347,16 +348,46 @@ def check_item(raw, subject_code: str, subject_name: str) -> dict:
     return item
 
 
+# ---------- keeping sensitive details on this computer ----------
+
+
+def without_sensitive_details(document: documents.Document) -> tuple[documents.Document, list[str]]:
+    """The document with anything like a card number or a password taken out, and the kinds that were found.
+
+    An outline should not hold details like these, but a student can pick
+    the wrong file. privacy.py does the checking, in plain code on this computer.
+
+    - A document sent as text has each detail replaced by "[removed]".
+    - A PDF is sent as the file itself, which cannot be edited. So if its
+      text holds a detail, the PDF's text is sent instead, with the detail
+      replaced. Tables lose their layout that way, so the rows need a closer check.
+    - An image, or a scanned PDF with no text, cannot be checked here and is sent as it is.
+    """
+    if document.kind == "pdf":
+        text, kinds = privacy.redact(documents.pdf_text(document.data))
+        if not kinds:
+            return document, []
+        return documents.Document("pdf", text=text[: documents.MAX_TEXT_CHARS]), kinds
+    if document.text:
+        text, kinds = privacy.redact(document.text)
+        return dataclasses.replace(document, text=text), kinds
+    return document, []
+
+
 # ---------- reading one outline ----------
 
 
-def extract_items(data: bytes, filename: str | None = None, client=None) -> list[dict]:
+def extract_items(data: bytes, filename: str | None = None, client=None, removed: list | None = None) -> list[dict]:
     """Ask Gemini for every deadline in one outline file and return them as checked dicts.
 
     data is the file's bytes. filename, for example "33130.docx", is only a
     hint (see documents.py), so extract_items(pdf_bytes) works as it always has.
     client is a google-genai Client. Leave it out to use the key in
     deadline_agent/.env. The tests pass a fake one instead.
+
+    Anything like a card number or a password is taken out before the
+    outline is sent (see without_sensitive_details). Pass a list as removed
+    to find out what was taken out: the kinds, like "card number", are added to it.
 
     Raises OutlineError (or one of its kinds above) when the outline cannot be
     read. A file that cannot be used is refused before anything is sent. It
@@ -366,6 +397,9 @@ def extract_items(data: bytes, filename: str | None = None, client=None) -> list
         document = documents.read_document(data, filename)
     except documents.DocumentError as error:
         raise OutlineFileError(str(error)) from error
+    document, kinds = without_sensitive_details(document)
+    if removed is not None:
+        removed += kinds
     if client is None:
         client = _default_client()
     answer = _parse(_ask_gemini(document, client))

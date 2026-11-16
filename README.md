@@ -10,7 +10,7 @@ Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney,
 
 *The home page, shown with made-up example deadlines.*
 
-> **Privacy:** your deadlines stay on your computer, but every chat message and every outline you preview is sent to Google's Gemini. On the free tier, Google may use and review it. Never enter anything sensitive, such as your student ID, passwords, health or money details.
+> **Privacy:** your deadlines stay on your computer, but every chat message and every outline you preview is sent to Google's Gemini. On the free tier, Google may use and review it. Never enter anything sensitive, such as your student ID, passwords, health or money details. As a safety net, Groot checks on your own computer for card numbers, tax file numbers, Medicare numbers, passwords, API keys, bank details and student IDs, and keeps them away from Gemini and out of your saved deadlines. It only knows patterns, so it cannot catch everything.
 
 ## What it does
 
@@ -20,6 +20,7 @@ Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney,
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
 - **Exports to your calendar** (.ics) and imports your timetable and Canvas calendar.
 - **Has a home page that uses no AI**, plus a chat with Groot.
+- **Holds back sensitive details.** A chat message with something like a card number or a password in it is never sent to the AI, and such details are taken out of outlines and never saved.
 
 ## Quick start
 
@@ -64,7 +65,7 @@ Measured with the real Gemini model, not just claimed:
 | --- | --- |
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
 | **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** |
-| **Automated tests** | About 1,900, run on Python 3.11, 3.13 and 3.14 on every change |
+| **Automated tests** | About 2,000, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
 

@@ -768,6 +768,20 @@ def _pdf_needs_password(data: bytes) -> bool:
     return reader.is_encrypted and reader.decrypt("") == PasswordType.NOT_DECRYPTED
 
 
+def pdf_text(data: bytes) -> str:
+    """The text pypdf can read out of a PDF, or "" if it cannot read any.
+
+    A PDF normally goes to Gemini as the file itself, which keeps its tables
+    intact. This plain text is only used to check the PDF for sensitive
+    details on this computer first (see outline.py). A scanned PDF is only
+    pictures of pages, so it gives "".
+    """
+    try:
+        return "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(data)).pages)
+    except Exception:  # a damaged PDF can make pypdf raise many kinds of error
+        return ""
+
+
 # ---------- reading one file ----------
 
 # The reader for each kind of file that is sent as text.
