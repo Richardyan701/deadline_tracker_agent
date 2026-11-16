@@ -150,7 +150,7 @@ def test_one_request_with_the_pdf_the_rules_and_the_schema():
     extract_items(PDF, client=client)
 
     [call] = client.models.calls
-    assert call["model"] == "gemini-3.5-flash"
+    assert call["model"] == outline.MODEL  # the model chosen in model_choice.py
     pdf_part, question = call["contents"]
     assert pdf_part.inline_data.data == PDF
     assert pdf_part.inline_data.mime_type == "application/pdf"
