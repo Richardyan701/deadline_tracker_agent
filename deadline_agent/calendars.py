@@ -32,8 +32,8 @@ Universities Australia "Academic calendar 2026-27" table):
     UNSW 2027   https://www.unsw.edu.au/student/managing-your-studies/key-dates/academic-calendar
     USyd 2027   the "Student wall calendar 2027" on https://www.sydney.edu.au/students/key-dates.html
     Macquarie 2027
-                https://students.mq.edu.au/study/course/dates and the Macquarie rows of
-                https://www.open.edu.au/your-studies/getting-started/key-dates/key-dates-next-year
+                the Session 1 and Session 2 table on https://students.mq.edu.au/study/course/dates
+                (classes start, mid-session break, classes resume, classes end and exams)
     Second source for all four
                 https://universitiesaustralia.edu.au/our-universities/teaching-calendars/
 
@@ -173,7 +173,8 @@ SESSIONS = {
     "MQ_S1_2027": {
         "university": "mq",
         "name": "Session 1 2027",
-        # Classes: 22 Feb to 6 Jun. Recess: 12 to 25 Apr.
+        # Classes: 22 Feb to 6 Jun. Mid-session break: 12 to 25 Apr. Classes resume on
+        # Tue 27 Apr, because Mon 26 Apr is the extra Anzac Day holiday.
         # So weeks 1 to 7 start on 22 Feb and weeks 8 to 13 start on 26 Apr.
         "weeks": _mondays(date(2027, 2, 22), 7) + _mondays(date(2027, 4, 26), 6),
         "breaks": [date(2027, 4, 12), date(2027, 4, 19)],
@@ -183,9 +184,9 @@ SESSIONS = {
     "MQ_S2_2027": {
         "university": "mq",
         "name": "Session 2 2027",
-        # Classes: 26 Jul to 7 Nov. Recess: 20 Sep to 4 Oct, where Mon 4 Oct is the
-        # Labour Day holiday. So weeks 1 to 8 start on 26 Jul and weeks 9 to 13
-        # start on 4 Oct, with classes back on Tue 5 Oct.
+        # Classes: 26 Jul to 7 Nov. Mid-session break: 20 Sep to 4 Oct, where Mon 4 Oct
+        # is the Labour Day holiday. So weeks 1 to 8 start on 26 Jul and weeks 9 to 13
+        # start on 4 Oct, with classes resuming on Tue 5 Oct.
         "weeks": _mondays(date(2027, 7, 26), 8) + _mondays(date(2027, 10, 4), 5),
         "breaks": [date(2027, 9, 20), date(2027, 9, 27)],
         # Exams: 8 to 26 Nov
