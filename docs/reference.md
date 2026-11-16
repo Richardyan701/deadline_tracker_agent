@@ -647,7 +647,7 @@ There are about 2,000 tests, run with pytest:
 | `tests/test_importer.py` | 68 | Every row of the date rules, Canvas matching, public holidays, past dates and saving |
 | `tests/test_start_and_setup.py` | 55 | The start files (`start_groot.sh` is run for real) and every part of the setup checker |
 | `tests/test_friendly_errors.py` | 50 | The chat's replies for limits, key problems and timeouts |
-| `tests/test_other_providers.py` | 34 | Models from other companies: their error replies, reading outlines as text, and what the pages say about where your words go |
+| `tests/test_other_providers.py` | 31 | Models from other companies: their error replies, reading outlines as text, and what the pages say about where your words go |
 | `tests/test_privacy.py` | 93 | Every kind of sensitive detail, ordinary text that must be left alone, whole chat turns that prove nothing is sent to Google, outlines and saving |
 | `tests/test_canvas.py` | 49 | Reading Canvas feeds, time zones, refused links, the size and time limits, and the link never logged |
 | `tests/test_export.py` | 48 | The calendar file: its exact text, folded lines, escaping, IDs, daylight saving and failed saves |
