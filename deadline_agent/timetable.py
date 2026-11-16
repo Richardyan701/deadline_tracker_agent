@@ -22,7 +22,7 @@ from datetime import date
 
 import pypdf
 
-from . import uts_calendar
+from . import calendars
 from .import_types import TimetableClass
 from .tools import WEEKDAY_NAMES
 
@@ -60,7 +60,7 @@ def parse_timetable(text: str, session: str) -> dict[str, list[TimetableClass]]:
     tests can give it text directly. Raises ValueError if no class is found
     or a class block is missing its subject code, activity or dates.
     """
-    year = uts_calendar.week_start(session, 1).year  # also checks the session
+    year = calendars.week_start(session, 1).year  # also checks the session
     timetable = {}
     for block in _blocks(text):
         code, found = _read_block(block, year)

@@ -26,7 +26,9 @@ const dropZone = document.getElementById("drop-zone");
 const outlineInput = document.getElementById("outline-input");
 const fileMessage = document.getElementById("file-message");
 const outlineList = document.getElementById("outline-list");
+const timetableField = document.getElementById("timetable-field");
 const timetableInput = document.getElementById("timetable-input");
+const canvasField = document.getElementById("canvas-field");
 const canvasInput = document.getElementById("canvas-input");
 const sessionSelect = document.getElementById("session-select");
 const requestCount = document.getElementById("request-count");
@@ -39,6 +41,13 @@ const reviewBody = document.getElementById("review-body");
 const saveButton = document.getElementById("save-button");
 const saveMessage = document.getElementById("save-message");
 
+// What each university can add to its outlines. Only UTS timetables can be
+// read so far, and only UTS and USyd use Canvas (UNSW and Macquarie use Moodle).
+const USES_TIMETABLE = ["uts"];
+const USES_CANVAS = ["uts", "usyd"];
+// Where the browser remembers the session picked last time, so it is only chosen once
+const REMEMBERED_SESSION = "groot-session";
+
 // The file endings Groot reads, like ".pdf" and ".docx". The server puts them in the
 // file picker's accept list. It still checks what each file really is from its contents.
 const ENDINGS = outlineInput.accept.split(",");
@@ -46,7 +55,59 @@ const ENDINGS = outlineInput.accept.split(",");
 let outlines = [];  // the outline files chosen so far
 let tableRows = [];  // one entry for each row of the review table, made by makeRow
 
-// ---------- 1. choosing files ----------
+// ---------- 1. choosing the university and files ----------
+
+// The university of the session picked, like "uts", or "" while none is picked
+function chosenUniversity() {
+  const option = sessionSelect.selectedOptions[0];
+  return option ? option.dataset.university || "" : "";
+}
+
+// Show only the extra fields the chosen university can use, and empty the ones
+// that are hidden, so a file or link chosen for another university is never sent.
+function showFieldsForUniversity() {
+  const university = chosenUniversity();
+  timetableField.hidden = !USES_TIMETABLE.includes(university);
+  if (timetableField.hidden) {
+    timetableInput.value = "";
+  }
+  canvasField.hidden = !USES_CANVAS.includes(university);
+  if (canvasField.hidden) {
+    canvasInput.value = "";
+  }
+}
+
+// Preview needs a session and at least one outline. Say which one is missing.
+function updatePreviewButton() {
+  const count = outlines.length;
+  if (sessionSelect.value === "") {
+    requestCount.textContent = "Choose your university and session to preview.";
+  } else if (count === 0) {
+    requestCount.textContent = "Choose at least one outline to preview.";
+  } else {
+    requestCount.textContent = `Preview will use ${count} Gemini ${count === 1 ? "request" : "requests"}, one for each outline.`;
+  }
+  previewButton.disabled = count === 0 || sessionSelect.value === "";
+}
+
+sessionSelect.addEventListener("change", () => {
+  // Remembering is only a convenience, so a browser that blocks storage is fine
+  try {
+    localStorage.setItem(REMEMBERED_SESSION, sessionSelect.value);
+  } catch {}
+  showFieldsForUniversity();
+  updatePreviewButton();
+});
+
+// Start on the session picked last time, if the picker still offers it
+try {
+  const remembered = localStorage.getItem(REMEMBERED_SESSION);
+  if (remembered && [...sessionSelect.options].some((option) => option.value === remembered)) {
+    sessionSelect.value = remembered;
+  }
+} catch {}
+showFieldsForUniversity();
+updatePreviewButton();
 
 function addOutlines(files) {
   const problems = [];
@@ -81,11 +142,7 @@ function drawOutlineList() {
     item.append(element("span", `${file.name} (${sizeText(file.size)})`), remove);
     return item;
   }));
-  const count = outlines.length;
-  requestCount.textContent = count === 0
-    ? "Choose at least one outline to preview."
-    : `Preview will use ${count} Gemini ${count === 1 ? "request" : "requests"}, one for each outline.`;
-  previewButton.disabled = count === 0;
+  updatePreviewButton();
 }
 
 function sizeText(bytes) {
@@ -152,7 +209,7 @@ previewButton.addEventListener("click", async () => {
   } catch {
     showOffline(previewMessage);
   } finally {
-    previewButton.disabled = outlines.length === 0;
+    updatePreviewButton();
   }
 });
 

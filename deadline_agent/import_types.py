@@ -12,7 +12,7 @@ from typing import Literal, TypedDict
 class ExtractedItem(TypedDict):
     """One dated item that the outline reader found in a subject outline."""
 
-    subject_code: str  # five digits, for example "33130"
+    subject_code: str  # for example "33130" (UTS) or "COMP1511" (UNSW, USyd, Macquarie)
     subject_name: str  # for example "Mathematics 1"
     name: str  # for example "Skills Test 1", at most 120 characters
     task_number: int | None  # the outline's assessment task number, if any
@@ -28,7 +28,7 @@ class ExtractedItem(TypedDict):
 
 
 class TimetableClass(TypedDict):
-    """One class from the student's UTS timetable, for example a tutorial."""
+    """One class from the student's timetable, for example a tutorial. Only UTS timetables can be read so far."""
 
     activity: str  # for example "Tut1", "Wrk1" or "Cmp1"
     weekday: str  # "monday" to "sunday", from the first date the class runs
@@ -39,7 +39,7 @@ class TimetableClass(TypedDict):
 class CanvasEvent(TypedDict):
     """One event from the student's Canvas calendar feed."""
 
-    subject_code: str  # the first five-digit number in the title, or "" if there is none
+    subject_code: str  # the first subject code in the event's course tag or title, or "" if there is none
     title: str  # the event's title, without the course tag in square brackets
     due: str  # Sydney time, "YYYY-MM-DD HH:MM"
     all_day: bool  # True if Canvas has a date but no time

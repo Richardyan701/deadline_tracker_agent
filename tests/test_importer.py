@@ -3,7 +3,7 @@
 These need no API key and no internet. Saving goes to a temporary file
 (through the DEADLINES_FILE variable), so your real deadlines.json is never touched.
 
-Spring 2026 dates used below (from the UTS calendar):
+UTS Spring 2026 dates used below (from the UTS calendar):
 week 1 starts Mon 27 Jul, week 7 Mon 7 Sep, week 8 Mon 14 Sep, StuVac 21 to 27 Sep,
 week 9 Mon 28 Sep, week 10 Mon 5 Oct (Labour Day), week 12 Mon 19 Oct.
 """
@@ -197,6 +197,159 @@ def test_exam_period_is_unknown_and_points_to_the_exam_timetable():
     assert (row["due_date"], row["status"], row["include"]) == (None, "unknown", False)
     assert "check the UTS exam timetable" in row["note"]
     assert "Monday 2 Nov 2026 to Friday 20 Nov 2026" in row["note"]
+
+
+# ---------- the other universities ----------
+#
+# 2027 dates used below (from each university's official calendar):
+# UNSW Term 1: week 1 Mon 15 Feb, week 6 (flexibility week) Mon 22 Mar, week 10 Mon 19 Apr, exams 30 Apr to 13 May.
+# USyd Semester 1: week 5 Mon 22 Mar, break 29 Mar to 4 Apr, week 6 Mon 5 Apr, week 13 Mon 24 May.
+# Macquarie Session 1: week 7 Mon 5 Apr, recess 12 to 25 Apr, week 8 Mon 26 Apr, week 13 Mon 31 May.
+
+UNSW = {"code": "COMP1511", "subject": "Programming Fundamentals", "session": "UNSW_T1_2027"}
+USYD = {"code": "INFO1110", "subject": "Introduction to Programming", "session": "USYD_S1_2027"}
+MQ = {"code": "COMP1000", "subject": "Introduction to Computer Programming", "session": "MQ_S1_2027"}
+
+
+def other(name, when, university, **fields):
+    """An outline item at another university, and the session to preview it in."""
+    found = item(name, when, code=university["code"], subject=university["subject"], **fields)
+    return found, university["session"]
+
+
+def other_rows(name, when, university, **fields):
+    found, session = other(name, when, university, **fields)
+    return preview(found, session=session)
+
+
+@pytest.mark.parametrize(
+    "university, week, due",
+    [
+        (UNSW, 5, "2027-03-19 23:59"),
+        (UNSW, 7, "2027-04-02 23:59"),  # the week after flexibility week
+        (UNSW, 10, "2027-04-23 23:59"),
+        (USYD, 5, "2027-03-26 23:59"),
+        (USYD, 6, "2027-04-09 23:59"),  # the mid-semester break has no number, so week 6 is two weeks after week 5
+        (USYD, 13, "2027-05-28 23:59"),
+        (MQ, 7, "2027-04-09 23:59"),
+        (MQ, 8, "2027-04-30 23:59"),  # the two-week recess has no number
+        (MQ, 13, "2027-06-04 23:59"),
+    ],
+)
+def test_a_week_becomes_that_universitys_own_date(university, week, due):
+    [row] = other_rows("Assignment 1", "week", university, week=week, weekday="friday", time="23:59")
+    assert row["due_date"] == due
+
+
+def test_good_friday_2027_is_flagged_for_a_usyd_deadline():
+    [row] = other_rows("Assignment 1", "week", USYD, week=5, weekday="friday", time="23:59")  # Fri 26 Mar 2027
+    assert row["status"] == "assumed"
+    assert "Friday 26 Mar 2027 is a NSW public holiday (Good Friday), so check this date." in row["note"]
+
+
+def test_titles_and_subjects_use_the_letter_style_code():
+    [row] = other_rows("Assignment 1", "week", UNSW, week=3)
+    assert (row["title"], row["subject"]) == ("COMP1511 Assignment 1", "COMP1511 Programming Fundamentals")
+
+
+@pytest.mark.parametrize(
+    "university, week, last, name",
+    [(UNSW, 11, 10, "Term 1 2027"), (UNSW, 12, 10, "Term 1 2027"), (USYD, 14, 13, "Semester 1 2027"), (MQ, 14, 13, "Session 1 2027")],
+)
+def test_a_week_past_the_universitys_last_week_is_unknown(university, week, last, name):
+    [row] = other_rows("Assignment 3", "week", university, week=week)
+    assert (row["due_date"], row["status"]) == (None, "unknown")
+    assert row["note"] == f"The outline says week {week}, but {name} only has teaching weeks 1 to {last}, so the date is unknown."
+
+
+def test_week_13_is_a_real_week_at_usyd_and_macquarie_but_not_at_uts():
+    assert other_rows("Report", "week", USYD, week=13)[0]["status"] == "assumed"
+    assert other_rows("Report", "week", MQ, week=13)[0]["status"] == "assumed"
+    assert only_row(item("Report", "week", week=13))["status"] == "unknown"  # UTS Spring 2026
+
+
+def test_unsw_week_6_is_flagged_as_flexibility_week():
+    [row] = other_rows("Assignment 1", "week", UNSW, week=6, weekday="friday", time="17:00")
+    assert (row["due_date"], row["status"], row["include"]) == ("2027-03-26 17:00", "assumed", True)
+    assert row["note"] == (
+        "The outline says Friday of week 6. Week 6 is UNSW's flexibility week, when most classes do not run, "
+        "so check this date. Friday 26 Mar 2027 is a NSW public holiday (Good Friday), so check this date."
+    )
+
+
+def test_unsw_week_6_note_when_it_is_not_a_holiday():
+    found, _ = other("Assignment 1", "week", UNSW, week=6, weekday="wednesday", time="17:00")
+    [row] = preview(found, session="UNSW_T2_2027")  # Wed 7 Jul 2027
+    assert (row["due_date"], row["status"]) == ("2027-07-07 17:00", "assumed")
+    assert row["note"] == (
+        "The outline says Wednesday of week 6. Week 6 is UNSW's flexibility week, when most classes do not run, "
+        "so check this date."
+    )
+
+
+def test_a_weekly_item_at_unsw_keeps_week_6_but_flags_it():
+    rows = other_rows("Weekly quiz", "recurring", UNSW, first_week=4, last_week=8, weekday="monday", time="09:00")
+    assert [row["title"] for row in rows] == [f"COMP1511 Weekly quiz (week {week})" for week in range(4, 9)]
+    assert [row["due_date"] for row in rows] == [
+        "2027-03-08 09:00", "2027-03-15 09:00", "2027-03-22 09:00", "2027-03-29 09:00", "2027-04-05 09:00",
+    ]
+    # Week 6 is flexibility week, and Mon 29 Mar (week 7) is Easter Monday
+    assert [row["status"] for row in rows] == ["exact", "exact", "assumed", "assumed", "exact"]
+    assert "UNSW's flexibility week" in rows[2]["note"]
+    assert "Easter Monday" in rows[3]["note"]
+    assert all("flexibility week" not in rows[at]["note"] for at in (0, 1, 3, 4))
+
+
+def test_a_weekly_item_with_no_last_week_runs_to_the_universitys_own_last_week():
+    for university, last in ((UNSW, 10), (USYD, 13), (MQ, 13)):
+        rows = other_rows("Weekly quiz", "recurring", university, first_week=2, weekday="tuesday", time="10:00")
+        assert len(rows) == last - 1
+        assert rows[-1]["title"].endswith(f"(week {last})")
+        assert f"The outline gives no last week, so week {last} was used." in rows[-1]["note"]
+
+
+def test_a_weekly_item_skips_the_macquarie_recess_and_the_usyd_break():
+    rows = other_rows("Weekly quiz", "recurring", MQ, first_week=7, last_week=8, weekday="wednesday", time="12:00")
+    assert [row["due_date"] for row in rows] == ["2027-04-07 12:00", "2027-04-28 12:00"]
+    rows = other_rows("Weekly quiz", "recurring", USYD, first_week=5, last_week=6, weekday="wednesday", time="12:00")
+    assert [row["due_date"] for row in rows] == ["2027-03-24 12:00", "2027-04-07 12:00"]
+
+
+def test_a_weekly_item_past_the_last_week_is_unknown_and_names_the_right_limit():
+    [row] = other_rows("Weekly quiz", "recurring", UNSW, first_week=4, last_week=12)
+    assert row["status"] == "unknown"
+    assert row["note"] == "The outline says weeks 4 to 12, but teaching weeks run from 1 to 10, so the date is unknown."
+
+
+@pytest.mark.parametrize(
+    "university, name, period",
+    [
+        (UNSW, "UNSW", "Friday 30 Apr 2027 to Thursday 13 May 2027"),
+        (USYD, "USyd", "Monday 7 Jun 2027 to Saturday 19 Jun 2027"),
+        (MQ, "Macquarie", "Monday 7 Jun 2027 to Friday 25 Jun 2027"),
+    ],
+)
+def test_the_exam_note_names_the_university_and_its_exam_period(university, name, period):
+    [row] = other_rows("Final exam", "exam_period", university)
+    assert (row["due_date"], row["status"]) == (None, "unknown")
+    assert row["note"] == (
+        f"The outline says this is in the exam period ({period}), so check the {name} exam timetable for the date."
+    )
+
+
+def test_a_tutorial_at_a_university_with_no_timetable_reader_needs_the_students_date():
+    [row] = other_rows("Lab test", "tutorial", UNSW, week=7)
+    assert (row["due_date"], row["status"]) == (None, "needs_input")
+    assert row["note"] == (
+        "The outline says your tutorial in week 7, but Groot does not know your tutorial time for this subject, "
+        "so please type the date. Week 7 starts on Monday 29 Mar 2027."
+    )
+
+
+def test_canvas_events_match_letter_style_codes():
+    found, session = other("Assignment 1", "week", USYD, week=3)
+    rows = preview(found, session=session, canvas_events=[event("Assignment 1", "2027-03-12 17:00", code="INFO1110")])
+    assert [(row["due_date"], row["status"], row["source"]) for row in rows] == [("2027-03-12 17:00", "exact", "both")]
 
 
 def test_nothing_usable_is_unknown():

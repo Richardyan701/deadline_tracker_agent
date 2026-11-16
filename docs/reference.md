@@ -39,11 +39,11 @@ The chat is the one ADK gives every agent, with Groot already chosen. If a box a
 
 Titles are matched as whole titles. Upper and lower case, extra spaces and look-alike characters (such as a full-width letter from an Asian keyboard) are ignored, so "assignment 1" finds "Assignment 1". Part of a title is not enough, so "Assignment" does not find "Assignment 1".
 
-Groot only helps with deadlines, and it is told to say so politely if you ask about anything else. If you ask about your subject outlines, or attach a file in the chat, Groot points you to the Import from outlines page instead of reading dates from the file itself, because only that page knows the UTS calendar.
+Groot only helps with deadlines, and it is told to say so politely if you ask about anything else. If you ask about your subject outlines, or attach a file in the chat, Groot points you to the Import from outlines page instead of reading dates from the file itself, because only that page knows the university calendars.
 
 ### Import from outlines
 
-Drop in your subject outlines, and Groot lists every assessment deadline it finds with the real date from the UTS calendar. You check the list, and only the rows you tick are saved. [Importing deadlines from your outlines](#importing-deadlines-from-your-outlines) explains every step.
+Drop in your subject outlines, and Groot lists every assessment deadline it finds with the real date from your university's calendar. You check the list, and only the rows you tick are saved. [Importing deadlines from your outlines](#importing-deadlines-from-your-outlines) explains every step.
 
 ## Date phrases it understands
 
@@ -135,7 +135,7 @@ On a different day, the phrase counts whole calendar days. On the same day, it c
 Groot points out deadlines that bunch up, so you can start one earlier. This is plain Python in `_clashes` in `deadline_agent/tools.py`, so it never uses a Gemini request. A clash is either:
 
 - **Two deadlines 48 hours or less apart.** Only deadlines next to each other in time are paired, so three in a row give two warnings, not three. The gap is counted in real hours, so it stays right on the nights the clocks change.
-- **3 or more deadlines in the same Monday to Sunday week**, the same weeks as UTS teaching weeks. Fixed weeks never overlap, so you are never warned about the same deadlines twice (a rolling 7 days could do that).
+- **3 or more deadlines in the same Monday to Sunday week**, the same weeks as teaching weeks. Fixed weeks never overlap, so you are never warned about the same deadlines twice (a rolling 7 days could do that).
 
 Only unfinished deadlines that have not passed yet count, and a clash is shown when its first deadline is due in the next 7 days, the same window as the reminders. For example:
 
@@ -212,10 +212,9 @@ Good to know:
 
 The Import from outlines page (<http://127.0.0.1:8000/groot/import>) works in four steps.
 
-1. **Choose your files.** Drag 1 to 8 subject outlines onto the box, or click **Choose outline files**. Each one can be up to 10 MB and any kind of file in [Supported file types](#supported-file-types), for example the PDF from UTS, a Word file or a photo of the assessment table. You can also add:
-   - **Your UTS timetable**, as the PDF export of your timetable. Only a PDF works here. Groot reads it with plain code to find the day and time of your tutorials, so it never uses Gemini.
-   - **Your Canvas calendar feed link.** In Canvas, open Calendar, then Calendar Feed, and copy the link. Groot fetches it once to get Canvas's exact due dates. It only accepts `https` links to `canvas.uts.edu.au` or an `instructure.com` address, waits at most 10 seconds, reads at most 2 MB and never follows a redirect. The link works like a password, so Groot never saves it, logs it or shows it again, and you should keep it private.
-   - **The session**, Autumn 2026 or Spring 2026. Spring 2026 is chosen at the start.
+1. **Choose your university and files.** First pick **your university and session**: UTS, UNSW, the University of Sydney or Macquarie University, each with its 2027 sessions. Nothing is chosen for you, because each university counts its weeks differently and a wrong guess would give wrong dates. Your browser remembers your pick for next time, and sessions that have finished are not listed. Then drag 1 to 8 subject outlines onto the box, or click **Choose outline files**. Each one can be up to 10 MB and any kind of file in [Supported file types](#supported-file-types), for example the PDF from your university, a Word file or a photo of the assessment table. A subject outline is what UTS calls it. A UNSW course outline, a USyd unit outline and a Macquarie unit guide all work the same way. Depending on your university, you can also add:
+   - **Your UTS timetable** (UTS only so far), as the PDF export of your timetable. Only a PDF works here. Groot reads it with plain code to find the day and time of your tutorials, so it never uses Gemini.
+   - **Your Canvas calendar feed link** (UTS and USyd, because UNSW and Macquarie use Moodle, which Groot cannot read yet). In Canvas, open Calendar, then Calendar Feed, and copy the link. Groot fetches it once to get Canvas's exact due dates. It only accepts `https` links to `canvas.uts.edu.au`, `canvas.sydney.edu.au` or an `instructure.com` address, waits at most 10 seconds, reads at most 2 MB and never follows a redirect. The link works like a password, so Groot never saves it, logs it or shows it again, and you should keep it private.
 2. **Preview.** Groot sends each outline to Gemini once, and Gemini lists every assessment item with the outline's own words for when it happens. Gemini is told to copy what the outline says and never to work out a date, and its answer is checked in plain Python before it is used. The page tells you how many requests Preview will use before you click. Every file is checked before anything is sent: a kind of file Groot cannot read stops the whole preview straight away, and a file that turns out to have no readable text is reported without using a request. One outline that Gemini cannot read never stops the others.
 3. **Check.** The review table has one row for each deadline, with a note that says where its date came from and how sure Groot is:
 
@@ -227,24 +226,49 @@ The Import from outlines page (<http://127.0.0.1:8000/groot/import>) works in fo
    | No date yet | For example an exam in the exam period, or an outline that says to check Canvas | No |
    | Already passed | The date is in the past. It is greyed out, never shown as an error | No |
 
-4. **Save.** Click **Save ticked deadlines**. Each row goes through `add_deadline`, the same as adding a deadline by hand, so a typed date gets the same checks, and each row says whether it was saved. One row that cannot be saved never stops the others. Titles start with the subject code, like `33130 Skills Test 1`, so items in different subjects never clash.
+4. **Save.** Click **Save ticked deadlines**. Each row goes through `add_deadline`, the same as adding a deadline by hand, so a typed date gets the same checks, and each row says whether it was saved. One row that cannot be saved never stops the others. Titles start with the subject code, like `33130 Skills Test 1` or `COMP1511 Assignment 1`, so items in different subjects never clash.
 
 ### How dates are decided
 
-Outlines give most dates as teaching weeks, like "due in week 2". The weeks are not evenly spaced, because each session has a study week (StuVac) in the middle that has no number. So the dates come from the official UTS 2026 calendar in `deadline_agent/uts_calendar.py`, never from counting weeks. Weeks start on Monday.
+Outlines give most dates as teaching weeks, like "due in week 2". The weeks are not evenly spaced, because most sessions have a break in the middle that has no number. So the dates come from each university's official calendar in `deadline_agent/calendars.py`, never from counting weeks. Weeks start on Monday.
 
-| Session | Week 1 starts | StuVac | Exams |
+Each university counts its weeks differently:
+
+| University | Teaching weeks | The break in the middle |
+| --- | --- | --- |
+| UTS | 12 | One StuVac week with no number, after week 7 or 8 |
+| UNSW | 10 | None. Week 6 is "flexibility week", which keeps its number even though most classes do not run |
+| University of Sydney | 13 | A one-week mid-semester break with no number |
+| Macquarie University | 13 | A two-week mid-session recess with no number |
+
+The sessions Groot knows (each university's main calendar only):
+
+| Session | Week 1 starts | Weeks with no number | Exams |
 | --- | --- | --- | --- |
-| Autumn 2026 | Monday 16 Feb | 6 to 12 Apr, and 18 to 24 May | 25 May to 12 Jun |
-| Spring 2026 | Monday 27 Jul | 21 to 27 Sep, and 26 Oct to 1 Nov | 2 to 20 Nov |
+| UTS Autumn 2026 | Monday 16 Feb 2026 | StuVac 6 to 12 Apr, and 18 to 24 May | 25 May to 12 Jun |
+| UTS Spring 2026 | Monday 27 Jul 2026 | StuVac 21 to 27 Sep, and 26 Oct to 1 Nov | 2 to 20 Nov |
+| UTS Autumn 2027 | Monday 15 Feb 2027 | StuVac 12 to 18 Apr, and 17 to 23 May | 24 May to 11 Jun |
+| UTS Spring 2027 | Monday 26 Jul 2027 | StuVac 20 to 26 Sep, and 25 to 31 Oct | 1 to 19 Nov |
+| UNSW Term 1 2027 | Monday 15 Feb 2027 | None (flexibility week is week 6, 22 to 28 Mar) | 30 Apr to 13 May |
+| UNSW Term 2 2027 | Monday 31 May 2027 | None (flexibility week is week 6, 5 to 11 Jul) | 13 to 26 Aug |
+| UNSW Term 3 2027 | Monday 13 Sep 2027 | None (flexibility week is week 6, 18 to 24 Oct) | 26 Nov to 9 Dec |
+| USyd Semester 1 2027 | Monday 22 Feb 2027 | Mid-semester break 29 Mar to 4 Apr | 7 to 19 Jun |
+| USyd Semester 2 2027 | Monday 2 Aug 2027 | Mid-semester break 27 Sep to 4 Oct (Mon 4 Oct is Labour Day, and week 9 is that week) | 15 to 27 Nov |
+| Macquarie Session 1 2027 | Monday 22 Feb 2027 | Recess 12 to 25 Apr | 7 to 25 Jun |
+| Macquarie Session 2 2027 | Monday 26 Jul 2027 | Recess 20 Sep to 4 Oct (Mon 4 Oct is Labour Day, and week 9 is that week) | 8 to 26 Nov |
+
+The dates come from each university's own calendar page, and each was checked against a second source, the Universities Australia 2026-27 academic calendar. The links are at the top of `deadline_agent/calendars.py`.
+
+**The calendars run out.** Universities publish new dates every year, and someone has to add them to `calendars.py` by hand. Until then, the picker stops offering a session once its exams are over, and the page says so when a university has no session left. UNSW also changes to two 12-week semesters in 2028, so its 2028 calendar will look different.
 
 The rules, for each item:
 
 - **A calendar date** is used as it is, at 11:59 PM when the outline gives no time.
 - **A week with a day**, like "Monday of week 9", is that day. **A week with no day** is Friday of that week, at 11:59 PM or at the time the outline gives, and marked Assumed.
 - **In your tutorial in a given week** uses the day and start time of your tutorial from your timetable (your Tut class, or your Wrk class if the subject has no Tut). With no timetable, or two different tutorial times, the row needs your date.
-- **Every week from week A**, like weekly quizzes, becomes one row for each teaching week up to the last week the outline gives (week 12 if it gives none), skipping StuVac. They are on Friday unless the outline names a day.
-- **An exam in the exam period** has no date yet. The note tells you to check the UTS exam timetable.
+- **Every week from week A**, like weekly quizzes, becomes one row for each teaching week up to the last week the outline gives (the session's last teaching week if it gives none: 12 at UTS, 10 at UNSW, 13 at USyd and Macquarie), skipping any break that has no number. They are on Friday unless the outline names a day.
+- **An exam in the exam period** has no date yet. The note tells you to check your university's exam timetable.
+- **A date in UNSW's flexibility week** (week 6) keeps its date, because the week keeps its number, but it is flagged and at best Assumed, since a weekly quiz or class test may skip that week.
 - **A Canvas event** that clearly matches a row, in the same subject and with a similar name, gives that row Canvas's exact date. A Canvas event that matches nothing gets a row of its own. When two rows are equally close, nothing is merged and both are flagged so you can check for a duplicate.
 - **A date on a NSW public holiday**, like Labour Day on Monday 5 Oct 2026, is flagged in the note and is at best Assumed.
 
@@ -400,7 +424,7 @@ Nothing else ever uses a request: not the home page, adding or changing deadline
 
 The tests prove the code follows its rules, but they never talk to Gemini. Two evaluations measure how well the real Gemini model does its part. Both need your key, use your free requests, wait between requests so they send at most 4 in a minute (the chat evaluation's `--per-minute` changes that for a paid key), and write their scores to a `results.md` file.
 
-- **The outline evaluation** (`eval/run_eval.py`) sends real UTS outlines to the outline reader and compares Gemini's items with an answer key you check by hand: items found, items invented, weights, the timing words, the real dates from the UTS calendar, and silently wrong dates (a wrong date shown as if it were fine). Put the outlines in `eval/outlines/` (they stay off GitHub) and the answer keys in `eval/answer_key/`, then run `.venv/bin/python -m eval.run_eval` on Linux and macOS or `.\.venv\Scripts\python.exe -m eval.run_eval` on Windows. Add `--session AUT2026` for Autumn outlines. [eval/README.md](../eval/README.md) explains the answer key format and every score.
+- **The outline evaluation** (`eval/run_eval.py`) sends real outlines to the outline reader and compares Gemini's items with an answer key you check by hand: items found, items invented, weights, the timing words, the real dates from the university's calendar, and silently wrong dates (a wrong date shown as if it were fine). Put the outlines in `eval/outlines/` (they stay off GitHub) and the answer keys in `eval/answer_key/`, then run `.venv/bin/python -m eval.run_eval` on Linux and macOS or `.\.venv\Scripts\python.exe -m eval.run_eval` on Windows. Add `--session` with the session code of your outlines, like `--session AUT2027` or `--session UNSW_T1_2027` (the codes are in `calendars.py`). An answer key is named after its subject code, like `33130.json` or `COMP1511.json`. [eval/README.md](../eval/README.md) explains the answer key format and every score.
 - **The chat evaluation** (`eval/chat/run_chat_eval.py`) sends 63 realistic student messages to the real Groot and checks which tools it called and what ended up saved, never its wording. Run `.venv/bin/python -m eval.chat.run_chat_eval --limit 3` first (on Windows, `.\.venv\Scripts\python.exe -m eval.chat.run_chat_eval --limit 3`), then leave out `--limit` for every case. A full run needs at least 121 requests, so on the free tier it takes several days. It saves each finished case and carries on from where it stopped. [eval/chat/README.md](../eval/chat/README.md) has the details.
 
 ### Results so far
@@ -446,7 +470,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say that every test passed (about 1,500). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say that every test passed (about 1,900). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -481,6 +505,8 @@ On the import page, each outline that could not be read gets one sentence in the
 - **"Gemini took too long to read this outline. Try again in a minute."**
 - **"This is an old Word/PowerPoint file. Save it as .docx, .pptx or PDF and try again."** Install LibreOffice (see [Supported file types](#supported-file-types)), or save a new copy in another format.
 - **"Your timetable could not be used."** Use the PDF export of your UTS timetable, or remove the timetable. Nothing was sent to Gemini.
+- **"Groot can only read UTS timetables so far."** You chose a session at another university and added a timetable. Remove the timetable. Rows held in your tutorial will then ask you to type the date.
+- **"Groot's calendar for ... has run out."** Every session Groot knows for that university has finished. Update Groot to a version with the next year's dates.
 - **"Your Canvas calendar was not used, so the preview went on without it."** Copy the link again from Canvas, Calendar, Calendar Feed. It must start with `https://`.
 
 Starting Groot:
@@ -500,7 +526,7 @@ deadline_agent/
   check_setup.py     the setup checker
   outline.py         the outline reader, one Gemini request for each outline
   documents.py       turns an outline file of any supported kind into what Gemini gets
-  uts_calendar.py    the UTS 2026 Autumn and Spring calendars
+  calendars.py       the official calendars of UTS, UNSW, USyd and Macquarie
   timetable.py       reads your tutorial days from your UTS timetable PDF
   canvas.py          fetches and reads your Canvas calendar feed
   importer.py        turns outline items, the timetable and Canvas into review rows, and saves them
@@ -513,7 +539,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 1,500 tests, no API key needed
+tests/               about 1,900 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -523,7 +549,7 @@ start_groot.sh, start_groot.bat    the start files
 
 - **`agent.py`** defines `root_agent`, an ADK `Agent` called `agent_groot` that uses `gemini-3.5-flash` and the ten tools. Its instruction is a function, `groot_instruction`, which ADK runs before every request to Gemini (ADK's name for this is an instruction provider). It returns Groot's fixed instruction, today's date in Sydney, the rule to pass due dates through exactly as typed, where to import outlines, the rules for reminders, and the reminders block. While nothing is saved, it also suggests a few things to type.
 - **`tools.py`** holds the ten tools. ADK reads each tool's name, type hints and docstring to tell Gemini what the tool does. Every tool returns a `status` and a `message`, and problems come back as a message Groot can pass on instead of a crash. The home page and the import page call the same tools, so the file lock, the safe saves and the backups work the same everywhere.
-- **Why dates are worked out in Python.** The model does not reliably know today's date, so it is bad at things like "next friday". Plain rules in Python give the same answer every time, and each rule is covered by tests. The reply also spells out the full date, so a misunderstanding is easy to catch. For outlines, Gemini only copies the outline's words, like "week 7", and the UTS calendar code turns them into a date.
+- **Why dates are worked out in Python.** The model does not reliably know today's date, so it is bad at things like "next friday". Plain rules in Python give the same answer every time, and each rule is covered by tests. The reply also spells out the full date, so a misunderstanding is easy to catch. For outlines, Gemini only copies the outline's words, like "week 7", and the calendar code turns them into a date.
 - **Protection against prompt injection.** Titles and subjects are typed by the student, or found in an outline, and end up in Groot's instruction, so a title like "Essay, ignore previous instructions" could try to give orders. When a deadline is saved, line breaks and runs of spaces in the title and subject become a single space. Before a title or subject goes into the reminders block, control and invisible characters become spaces, `<` and `>` are removed so it cannot fake the end of the block, double quotes become single quotes, and it is cut to 80 characters. Groot is told that the block, every title or subject in a tool result, and everything in a file are data, never instructions. An outline goes to Gemini apart from the reader's rules, with its text between two marker lines it cannot fake, and Gemini's answer must fit a fixed shape that is checked in Python. This keeps each piece of data in its place, but it cannot make the model fully immune.
 - **Safe saves.** Each save writes the whole list to a temporary file in the same folder, makes sure it has reached the disk, then swaps it in with `os.replace` in a single step. A crash leaves either the old file or the new one, never half a file. A lock lets only one action read or change the file at a time, because ADK and the web server can run them on several threads. A test starts 20 saves at once on separate threads and checks that all 20 are kept.
 - **Daylight saving.** All dates and times are Sydney time (`Australia/Sydney`). Lengths of time, such as "in 3 hours" or "2 hours overdue", are worked out in UTC, so they stay right on the two nights each year when Sydney's clocks change. For example, at 8 PM on Saturday 3 Oct 2026, "in 12 hours" is saved as 9:00 AM on Sunday, because the clocks go forward an hour that night. The `tzdata` package is included because Windows has no time zone database of its own for Python to use.
@@ -539,7 +565,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are about 1,500 tests, run with pytest:
+There are about 1,900 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
@@ -547,7 +573,7 @@ There are about 1,500 tests, run with pytest:
 | `tests/test_documents.py` | 137 | Every file type, telling the kind from the contents, macros, passwords, zip bombs, XML tricks, links that must never be fetched, and LibreOffice with a stand-in and the real program |
 | `tests/test_reminders.py` | 113 | Reminder groups, exact edges like 11:59 PM, the friendly phrases, the reminders block, and the prompt injection protection |
 | `tests/test_outline.py` | 109 | What the outline reader sends to Gemini, how the answer is checked, prompt injection and API errors, with a fake Gemini |
-| `tests/test_uts_calendar.py` | 108 | Every week of both sessions against the official planner, StuVac, the exams and public holidays |
+| `tests/test_calendars.py` | 443 | Every week of every session at all four universities against the official calendars, the breaks, UNSW's flexibility week, the exams, finished sessions and public holidays |
 | `tests/test_web.py` | 99 | The home page and its API, escaping, the Origin and content type checks, and the real server shared with ADK's chat |
 | `tests/test_tools.py` | 80 | The tools, title matching, saving, backups of unreadable files, failed saves and many threads at once |
 | `tests/test_eval.py` | 77 | The outline evaluation's pairing, scores, real dates and spacing of requests |
@@ -573,7 +599,8 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 
 - **One user, one local file.** There are no accounts. Everyone using the same copy shares one `deadlines.json`, and nothing syncs between devices.
 - **The free tier is small.** About 20 requests a day is roughly 8 to 10 chat messages that use a tool, or 20 outlines. See [The Gemini free tier](#the-gemini-free-tier).
-- **UTS only, and only 2026.** The calendar knows Autumn 2026 and Spring 2026. Other sessions, other years and other universities are not supported yet.
+- **Four Sydney universities, up to the end of 2027.** The calendar knows the main sessions of UTS, UNSW, the University of Sydney and Macquarie University. Summer and winter terms, other calendars (like UTS Health or UNSW Canberra) and other universities are not supported yet, and next year's dates have to be added by hand.
+- **The other universities are newer than UTS.** The outline reader's accuracy was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd only.
 - **The outline reader can make mistakes.** Gemini can miss an item or misread a weight or a week, so always check the review table before you save. Rows that are assumed or need your date say so, but a misread week still gives a date that looks fine. On 5 real outlines it found 93% of the assessments and invented none, but one outline (31265) had two missed items and two wrong weights. See [Results so far](#results-so-far).
 - **Old .doc and .ppt files depend on LibreOffice**, which runs with your own permissions. Groot blocks macros, link updates and web addresses, but it cannot rule out every trick a file from someone else might try, for example a link to a network share on Windows, or a bug in an old LibreOffice. Keep LibreOffice up to date, and save an old file from someone you do not trust as a PDF before you import it.
 - **The chat is ADK's development page.** It has no login and is made for building agents, so only run Groot on your own computer. Port 8000 is fixed in the code.

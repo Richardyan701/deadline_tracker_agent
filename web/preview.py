@@ -15,7 +15,7 @@ import importlib
 import logging
 from collections.abc import Callable
 
-from deadline_agent import canvas, importer, timetable, tools, uts_calendar
+from deadline_agent import calendars, canvas, importer, timetable, tools
 from deadline_agent.import_types import CanvasEvent, ExtractedItem, PreviewRow, TimetableClass
 
 from . import Refused
@@ -74,9 +74,9 @@ def build(upload: Upload, read: OutlineReader) -> dict:
     timetable cannot be used, or if the outline reader is not installed yet.
     """
     try:
-        uts_calendar.session_info(upload.session)
+        calendars.session_info(upload.session)
     except ValueError:
-        raise Refused(400, "Choose the session your outlines are for: Autumn 2026 or Spring 2026.") from None
+        raise Refused(400, "Choose your university and session, then try again.") from None
     classes = _read_timetable(upload)
     notes = [] if classes is None else ["Your timetable was read, so tutorial days come from it."]
 
@@ -101,6 +101,12 @@ def _read_timetable(upload: Upload) -> dict[str, list[TimetableClass]] | None:
     """The classes in the timetable PDF, or None if no timetable was added."""
     if upload.timetable is None:
         return None
+    if calendars.session_info(upload.session)["university"] != "uts":
+        raise Refused(
+            400,
+            "Groot can only read UTS timetables so far. Remove the timetable, then try again. "
+            "Nothing was sent to Gemini.",
+        )
     try:
         return timetable.read_timetable(upload.timetable.data, upload.session)
     except ValueError as error:  # its messages are written for the student

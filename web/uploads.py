@@ -11,7 +11,7 @@ The drop box page sends these form fields:
     outlines    1 to 8 files, each at most 10 MB, of any kind documents.py reads
     timetable   optional, one PDF file of at most 10 MB
     canvas_url  optional text, the student's Canvas calendar feed link
-    session     text, the session code, like "SPR2026"
+    session     text, the session code, like "SPR2027" or "UNSW_T1_2027"
 
 What each outline really is comes from its bytes (documents.detect_kind),
 and its name is only a hint. Every file is checked before any outline is
@@ -196,7 +196,7 @@ def _checked(parts: list[_Part]) -> Upload:
         if not timetable.data.startswith(documents.PDF_START):
             raise Refused(400, f"{timetable.name} is not a PDF, so nothing was read. Check you chose the right file.")
     if "session" not in texts:
-        raise Refused(400, "Choose a session, then try again.")
+        raise Refused(400, "Choose your university and session, then try again.")
 
     timetable = files["timetable"][0] if files["timetable"] else None
     return Upload(files["outlines"], timetable, texts.get("canvas_url", "").strip(), texts["session"])

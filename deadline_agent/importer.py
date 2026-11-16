@@ -4,7 +4,7 @@ Plain code, no AI. build_preview follows the "How dates are decided" rules
 in docs/superpowers/specs/2026-11-04-outline-dropbox-design.md:
 
 1. Each outline item becomes one row (or one row per week for a weekly item),
-   with a date from the UTS calendar and a status saying how sure it is.
+   with a date from the university's calendar and a status saying how sure it is.
 2. A Canvas event that clearly matches a row gives that row its exact date.
    Canvas events that match nothing become extra rows.
 3. Rows on a NSW public holiday are flagged, and rows already past start unticked.
@@ -18,7 +18,7 @@ from collections import Counter
 from datetime import datetime
 from difflib import SequenceMatcher
 
-from . import tools, uts_calendar
+from . import calendars, tools
 from .import_types import CanvasEvent, ExtractedItem, PreviewRow, TimetableClass
 
 # Used when the outline names no day or no time
@@ -46,7 +46,8 @@ def build_preview(
 
     Args:
         extracted_items: What the outline reader found, from every outline.
-        session: "AUT2026" or "SPR2026". Any other session raises ValueError.
+        session: A session code from calendars.SESSIONS, like "SPR2027" or
+            "UNSW_T1_2027". Any other session raises ValueError.
         timetable: From timetable.read_timetable, used for tutorial days.
         canvas_events: From canvas.parse_feed.
         chosen_subjects: Subject codes to include. Items, classes and Canvas
@@ -54,7 +55,7 @@ def build_preview(
             outline for it) are ignored. Defaults to the subjects in extracted_items.
         now: The time to compare dates with. Defaults to tools._now().
     """
-    uts_calendar.session_info(session)  # raises ValueError for an unknown session
+    calendars.session_info(session)  # raises ValueError for an unknown session
     now = tools._now() if now is None else now
     if chosen_subjects is None:
         chosen = {item["subject_code"] for item in extracted_items}
@@ -152,10 +153,10 @@ def _outline_rows(item: ExtractedItem, session: str, classes: list[TimetableClas
     if when == "recurring":
         return _recurring_rows(item, session)
     if when == "exam_period":
-        first, last = uts_calendar.session_info(session)["exams"]
+        first, last = calendars.session_info(session)["exams"]
         note = (
             f"The outline says this is in the exam period ({tools._friendly_day(first)} to "
-            f"{tools._friendly_day(last)}), so check the UTS exam timetable for the date."
+            f"{tools._friendly_day(last)}), so check the {calendars.university_name(session)} exam timetable for the date."
         )
         return [_row(item, "unknown", None, note)]
     if when == "unknown":
@@ -163,16 +164,34 @@ def _outline_rows(item: ExtractedItem, session: str, classes: list[TimetableClas
     raise ValueError(f"Unknown 'when' value {when!r} for '{item['name']}'.")
 
 
-def _is_teaching_week(week) -> bool:
-    return week is not None and 1 <= week <= uts_calendar.LAST_WEEK
+def _is_teaching_week(week, session: str) -> bool:
+    return week is not None and 1 <= week <= calendars.last_week(session)
+
+
+def _quiet_week(row: PreviewRow, session: str, week: int) -> PreviewRow:
+    """Flag a row that lands in a numbered week when most classes do not run (UNSW's flexibility week).
+
+    The date itself is right, because the week keeps its number. But a weekly
+    quiz or a class test may skip that week, so the row is at best assumed.
+    """
+    called = calendars.quiet_week(session, week)
+    if called:
+        row["note"] += (
+            f" Week {week} is {calendars.university_name(session)}'s {called}, "
+            "when most classes do not run, so check this date."
+        )
+        if row["status"] == "exact":
+            row["status"] = "assumed"
+    return row
 
 
 def _not_a_week_note(week, session: str) -> str:
     """The note for a row whose week is missing or is not a teaching week."""
     if week is None:
         return "The outline does not say which week, so the date is unknown."
-    name = uts_calendar.session_info(session)["name"]
-    return f"The outline says week {week}, but {name} only has teaching weeks 1 to 12, so the date is unknown."
+    name = calendars.session_info(session)["name"]
+    last = calendars.last_week(session)
+    return f"The outline says week {week}, but {name} only has teaching weeks 1 to {last}, so the date is unknown."
 
 
 def _date_row(item: ExtractedItem) -> PreviewRow:
@@ -189,22 +208,22 @@ def _date_row(item: ExtractedItem) -> PreviewRow:
 def _week_row(item: ExtractedItem, session: str) -> PreviewRow:
     """The outline gives a teaching week, maybe with a day or a time."""
     week, weekday, time = item["week"], item["weekday"], item["time"]
-    if not _is_teaching_week(week):
+    if not _is_teaching_week(week, session):
         return _row(item, "unknown", None, _not_a_week_note(week, session))
 
     if weekday:
-        due = uts_calendar.week_date(session, week, weekday, time or DEFAULT_TIME)
+        due = calendars.week_date(session, week, weekday, time or DEFAULT_TIME)
         note = f"The outline says {weekday.title()} of week {week}"
         note += "." if time else " with no time, so 11:59 PM was used."
-        return _row(item, "exact", due, note)
+        return _quiet_week(_row(item, "exact", due, note), session, week)
 
     # No day, so Friday is assumed. A time alone does not say which day.
-    due = uts_calendar.week_date(session, week, DEFAULT_WEEKDAY, time or DEFAULT_TIME)
+    due = calendars.week_date(session, week, DEFAULT_WEEKDAY, time or DEFAULT_TIME)
     if time:
         note = f"The outline says week {week} at {time} with no day, so Friday of week {week} was assumed."
     else:
         note = f"The outline says week {week} with no day, so Friday of week {week} at 11:59 PM was assumed."
-    return _row(item, "assumed", due, note)
+    return _quiet_week(_row(item, "assumed", due, note), session, week)
 
 
 def _tutorials(classes: list[TimetableClass]) -> list[TimetableClass]:
@@ -222,27 +241,30 @@ def _tutorial_row(item: ExtractedItem, session: str, classes: list[TimetableClas
     if week is None:
         note = "The outline says this happens in your tutorial but gives no week, so please type the date."
         return _row(item, "needs_input", None, note)
-    if not _is_teaching_week(week):
+    if not _is_teaching_week(week, session):
         return _row(item, "unknown", None, _not_a_week_note(week, session))
 
     tutorials = _tutorials(classes)
     times = {(one["weekday"], one["start"]) for one in tutorials}
     if len(times) != 1:
-        found = "no tutorial time" if not times else "more than one tutorial time"
-        monday = tools._friendly_day(uts_calendar.week_start(session, week))
+        if times:
+            problem = "your timetable has more than one tutorial time for this subject"
+        else:
+            problem = "Groot does not know your tutorial time for this subject"
+        monday = tools._friendly_day(calendars.week_start(session, week))
         note = (
-            f"The outline says your tutorial in week {week}, but {found} for this subject was found in your "
-            f"timetable, so please type the date. Week {week} starts on {monday}."
+            f"The outline says your tutorial in week {week}, but {problem}, "
+            f"so please type the date. Week {week} starts on {monday}."
         )
         return _row(item, "needs_input", None, note)
 
     weekday, start = times.pop()
-    due = uts_calendar.week_date(session, week, weekday, start)
+    due = calendars.week_date(session, week, weekday, start)
     note = (
         f"The outline says your tutorial in week {week}, and your timetable has your "
         f"{tutorials[0]['activity']} class on {weekday.title()} at {start}."
     )
-    return _row(item, "exact", due, note)
+    return _quiet_week(_row(item, "exact", due, note), session, week)
 
 
 def _recurring_rows(item: ExtractedItem, session: str) -> list[PreviewRow]:
@@ -254,10 +276,13 @@ def _recurring_rows(item: ExtractedItem, session: str) -> list[PreviewRow]:
     end_note = ""
     if last is None:
         # "Each week from week 4" means until the end of teaching
-        last = uts_calendar.LAST_WEEK
+        last = calendars.last_week(session)
         end_note = f" The outline gives no last week, so week {last} was used."
-    if not (_is_teaching_week(first) and _is_teaching_week(last) and first <= last):
-        note = f"The outline says weeks {first} to {last}, but teaching weeks run from 1 to 12, so the date is unknown."
+    if not (_is_teaching_week(first, session) and _is_teaching_week(last, session) and first <= last):
+        note = (
+            f"The outline says weeks {first} to {last}, but teaching weeks run from 1 to "
+            f"{calendars.last_week(session)}, so the date is unknown."
+        )
         return [_row(item, "unknown", None, note)]
 
     if weekday:
@@ -269,11 +294,11 @@ def _recurring_rows(item: ExtractedItem, session: str) -> list[PreviewRow]:
     status = "exact" if weekday and not end_note else "assumed"
 
     rows = []
-    for week, _monday in uts_calendar.teaching_weeks(session, first, last):  # StuVac is skipped
-        due = uts_calendar.week_date(session, week, weekday or DEFAULT_WEEKDAY, time or DEFAULT_TIME)
+    for week, _monday in calendars.teaching_weeks(session, first, last):  # a break with no week number is skipped
+        due = calendars.week_date(session, week, weekday or DEFAULT_WEEKDAY, time or DEFAULT_TIME)
         row = _row(item, status, due, note + end_note)
         row["title"] += f" (week {week})"  # every saved title must be different
-        rows.append(row)
+        rows.append(_quiet_week(row, session, week))
     return rows
 
 
@@ -398,8 +423,8 @@ def _check_date(row: PreviewRow, now: datetime) -> None:
     if row["due_date"] is None:
         return
     due = tools._parse_due_date(row["due_date"])
-    if uts_calendar.is_public_holiday(due.date()):
-        holiday = uts_calendar.PUBLIC_HOLIDAYS[due.date()]
+    if calendars.is_public_holiday(due.date()):
+        holiday = calendars.PUBLIC_HOLIDAYS[due.date()]
         row["note"] += f" {tools._friendly_day(due)} is a NSW public holiday ({holiday}), so check this date."
         if row["status"] == "exact":
             row["status"] = "assumed"  # a date on a holiday is at best assumed

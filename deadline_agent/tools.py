@@ -18,7 +18,7 @@ file, so the student can import them into a calendar app.
 
 Two more things are worked out here in plain Python, never by Gemini:
 clashes (deadlines that bunch up close together) and grade_needed (the
-average mark still needed for each UTS grade band).
+average mark still needed for each grade band).
 """
 
 import hashlib
@@ -43,8 +43,12 @@ REQUIRED_KEYS = {"title", "due_date", "subject", "done"}
 #   mark_percent: the student's result for it, once known
 PERCENT_KEYS = ("weight_percent", "mark_percent")
 
-# The student studies at UTS, so every date and time is Sydney time.
+# Every university Groot knows (UTS, UNSW, USyd and Macquarie) is in Sydney, so every date and time is Sydney time.
 SYDNEY = ZoneInfo("Australia/Sydney")
+
+# What a subject code looks like: five digits at UTS ("33130"), or four
+# letters then four digits at UNSW, USyd and Macquarie ("COMP1511").
+SUBJECT_CODE = r"(?:[0-9]{5}|[A-Z]{4}[0-9]{4})"
 
 # The two saved forms, for example "2026-11-05" and "2026-11-05 14:30".
 ISO_DATE = r"[0-9]{4}-[0-9]{2}-[0-9]{2}"
@@ -82,7 +86,7 @@ CLASH_HOURS = 48
 BUSY_WEEK_COUNT = 3
 CLASH_DAYS = REMINDER_DAYS
 
-# The UTS grade bands, with the final mark each one starts at.
+# The grade bands, with the final mark each one starts at. UTS, UNSW, USyd and Macquarie all use these four.
 GRADE_BANDS = {
     "pass": ("Pass", 50),
     "credit": ("Credit", 65),
@@ -689,7 +693,7 @@ def _clashes(now: datetime | None = None, deadlines: list | None = None) -> list
         CLASH_HOURS (48) hours or less apart. Only neighbours are paired, so
         three deadlines in a row give two warnings, not three.
     "busy_week": BUSY_WEEK_COUNT (3) or more deadlines in the same Monday to
-        Sunday week. Fixed weeks, like UTS teaching weeks, never overlap, so
+        Sunday week. Fixed weeks, like teaching weeks, never overlap, so
         the same deadlines are not warned about twice.
     Finished deadlines and deadlines whose time has passed never count. A
     clash is only kept if its first deadline is due within CLASH_DAYS days,
@@ -752,9 +756,10 @@ def _clash_sentence(count: int) -> str:
 def _subject_parts(subject: str):
     """'41039 Programming Fundamentals' -> ('41039', 'Programming Fundamentals').
 
-    A subject with no 5-digit UTS code in front gives (None, the whole subject).
+    'COMP1511 Programming Fundamentals' works the same way. A subject with no
+    subject code in front (see SUBJECT_CODE) gives (None, the whole subject).
     """
-    match = re.fullmatch(r"([0-9]{5}) +(.+)", subject.strip())
+    match = re.fullmatch(rf"({SUBJECT_CODE}) +(.+)", subject.strip(), re.IGNORECASE)
     if match:
         return match[1], match[2]
     return None, subject.strip()
@@ -765,7 +770,7 @@ def _subject_matches(subject: str, wanted: str) -> bool:
     if not subject.strip():
         return False
     code, name = _subject_parts(subject)
-    names = {_title_key(subject), _title_key(name)} | ({code} if code else set())
+    names = {_title_key(subject), _title_key(name)} | ({_title_key(code)} if code else set())
     return _title_key(wanted) in names
 
 
@@ -1405,7 +1410,7 @@ def grade_needed(subject: str, target: str = "credit") -> dict:
     Call this when the student asks things like "what do I need on the exam
     to pass?", "can I still get a distinction in 41039?" or "how am I going
     in Programming Fundamentals?". It uses the weights and marks saved with
-    each deadline (see set_mark). The UTS grade bands are Pass 50, Credit 65,
+    each deadline (see set_mark). The grade bands are Pass 50, Credit 65,
     Distinction 75 and High Distinction 85. Many subjects also have minimum
     rules (for example at least 40% on the exam) that this cannot check, so
     remind the student to read their subject outline.

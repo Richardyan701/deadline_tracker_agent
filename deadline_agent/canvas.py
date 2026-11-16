@@ -17,18 +17,21 @@ import httpx
 import icalendar
 
 from .import_types import CanvasEvent
+from .tools import SUBJECT_CODE as CODE_SHAPE
 
 SYDNEY = ZoneInfo("Australia/Sydney")
 
 # Only links to these hosts are fetched, so the server cannot be tricked into
-# visiting some other site.
-UTS_CANVAS_HOST = "canvas.uts.edu.au"
+# visiting some other site. UTS and USyd use Canvas. UNSW and Macquarie use
+# Moodle instead, which Groot cannot read yet.
+CANVAS_HOSTS = ("canvas.uts.edu.au", "canvas.sydney.edu.au")
 INSTRUCTURE_DOMAIN = ".instructure.com"  # any host ending in this, like uts.instructure.com
 
 TIMEOUT_SECONDS = 10
 MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 
-SUBJECT_CODE = re.compile(r"(?<![0-9])[0-9]{5}(?![0-9])")  # five digits, not part of a longer number
+# A subject code like "33130" or "COMP1511" that is not part of a longer word or number
+SUBJECT_CODE = re.compile(rf"(?<![A-Za-z0-9]){CODE_SHAPE}(?![A-Za-z0-9])")
 COURSE_TAG = re.compile(r"(.*?) *\[([^\]]*)\] *")  # "Assignment 2 [33130_SPR_U_1_S]"
 
 
@@ -41,7 +44,7 @@ class _HideCanvasLinks(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage().lower()
-        return UTS_CANVAS_HOST not in message and INSTRUCTURE_DOMAIN not in message
+        return INSTRUCTURE_DOMAIN not in message and not any(host in message for host in CANVAS_HOSTS)
 
 
 logging.getLogger("httpx").addFilter(_HideCanvasLinks())
@@ -59,15 +62,15 @@ def check_link(link: str) -> httpx.URL:
         raise CanvasError("That is not a valid web link. Copy it again from Canvas, Calendar, Calendar Feed.") from None
     if url.scheme != "https":
         raise CanvasError("The Canvas link must start with https://.")
-    if url.host != UTS_CANVAS_HOST and not url.host.endswith(INSTRUCTURE_DOMAIN):
-        raise CanvasError(f"Only Canvas links from {UTS_CANVAS_HOST} or instructure.com can be used.")
+    if url.host not in CANVAS_HOSTS and not url.host.endswith(INSTRUCTURE_DOMAIN):
+        raise CanvasError(f"Only Canvas links from {', '.join(CANVAS_HOSTS)} or instructure.com can be used.")
     return url
 
 
 def fetch_feed(link: str) -> bytes:
     """Download the Canvas calendar feed once and return its bytes.
 
-    Only https links to canvas.uts.edu.au or *.instructure.com are fetched.
+    Only https links to the hosts in CANVAS_HOSTS or *.instructure.com are fetched.
     Redirects are not followed, the wait is at most 10 seconds and the feed
     can be at most 2 MB. Raises CanvasError with a message that never
     contains the link.
@@ -99,7 +102,7 @@ def _sydney_due(start) -> str:
     if isinstance(start, datetime):
         if start.tzinfo is not None:
             start = start.astimezone(SYDNEY)
-        # A time with no timezone ("floating") already means local time, which is Sydney for a UTS student
+        # A time with no timezone ("floating") already means local time, and every university Groot knows is in Sydney
         return start.strftime("%Y-%m-%d %H:%M")
     # An all-day event has a date but no time, so it is due by the end of that day
     return f"{start.isoformat()} 23:59"
@@ -109,9 +112,10 @@ def parse_feed(data: bytes) -> list[CanvasEvent]:
     """The events in a Canvas calendar feed, in Sydney time.
 
     Canvas titles end with the course in square brackets, like
-    "Assignment 2 [33130_SPR_U_1_S]". The tag is removed from the title, and
-    the subject code is the first five-digit number in the title or the tag
-    ("" if there is none, for example a personal event).
+    "Assignment 2 [33130_SPR_U_1_S]". The tag is removed from the title. The
+    subject code (like "33130" or "COMP1511") is the first one in the tag, or
+    else the first one in the title ("" if there is none, for example a
+    personal event).
     Raises CanvasError if the data is not a calendar.
     """
     try:
@@ -122,7 +126,8 @@ def parse_feed(data: bytes) -> list[CanvasEvent]:
         for event in calendar.events:
             summary = str(event.get("SUMMARY", ""))
             tagged = COURSE_TAG.fullmatch(summary)
-            code = SUBJECT_CODE.search(summary)
+            # The course tag is checked first, so a word in the title that only looks like a code never wins
+            code = (tagged and SUBJECT_CODE.search(tagged[2])) or SUBJECT_CODE.search(summary)
             events.append({
                 "subject_code": code[0] if code else "",
                 "title": (tagged[1] if tagged else summary).strip(),

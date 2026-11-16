@@ -224,7 +224,7 @@ def test_impossible_first_date_is_a_clear_error():
 
 def test_unknown_session_is_a_clear_error():
     with pytest.raises(ValueError, match="Unknown session"):
-        timetable.parse_timetable(FIXTURE, "SPR2027")
+        timetable.parse_timetable(FIXTURE, "SPR2099")
 
 
 # ---------- reading the PDF ----------
