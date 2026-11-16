@@ -332,10 +332,28 @@ def test_an_item_with_no_name_is_an_error(name):
         read_one(raw_item(name=name))
 
 
-@pytest.mark.parametrize("code", ["3313", "331300", "SUBJ 33130", "33l30", 33130, None, ""])
+@pytest.mark.parametrize(
+    "code",
+    ["3313", "331300", "SUBJ 33130", "33l30", 33130, None, "", "COMP151", "COMP15111", "COMPX1511", "CS1511", "1511COMP"],
+)
 def test_a_missing_or_odd_subject_code_is_an_error(code):
-    with pytest.raises(OutlineError, match="five-digit subject code"):
+    with pytest.raises(OutlineError, match="subject code like 33130 or COMP1511"):
         read_one_with_code(code)
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        ("33130", "33130"),  # UTS
+        (" 33130 ", "33130"),
+        ("COMP1511", "COMP1511"),  # UNSW, USyd and Macquarie use four letters then four digits
+        ("INFO1110", "INFO1110"),
+        ("comp1511", "COMP1511"),  # made capitals
+        ("COMP 1511", "COMP1511"),  # some outlines print a space in the code
+    ],
+)
+def test_subject_codes_from_every_university_are_accepted(code, expected):
+    assert read_one_with_code(code) == expected
 
 
 # ---------- wrong types and bad values become None ----------

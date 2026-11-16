@@ -14,7 +14,7 @@ Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney,
 
 ## What it does
 
-- **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date using the official UTS calendar.
+- **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date using your university's official calendar. It knows **UTS, UNSW, the University of Sydney and Macquarie University**.
 - **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
 - **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up.
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
@@ -64,7 +64,7 @@ Measured with the real Gemini model, not just claimed:
 | --- | --- |
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
 | **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** |
-| **Automated tests** | About 1,500, run on Python 3.11, 3.13 and 3.14 on every change |
+| **Automated tests** | About 1,900, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
 
@@ -92,7 +92,7 @@ Because both give you one place to keep your study life in order: a list of task
 
 **What Groot does that Notion does not do out of the box**
 
-- **Knows the UTS calendar.** "Due in week 7" becomes the real date, with the mid-session break and public holidays handled. In Notion, you or the AI have to work that date out.
+- **Knows your university's calendar.** "Due in week 7" becomes the real date at UTS, UNSW, USyd or Macquarie, with each one's mid-session break and the public holidays handled. In Notion, you or the AI have to work that date out.
 - **Works dates out in tested code, not by AI.** The same phrase always gives the same date, and unclear dates are refused instead of guessed.
 - **Shows how sure it is.** Every imported row is marked exact, assumed or needing your date, and nothing is saved until you tick it.
 - **Warns about clashes and works out the mark you need** with no formulas to write.
@@ -105,7 +105,8 @@ Because both give you one place to keep your study life in order: a list of task
 
 - **The Gemini free tier is small:** about 5 requests a minute and 20 a day, which is roughly 8 to 10 chat messages that use a tool. Groot says so politely when you hit a limit. The home page never uses Gemini.
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
-- **UTS only, and only 2026.** The calendar covers Autumn and Spring 2026.
+- **Four Sydney universities, up to the end of 2027.** UTS, UNSW, the University of Sydney and Macquarie University, main sessions only. Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out.
+- **UTS is the best tested.** The accuracy above was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
 - **Run it on your own computer only.** The chat page has no login.
 - **The grade calculator can't check minimum rules** (like a minimum exam mark). Read your subject outline.

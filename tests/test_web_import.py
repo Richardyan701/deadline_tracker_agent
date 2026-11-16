@@ -32,7 +32,7 @@ from test_canvas import LINK, SECRET, event, feed
 from test_documents import DOC, FIXTURES, PPT, docx_file, odf_file, ole_file, picture, pptx_file, xlsx_file, zip_file
 from test_timetable import FIXTURE, make_pdf
 
-from deadline_agent import documents, importer, outline, tools
+from deadline_agent import calendars, documents, importer, outline, tools
 from web import app as web_app
 from web import preview as web_preview
 from web import uploads
@@ -185,12 +185,93 @@ def test_the_page_script_takes_its_file_endings_from_the_picker():
     assert "is not a PDF" not in code
 
 
-def test_the_session_picker_starts_on_spring_2026(client):
+def picker(text: str) -> str:
+    """The university and session picker's HTML, cut out of the import page."""
+    start = text.index('<select id="session-select"')
+    return text[start : text.index("</select>", start) + len("</select>")]
+
+
+def test_the_session_picker_starts_empty_and_groups_sessions_by_university(client):
+    # NOW is 20 Jul 2026, so UTS Autumn 2026 has finished and is not offered
+    assert picker(client.get("/groot/import").text) == (
+        '<select id="session-select" aria-describedby="session-hint">'
+        '<option value="">Choose your university and session</option>'
+        '<optgroup label="University of Technology Sydney (UTS)">'
+        '<option value="SPR2026" data-university="uts">Spring 2026</option>'
+        '<option value="AUT2027" data-university="uts">Autumn 2027</option>'
+        '<option value="SPR2027" data-university="uts">Spring 2027</option>'
+        "</optgroup>"
+        '<optgroup label="UNSW Sydney">'
+        '<option value="UNSW_T1_2027" data-university="unsw">Term 1 2027</option>'
+        '<option value="UNSW_T2_2027" data-university="unsw">Term 2 2027</option>'
+        '<option value="UNSW_T3_2027" data-university="unsw">Term 3 2027</option>'
+        "</optgroup>"
+        '<optgroup label="University of Sydney">'
+        '<option value="USYD_S1_2027" data-university="usyd">Semester 1 2027</option>'
+        '<option value="USYD_S2_2027" data-university="usyd">Semester 2 2027</option>'
+        "</optgroup>"
+        '<optgroup label="Macquarie University">'
+        '<option value="MQ_S1_2027" data-university="mq">Session 1 2027</option>'
+        '<option value="MQ_S2_2027" data-university="mq">Session 2 2027</option>'
+        "</optgroup>"
+        "</select>"
+    )
+
+
+def test_no_session_is_chosen_for_the_student(client):
+    # Each university counts its weeks differently, so a wrong guess would give wrong dates
+    assert " selected" not in picker(client.get("/groot/import").text)
+
+
+def test_the_picker_offers_every_session_that_has_not_finished(client):
+    text = picker(client.get("/groot/import").text)
+    for code in calendars.open_sessions(NOW.date()):
+        assert f'<option value="{code}"' in text
+    assert 'value="AUT2026"' not in text
+
+
+def test_a_finished_session_drops_off_the_picker(client, monkeypatch):
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2026, 11, 21, 9, 0))  # the day after Spring 2026 exams end
+    text = client.get("/groot/import").text
+    assert 'value="SPR2026"' not in picker(text)
+    assert 'value="AUT2027"' in picker(text)
+    assert "has run out" not in text  # UTS still has 2027 sessions to offer
+
+
+def test_the_page_says_when_a_universitys_calendar_has_run_out(client, monkeypatch):
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 11, 20, 9, 0))  # the day after UTS Spring 2027 exams end
     text = client.get("/groot/import").text
     assert (
-        '<select id="session-select"><option value="AUT2026">Autumn 2026</option>'
-        '<option value="SPR2026" selected>Spring 2026</option></select>'
+        '<p class="warning">Groot\'s calendar for UTS has run out, because every session it knows there has finished. '
+        "Update Groot to get the next sessions.</p>"
     ) in text
+    assert "University of Technology Sydney" not in picker(text)
+    assert 'value="UNSW_T3_2027"' in picker(text)  # UNSW Term 3 exams run until 9 Dec
+
+
+def test_the_page_names_every_university_once_all_calendars_have_run_out(client, monkeypatch):
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2028, 1, 10, 9, 0))
+    text = client.get("/groot/import").text
+    assert "Groot's calendars for UTS, UNSW, USyd and Macquarie have run out" in text
+    assert picker(text) == (
+        '<select id="session-select" aria-describedby="session-hint">'
+        '<option value="">Choose your university and session</option></select>'
+    )
+
+
+def test_the_timetable_and_canvas_fields_start_hidden_until_a_university_is_chosen(client):
+    text = client.get("/groot/import").text
+    assert '<div class="field" id="timetable-field" hidden>' in text
+    assert '<div class="field" id="canvas-field" hidden>' in text
+
+
+def test_the_page_script_shows_each_university_only_the_fields_it_can_use():
+    code = (web_app.STATIC_DIR / "import.js").read_text(encoding="utf-8")
+    assert 'const USES_TIMETABLE = ["uts"];' in code  # only UTS timetables can be read
+    assert 'const USES_CANVAS = ["uts", "usyd"];' in code  # UNSW and Macquarie use Moodle
+    assert set(json.loads(code.split("const USES_CANVAS = ")[1].split(";")[0])) <= set(calendars.UNIVERSITIES)
+    # No preview without a session
+    assert 'previewButton.disabled = count === 0 || sessionSelect.value === "";' in code
 
 
 def test_the_page_warns_about_gemini_requests_before_preview(client):
@@ -200,6 +281,24 @@ def test_the_page_warns_about_gemini_requests_before_preview(client):
 
 
 # ---------- preview ----------
+
+
+def test_preview_uses_the_calendar_of_the_university_that_was_chosen(client, reader):
+    # The same "week 7" is a different Friday at each university
+    reader.answer = lambda data: [item("Assignment 1", "week", code="COMP1511", subject="Programming Fundamentals", week=7)]
+    fridays = {
+        "AUT2027": "Friday 2 Apr 2027, 11:59 PM",
+        "UNSW_T1_2027": "Friday 2 Apr 2027, 11:59 PM",
+        "USYD_S1_2027": "Friday 16 Apr 2027, 11:59 PM",  # after the one-week mid-semester break
+        "MQ_S1_2027": "Friday 9 Apr 2027, 11:59 PM",  # the last week before the recess
+        "UNSW_T2_2027": "Friday 16 Jul 2027, 11:59 PM",
+        "MQ_S2_2027": "Friday 10 Sep 2027, 11:59 PM",
+    }
+    for session, friday in fridays.items():
+        response = preview(client, ("outline.pdf", pdf("outline")), session=session)
+        assert response.status_code == 200
+        [row] = response.json()["rows"]
+        assert (row["title"], row["due_text"]) == ("COMP1511 Assignment 1", friday), session
 
 
 def test_preview_rows_come_from_the_real_importer(client, reader, deadlines_file):
@@ -308,7 +407,10 @@ def test_the_canvas_feed_is_merged_and_its_link_is_never_echoed_or_logged(client
     "link, reason",
     [
         (f"http://canvas.uts.edu.au/feeds/calendars/{SECRET}.ics", "The Canvas link must start with https://."),
-        (f"https://evil.example/{SECRET}.ics", "Only Canvas links from canvas.uts.edu.au or instructure.com can be used."),
+        (
+            f"https://evil.example/{SECRET}.ics",
+            "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au or instructure.com can be used.",
+        ),
     ],
 )
 def test_a_refused_canvas_link_is_explained_and_the_preview_goes_on(client, reader, fake_canvas, caplog, link, reason):
@@ -544,8 +646,15 @@ def refused_outline(name, message):
         (outlines(1), {"timetable": b"%PDF-" + b"x" * (10 * MB - 4)}, 413, "timetable.pdf is bigger than 10 MB, so nothing was read."),
         (outlines(9), {}, 400, "At most 8 outlines can be read at a time. Remove some, then try again."),
         ([], {"timetable": pdf("timetable")}, 400, "Add at least one subject outline, then try again."),
-        (outlines(1), {"session": None}, 400, "Choose a session, then try again."),
-        (outlines(1), {"session": "SUM2026"}, 400, "Choose the session your outlines are for: Autumn 2026 or Spring 2026."),
+        (outlines(1), {"session": None}, 400, "Choose your university and session, then try again."),
+        (outlines(1), {"session": ""}, 400, "Choose your university and session, then try again."),  # the picker's empty choice
+        (outlines(1), {"session": "SUM2026"}, 400, "Choose your university and session, then try again."),
+        (
+            outlines(1),
+            {"session": "UNSW_T1_2027", "timetable": make_pdf(["9:00 - 11:00"])},
+            400,
+            "Groot can only read UTS timetables so far. Remove the timetable, then try again. Nothing was sent to Gemini.",
+        ),
         (
             outlines(1),
             {"timetable": pdf("a"), "extra": [("timetable", ("second.pdf", pdf("b"), "application/pdf"))]},

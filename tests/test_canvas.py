@@ -97,9 +97,47 @@ def test_course_code_in_the_title_with_no_tag():
     assert (events[0]["subject_code"], events[0]["title"]) == ("31250", "31250 Project check-in")
 
 
-def test_first_five_digit_number_wins():
+def test_the_code_in_the_course_tag_wins_over_one_in_the_title():
+    # The tag is Canvas's own name for the course, so it is trusted before a number in the title
     events = canvas.parse_feed(feed(event("Reading 31265 notes [33130_SPR_U_1_S]")))
+    assert events[0]["subject_code"] == "33130"
+
+
+def test_the_first_code_in_the_title_is_used_when_the_tag_has_none():
+    events = canvas.parse_feed(feed(event("Reading 31265 and 33130 notes [Maths study group]")))
     assert events[0]["subject_code"] == "31265"
+
+
+@pytest.mark.parametrize(
+    "summary, code, title",
+    [
+        ("Assignment 1 [INFO1110 Introduction to Programming]", "INFO1110", "Assignment 1"),  # a USyd unit code in the tag
+        ("Quiz 2 [COMP1511_T1_2027]", "COMP1511", "Quiz 2"),
+        ("MATH1021 Assignment 2", "MATH1021", "MATH1021 Assignment 2"),  # in the title, with no tag
+    ],
+)
+def test_subject_codes_with_four_letters_and_four_digits(summary, code, title):
+    events = canvas.parse_feed(feed(event(summary)))
+    assert (events[0]["subject_code"], events[0]["title"]) == (code, title)
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "Read XCOMP1511 notes",  # part of a longer word
+        "Room COMP15110 booking",  # part of a longer number
+        "comp1511 revision",  # codes are written in capitals
+        "See COMP151 slides",  # too short
+    ],
+)
+def test_words_that_only_look_like_a_subject_code_are_not_one(summary):
+    events = canvas.parse_feed(feed(event(summary)))
+    assert events[0]["subject_code"] == ""
+
+
+def test_a_code_in_the_tag_wins_over_a_look_alike_word_in_the_title():
+    events = canvas.parse_feed(feed(event("Prepare for EXAM2027 [INFO1110 Introduction to Programming]")))
+    assert events[0]["subject_code"] == "INFO1110"
 
 
 def test_longer_numbers_are_not_subject_codes():
@@ -158,6 +196,19 @@ def test_a_damaged_feed_that_trips_up_the_calendar_library_is_a_clear_error():
 )
 def test_canvas_links_are_accepted(link):
     assert canvas.check_link(link).host in ("canvas.uts.edu.au", "uts.instructure.com")
+
+
+def test_the_university_of_sydney_canvas_link_is_accepted():
+    link = f"https://canvas.sydney.edu.au/feeds/calendars/{SECRET}.ics"
+    assert canvas.check_link(link).host == "canvas.sydney.edu.au"
+
+
+def test_a_refused_link_names_every_canvas_host():
+    with pytest.raises(canvas.CanvasError) as error:
+        canvas.check_link("https://moodle.telt.unsw.edu.au/calendar/export.ics")
+    assert str(error.value) == (
+        "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au or instructure.com can be used."
+    )
 
 
 @pytest.mark.parametrize(

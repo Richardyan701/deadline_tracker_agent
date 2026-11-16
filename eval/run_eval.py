@@ -12,7 +12,7 @@ the same subject code from eval/outlines/ (for example 33130.pdf or
 33130.docx) to Gemini through extract_items, compares the two, and writes the
 scores to eval/results.md. Timing is scored twice: by the timing fields, and
 by the real dates the drop box would show, worked out for the session by the
-same importer and UTS calendar. eval/README.md explains the answer key format
+same importer and calendar. eval/README.md explains the answer key format
 and how every score works.
 
 Gemini's free tier only allows a few requests a minute, so this waits between
@@ -28,7 +28,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from time import monotonic, sleep
 
-from deadline_agent import documents, importer, outline, tools, uts_calendar
+from deadline_agent import calendars, documents, importer, outline, tools
 
 EVAL_DIR = Path(__file__).resolve().parent
 OUTLINES_DIR = EVAL_DIR / "outlines"
@@ -124,8 +124,10 @@ def load_keys(keys_dir: Path) -> tuple[dict, list]:
     for path in sorted(keys_dir.glob("*.json")):
         if path.name == EXAMPLE_KEY:
             continue
-        if not re.fullmatch(r"[0-9]{5}", path.stem):
-            raise EvalError(f"{path.name}: an answer key must be named after its five-digit subject code, like 33130.json.")
+        if not re.fullmatch(tools.SUBJECT_CODE, path.stem):
+            raise EvalError(
+                f"{path.name}: an answer key must be named after its subject code, like 33130.json or COMP1511.json."
+            )
         key = load_key(path)
         if key["checked"]:
             checked[path.stem] = key["items"]
@@ -246,7 +248,7 @@ def describe_timing(item: dict) -> str:
 
 
 def resolve_dates(item: dict, code: str, session: str) -> tuple:
-    """The due dates the drop box would show for this item, worked out by the real importer and UTS calendar.
+    """The due dates the drop box would show for this item, worked out by the real importer and calendar.
 
     item is a key item or an extracted item. The result is one "YYYY-MM-DD HH:MM" for most items,
     one for each teaching week of a weekly item, and none when the drop box shows no date or asks
@@ -362,7 +364,7 @@ def table_row(label: str, score: dict) -> str:
 def render(scores: dict, unchecked: list, session: str) -> str:
     """The whole results.md file."""
     total = {name: sum(score[name] for score in scores.values()) for name in COUNTS}
-    calendar = uts_calendar.session_info(session)["name"]
+    calendar = calendars.session_info(session)["name"]
     lines = [
         "# Outline reader accuracy",
         "",
@@ -403,10 +405,10 @@ def render(scores: dict, unchecked: list, session: str) -> str:
 def evaluate(outlines_dir: Path, keys_dir: Path, session: str, client=None) -> str:
     """Score every checked answer key against its outline and return the text of results.md.
 
-    session ("SPR2026" or "AUT2026") is checked first, so a typo never wastes a Gemini request.
+    session (a code from calendars.SESSIONS, like "SPR2026") is checked first, so a typo never wastes a Gemini request.
     """
     try:
-        uts_calendar.session_info(session)
+        calendars.session_info(session)
     except ValueError as error:
         raise EvalError(str(error)) from None
     keys, unchecked = load_keys(keys_dir)
@@ -423,7 +425,7 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description="Measure how well the outline reader finds the deadlines in UTS outlines.")
     parser.add_argument(
         "--session",
-        choices=list(uts_calendar.SESSIONS),
+        choices=list(calendars.SESSIONS),
         default=DEFAULT_SESSION,
         help=f"the session of the outlines, whose calendar gives the real dates (default {DEFAULT_SESSION})",
     )

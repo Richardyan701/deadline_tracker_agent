@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from google.adk.cli.fast_api import get_fast_api_app
 
-from deadline_agent import importer, tools, uts_calendar
+from deadline_agent import calendars, importer, tools
 
 from . import Refused, pages, preview, uploads
 
@@ -58,7 +58,6 @@ STATIC_FILES = {
     "import.js": "text/javascript",
 }
 
-DEFAULT_SESSION = "SPR2026"
 SAVE_FIELDS = {"title", "due_date", "subject"}
 
 PAGE_HEADERS = {
@@ -134,7 +133,8 @@ def home() -> HTMLResponse:
 @router.get("/import", response_class=HTMLResponse)
 def import_page() -> HTMLResponse:
     """The outline drop box. Nothing is sent to Gemini until the student clicks Preview."""
-    return _page(pages.import_page(uts_calendar.SESSIONS, DEFAULT_SESSION))
+    today = tools._now().date()
+    return _page(pages.import_page(calendars.open_sessions(today), calendars.finished_universities(today)))
 
 
 @router.get("/static/{name}")

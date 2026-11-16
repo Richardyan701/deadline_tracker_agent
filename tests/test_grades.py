@@ -492,3 +492,38 @@ def test_save_rows_shares_a_weekly_series_weight_between_its_weeks(deadlines_fil
 def test_a_bad_weight_from_the_page_refuses_only_that_row(deadlines_file):
     results = importer.save_rows([row("41039 Exam", 140), row("41039 Report", 30)])
     assert [r["status"] for r in results] == ["error", "success"]
+
+
+# ---------- subject codes from the other universities ----------
+
+
+@pytest.mark.parametrize("wanted", ["COMP1511", "comp1511", "Programming Fundamentals", "COMP1511 Programming Fundamentals"])
+def test_a_subject_is_found_by_a_letter_style_code(deadlines_file, wanted):
+    # UNSW, USyd and Macquarie codes are four letters then four digits
+    rows = [
+        {"title": "Quiz", "due_date": "2026-11-20", "subject": "COMP1511 Programming Fundamentals", "done": True,
+         "weight_percent": 20, "mark_percent": 70},
+        {"title": "Exam", "due_date": "2026-11-20", "subject": "COMP1511 Programming Fundamentals", "done": False,
+         "weight_percent": 80},
+    ]  # fmt: skip
+    deadlines_file.write_text(json.dumps(rows), encoding="utf-8")
+
+    result = tools.grade_needed(wanted)
+
+    assert result["status"] == "success"
+    assert (result["earned_percent"], result["still_to_come_percent"]) == (14, 80)
+
+
+@pytest.mark.parametrize(
+    "subject, parts",
+    [
+        ("41039 Programming Fundamentals", ("41039", "Programming Fundamentals")),
+        ("COMP1511 Programming Fundamentals", ("COMP1511", "Programming Fundamentals")),
+        ("info1110 Introduction to Programming", ("info1110", "Introduction to Programming")),
+        ("Writing", (None, "Writing")),
+        ("COMP151 Short code", (None, "COMP151 Short code")),
+        ("2026 Plans", (None, "2026 Plans")),
+    ],
+)
+def test_subject_parts(subject, parts):
+    assert tools._subject_parts(subject) == parts

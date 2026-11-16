@@ -9,7 +9,7 @@ The browser then shows that text as it is and never runs it as code.
 from datetime import datetime
 from html import escape
 
-from deadline_agent import documents, tools
+from deadline_agent import calendars, documents, tools
 
 # Opens ADK's chat with Groot already chosen
 CHAT_PATH = "/dev-ui/?app=deadline_agent"
@@ -65,7 +65,7 @@ EDIT_DIALOG = """<dialog id="edit-dialog" aria-labelledby="edit-heading">
 
 # The honest note under the Grades heading
 GRADES_NOTE = (
-    "Groot works out the average you need on the tasks still to come for each UTS grade band: "
+    "Groot works out the average you need on the tasks still to come for each grade band: "
     "Pass 50, Credit 65, Distinction 75 and High Distinction 85. Some subjects also have minimum rules, "
     "for example at least 40% on the exam, that Groot cannot check, so read your subject outline too."
 )
@@ -272,16 +272,52 @@ def _edit_button(deadline: dict) -> str:
     )
 
 
-def import_page(sessions: dict, default_session: str) -> str:
-    """The outline drop box. sessions is uts_calendar.SESSIONS, so the picker always matches the calendar.
+def _session_picker(sessions: dict) -> str:
+    """The options of the university and session picker, grouped by university.
+
+    It starts on an empty choice on purpose. Each university counts its
+    weeks differently, so a wrong guess would give wrong dates, and the
+    student has to pick. import.js remembers their pick for next time.
+    Each option carries its university, which import.js uses to show only
+    the extra fields that university can use.
+    """
+    groups = ""
+    for key, university in calendars.UNIVERSITIES.items():
+        options = "".join(
+            f'<option value="{escape(code)}" data-university="{escape(key)}">{escape(info["name"])}</option>'
+            for code, info in sessions.items()
+            if info["university"] == key
+        )
+        if options:
+            groups += f'<optgroup label="{escape(university["full_name"])}">{options}</optgroup>'
+    return '<option value="">Choose your university and session</option>' + groups
+
+
+def _finished_warning(finished: list[str]) -> str:
+    """A warning naming the universities whose calendars in Groot have run out, or "" if none have."""
+    if not finished:
+        return ""
+    if len(finished) == 1:
+        which = f"calendar for {escape(finished[0])} has"
+    else:
+        names = ", ".join(escape(name) for name in finished[:-1]) + f" and {escape(finished[-1])}"
+        which = f"calendars for {names} have"
+    return (
+        f'<p class="warning">Groot\'s {which} run out, because every session it knows there has finished. '
+        "Update Groot to get the next sessions.</p>"
+    )
+
+
+def import_page(sessions: dict, finished: list[str]) -> str:
+    """The outline drop box.
+
+    sessions is calendars.open_sessions(today), so the picker only offers
+    sessions that have not finished, and finished is
+    calendars.finished_universities(today), which the page warns about.
 
     The outline picker accepts every file ending documents.py reads, and the
     hint lists them, so the page always matches what the reader can do.
     """
-    options = "".join(
-        f'<option value="{escape(code)}"{" selected" if code == default_session else ""}>{escape(info["name"])}</option>'
-        for code, info in sessions.items()
-    )
     body = f"""<header class="top">
 <p><a href="/groot">Back to your deadlines</a></p>
 <h1>Import from outlines</h1>
@@ -289,7 +325,13 @@ def import_page(sessions: dict, default_session: str) -> str:
 </header>
 <main>
 <section aria-labelledby="files-heading">
-<h2 id="files-heading">1. Choose your files</h2>
+<h2 id="files-heading">1. Choose your university and files</h2>
+<div class="field">
+<label for="session-select">Your university and session</label>
+<select id="session-select" aria-describedby="session-hint">{_session_picker(sessions)}</select>
+<p id="session-hint" class="hint">Groot turns a week number, like "due in week 7", into a real date with this university's official calendar. Sessions that have finished are not listed.</p>
+</div>
+{_finished_warning(finished)}
 <div id="drop-zone" class="drop-zone">
 <p class="drop-title">Drag your subject outlines here, or</p>
 <input id="outline-input" class="visually-hidden" type="file" accept="{escape(documents.HTML_ACCEPT)}" multiple aria-describedby="outline-hint">
@@ -298,27 +340,23 @@ def import_page(sessions: dict, default_session: str) -> str:
 </div>
 <p id="file-message" class="message" role="status"></p>
 <ul id="outline-list" class="file-list"></ul>
-<div class="field">
+<div class="field" id="timetable-field" hidden>
 <label for="timetable-input">Your UTS timetable <span class="optional">(optional PDF)</span></label>
 <input id="timetable-input" type="file" accept=".pdf,application/pdf" aria-describedby="timetable-hint">
 <button type="button" id="timetable-clear" class="secondary">Remove timetable</button>
-<p id="timetable-hint" class="hint">Groot uses it to find the day and time of your tutorials.</p>
+<p id="timetable-hint" class="hint">Groot uses it to find the day and time of your tutorials. Only UTS timetables can be read so far.</p>
 </div>
-<div class="field">
+<div class="field" id="canvas-field" hidden>
 <label for="canvas-input">Canvas calendar feed link <span class="optional">(optional)</span></label>
 <input id="canvas-input" type="url" autocomplete="off" spellcheck="false" aria-describedby="canvas-hint">
 <p id="canvas-hint" class="hint">In Canvas, open Calendar, then Calendar Feed, and copy the link. Groot reads it once and never saves it. Keep it private, because anyone with the link can see your calendar.</p>
-</div>
-<div class="field">
-<label for="session-select">Session</label>
-<select id="session-select">{options}</select>
 </div>
 </section>
 <section aria-labelledby="preview-heading">
 <h2 id="preview-heading">2. Preview</h2>
 <p class="warning">Preview sends each outline to Gemini, and each outline uses one Gemini request. Gemini's free tier allows 20 requests a day, so check your files first. The timetable and the Canvas link do not use Gemini.</p>
 <p class="warning">Privacy: outlines you preview are sent to Google's Gemini, and on the free tier Google may use and review them. Do not upload anything with sensitive personal details, such as your student ID.</p>
-<p id="request-count">Choose at least one outline to preview.</p>
+<p id="request-count">Choose your university and session to preview.</p>
 <button type="button" id="preview-button" disabled>Preview deadlines</button>
 <p id="preview-message" class="message" role="status"></p>
 <ul id="outline-results" class="results"></ul>

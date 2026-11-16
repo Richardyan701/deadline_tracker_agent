@@ -408,8 +408,14 @@ def test_keys_are_split_into_checked_and_not_checked_and_the_example_is_skipped(
 
 def test_a_key_must_be_named_after_its_subject_code(tmp_path):
     write_key(tmp_path, "maths", [])
-    with pytest.raises(EvalError, match="five-digit subject code"):
+    with pytest.raises(EvalError, match="named after its subject code, like 33130.json or COMP1511.json"):
         run_eval.load_keys(tmp_path)
+
+
+def test_a_key_can_be_named_after_a_letter_style_subject_code(tmp_path):
+    write_key(tmp_path, "COMP1511", [])
+    checked, unchecked = run_eval.load_keys(tmp_path)
+    assert list(checked) + unchecked == ["COMP1511"]
 
 
 # ---------- reading the outlines ----------
