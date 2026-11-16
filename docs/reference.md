@@ -407,6 +407,22 @@ This one server runs Groot's own pages and ADK's chat together, on port 8000. It
 
 Groot uses Gemini's free tier, which Google limits to about 5 requests per minute and 20 requests per day for each model. Google resets the daily limit at midnight Pacific time, which is between 5 PM and 7 PM in Sydney. Google sets these limits and can change them, see [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
 
+### Choosing another Gemini model
+
+Google gives each model its own free allowance, so a lighter model can have a much bigger daily limit on the same key. To switch, add one line to `deadline_agent/.env` and restart Groot:
+
+```
+GROOT_MODEL=gemini-3.5-flash-lite
+```
+
+Groot then uses that model for the chat and for reading outlines. Any model of Google's Gemini API works (a name starting with `gemini-` or `gemma-`). A name that is not one is ignored with a warning, and Groot keeps using `gemini-3.5-flash`. Remove the line to go back.
+
+What was measured on 17 Nov 2026 with `gemini-3.5-flash-lite`:
+
+- **Chat:** 62 of 63 cases passed (98%), against 63 of 63 for `gemini-3.5-flash`. The one miss saved the right deadline and date but also used the title as the subject. The full table is in [eval/chat/results-gemini-3.5-flash-lite.md](../eval/chat/results-gemini-3.5-flash-lite.md).
+- **Daily limit:** the run sent more than 120 requests in one evening on the free tier with no limit error, so its daily limit is at least six times the 20 of `gemini-3.5-flash`. Google does not publish the exact number, and it can change. Your own limits are shown in Google AI Studio.
+- **Outlines:** not measured. One UNSW outline was read correctly in a live test, but the outline evaluation was only run with `gemini-3.5-flash`, so check the review table with extra care.
+
 What uses a request:
 
 | Action | Requests |
@@ -522,6 +538,7 @@ Starting Groot:
 deadline_agent/
   agent.py           Groot itself: its model, its instruction and its list of tools
   tools.py           the ten tools, the date rules, the reminders and the saving code
+  model_choice.py    which Gemini model Groot uses (the GROOT_MODEL setting)
   friendly_errors.py short chat replies for a used up limit, a key problem or a timeout
   privacy.py         spots card numbers, passwords and other sensitive details, in plain code
   chat_privacy.py    keeps those details in a chat message away from Gemini

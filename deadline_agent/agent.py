@@ -6,6 +6,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from . import tools
 from .chat_privacy import keep_sensitive_details_from_gemini
 from .friendly_errors import friendly_model_error
+from .model_choice import chosen_model
 from .tools import (
     add_deadline,
     delete_deadline,
@@ -192,7 +193,7 @@ def groot_instruction(context: ReadonlyContext) -> str:
 
 
 root_agent = Agent(
-    model="gemini-3.5-flash",
+    model=chosen_model(),  # gemini-3.5-flash, unless GROOT_MODEL in .env names another Gemini model
     name="agent_groot",
     description="Keeps university students from missing any deadlines for their homework, projects, and assignments.",
     instruction=groot_instruction,

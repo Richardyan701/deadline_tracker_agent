@@ -34,10 +34,11 @@ from google import genai
 from google.genai import errors, types
 
 from . import documents, privacy
+from .model_choice import chosen_model
 from .tools import ISO_DATE, SUBJECT_CODE, WEEKDAY_NAMES
 
-# The same model as Groot (agent.py).
-MODEL = "gemini-3.5-flash"
+# The same model as Groot (agent.py): gemini-3.5-flash, unless GROOT_MODEL in .env names another Gemini model.
+MODEL = chosen_model()
 
 # The key lives here, the same file adk web loads for Groot.
 ENV_FILE = Path(__file__).resolve().parent / ".env"

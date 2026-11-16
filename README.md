@@ -104,7 +104,7 @@ Because both give you one place to keep your study life in order: a list of task
 
 ## Things to know
 
-- **The Gemini free tier is small:** about 5 requests a minute and 20 a day, which is roughly 8 to 10 chat messages that use a tool. Groot says so politely when you hit a limit. The home page never uses Gemini.
+- **The Gemini free tier is small:** about 5 requests a minute and 20 a day, which is roughly 8 to 10 chat messages that use a tool. Groot says so politely when you hit a limit. The home page never uses Gemini. For a much bigger daily limit, you can switch to a lighter Gemini model with one line in `.env`, which passed 62 of 63 chat cases. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
 - **Four Sydney universities, up to the end of 2027.** UTS, UNSW, the University of Sydney and Macquarie University, main sessions only. Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out.
 - **UTS is the best tested.** The accuracy above was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd.
