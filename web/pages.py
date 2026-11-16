@@ -9,7 +9,7 @@ The browser then shows that text as it is and never runs it as code.
 from datetime import datetime
 from html import escape
 
-from deadline_agent import calendars, documents, tools
+from deadline_agent import calendars, documents, model_choice, tools
 
 # Opens ADK's chat with Groot already chosen
 CHAT_PATH = "/dev-ui/?app=deadline_agent"
@@ -63,6 +63,70 @@ EDIT_DIALOG = """<dialog id="edit-dialog" aria-labelledby="edit-heading">
 </dialog>"""
 
 
+# ---------- what the pages say about the AI ----------
+#
+# Groot can use Gemini or a model from another company (model_choice.py), so
+# the pages name the one in use and say where the student's words really go.
+
+HELD_BACK = "card numbers, tax file numbers, passwords and similar details"
+
+
+def _on_this_computer(model: str) -> bool:
+    """True if the model runs on the student's own computer (Ollama), so nothing is sent to any company."""
+    return model_choice.provider_of(model)["key"] is None
+
+
+def home_privacy_note() -> str:
+    """The privacy line on the home page, for the model in use."""
+    model = model_choice.chosen_model()
+    ai = model_choice.provider_of(model)["name"]
+    if _on_this_computer(model):
+        return (
+            f"Your deadlines stay on this computer. Chat messages and previewed outlines are read by a model running "
+            f"on this computer ({ai}), so they do not leave it either. Groot still holds back {HELD_BACK} when it spots them."
+        )
+    if model_choice.uses_gemini(model):
+        where = "go to Google's Gemini, which may use and review them on the free tier"
+    else:
+        where = f"go to {ai}, which may use and review them, depending on its terms"
+    return (
+        f"Your deadlines stay on this computer. Chat messages and previewed outlines {where}, so never send sensitive "
+        f"details such as your student ID. Groot holds back {HELD_BACK} when it spots them, but it cannot spot everything."
+    )
+
+
+def import_warnings() -> list[str]:
+    """The warnings above the Preview button, for the model in use."""
+    model = model_choice.chosen_model()
+    ai = model_choice.provider_of(model)["name"]
+    uses = f"Preview sends each outline to {ai}, and each outline uses one {ai} request."
+    if model == model_choice.DEFAULT_MODEL:
+        uses += " Gemini's free tier allows 20 requests a day, so check your files first."
+    else:
+        uses += " Check your files first."
+    uses += f" The timetable and the Canvas link do not use {ai}."
+
+    do_not = "Do not upload anything with sensitive personal details, such as your student ID."
+    if _on_this_computer(model):
+        privacy_note = (
+            f"Privacy: outlines you preview are read by a model running on this computer ({ai}), so they do not leave it. "
+            f"Groot still takes out {HELD_BACK} it spots."
+        )
+    else:
+        if model_choice.uses_gemini(model):
+            where = "are sent to Google's Gemini, and on the free tier Google may use and review them"
+        else:
+            where = f"are sent to {ai}, which may use and review them, depending on its terms"
+        privacy_note = (
+            f"Privacy: outlines you preview {where}. {do_not} Groot takes out {HELD_BACK} it spots before sending, "
+            "but it cannot spot everything, and it cannot check a photo or a scanned page."
+        )
+    warnings = [uses, privacy_note]
+    if not model_choice.uses_gemini(model):
+        warnings.append(f"Groot can only send {ai} text, so a photo or a scanned PDF cannot be read while it is in use.")
+    return warnings
+
+
 # The honest note under the Grades heading
 GRADES_NOTE = (
     "Groot works out the average you need on the tasks still to come for each grade band: "
@@ -88,7 +152,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <a class="button" href="/groot/import">Import from outlines</a>
 <a class="button" href="{CHAT_PATH}">Chat with Groot</a>
 </div>
-<p class="privacy-note">Your deadlines stay on this computer. Chat messages and previewed outlines go to Google's Gemini, which may use and review them on the free tier, so never send sensitive details such as your student ID. Groot holds back card numbers, tax file numbers, passwords and similar details when it spots them, but it cannot spot everything.</p>
+<p class="privacy-note">{escape(home_privacy_note(), quote=False)}</p>
 <p id="top-message" class="message" role="status"></p>
 </header>
 <main>
@@ -354,8 +418,7 @@ def import_page(sessions: dict, finished: list[str]) -> str:
 </section>
 <section aria-labelledby="preview-heading">
 <h2 id="preview-heading">2. Preview</h2>
-<p class="warning">Preview sends each outline to Gemini, and each outline uses one Gemini request. Gemini's free tier allows 20 requests a day, so check your files first. The timetable and the Canvas link do not use Gemini.</p>
-<p class="warning">Privacy: outlines you preview are sent to Google's Gemini, and on the free tier Google may use and review them. Do not upload anything with sensitive personal details, such as your student ID. Groot takes out card numbers, tax file numbers, passwords and similar details it spots before sending, but it cannot spot everything, and it cannot check a photo or a scanned page.</p>
+{"".join(f'<p class="warning">{escape(warning, quote=False)}</p>' + chr(10) for warning in import_warnings()).rstrip()}
 <p id="request-count">Choose your university and session to preview.</p>
 <button type="button" id="preview-button" disabled>Preview deadlines</button>
 <p id="preview-message" class="message" role="status"></p>
@@ -391,7 +454,7 @@ def _layout(title: str, script: str, body: str) -> str:
 <link rel="stylesheet" href="/groot/static/groot.css">
 <script type="module" src="/groot/static/{script}"></script>
 </head>
-<body>
+<body data-ai="{escape(model_choice.ai_name())}">
 {body}
 </body>
 </html>

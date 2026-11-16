@@ -45,6 +45,8 @@ const saveMessage = document.getElementById("save-message");
 // read so far, and only UTS and USyd use Canvas (UNSW and Macquarie use Moodle).
 const USES_TIMETABLE = ["uts"];
 const USES_CANVAS = ["uts", "usyd"];
+// What Groot calls the AI it is using, like "Gemini" or "Groq". The server puts it on the page.
+const AI = document.body.dataset.ai || "Gemini";
 // Where the browser remembers the session picked last time, so it is only chosen once
 const REMEMBERED_SESSION = "groot-session";
 
@@ -85,7 +87,7 @@ function updatePreviewButton() {
   } else if (count === 0) {
     requestCount.textContent = "Choose at least one outline to preview.";
   } else {
-    requestCount.textContent = `Preview will use ${count} Gemini ${count === 1 ? "request" : "requests"}, one for each outline.`;
+    requestCount.textContent = `Preview will use ${count} ${AI} ${count === 1 ? "request" : "requests"}, one for each outline.`;
   }
   previewButton.disabled = count === 0 || sessionSelect.value === "";
 }
@@ -197,7 +199,7 @@ previewButton.addEventListener("click", async () => {
   const which = outlines.length === 1 ? "your outline" : `your ${outlines.length} outlines`;
   show(previewMessage, {
     status: "working",
-    message: `Reading ${which} with Gemini. This can take about half a minute for each outline.`,
+    message: `Reading ${which} with ${AI}. This can take about half a minute for each outline.`,
   });
   try {
     // The browser sets the form's content type, with its boundary, by itself

@@ -423,6 +423,35 @@ What was measured on 17 Nov 2026 with `gemini-3.5-flash-lite`:
 - **Daily limit:** the run sent more than 120 requests in one evening on the free tier with no limit error, so its daily limit is at least six times the 20 of `gemini-3.5-flash`. Google does not publish the exact number, and it can change. Your own limits are shown in Google AI Studio.
 - **Outlines:** not measured. One UNSW outline was read correctly in a live test, but the outline evaluation was only run with `gemini-3.5-flash`, so check the review table with extra care.
 
+### Using a model from another company
+
+Groot can also use a model from Groq, OpenAI, Anthropic, xAI, DeepSeek or OpenRouter, or one running on your own computer with Ollama. Add two lines to `deadline_agent/.env` and restart Groot: the model, written `provider/model`, and that company's own key.
+
+```
+GROOT_MODEL=groq/openai/gpt-oss-120b
+GROQ_API_KEY=your-key-here
+```
+
+| Company | `GROOT_MODEL` starts with | Key line in `.env` |
+| --- | --- | --- |
+| Groq | `groq/` | `GROQ_API_KEY` |
+| OpenAI | `openai/` | `OPENAI_API_KEY` |
+| Anthropic | `anthropic/` | `ANTHROPIC_API_KEY` |
+| xAI | `xai/` | `XAI_API_KEY` |
+| DeepSeek | `deepseek/` | `DEEPSEEK_API_KEY` |
+| OpenRouter | `openrouter/` | `OPENROUTER_API_KEY` |
+| Ollama, on your own computer | `ollama_chat/` | none |
+
+The model names themselves come from each company's own list and change often, so copy the name from their website. These models are run through [LiteLLM](https://docs.litellm.ai/docs/providers), a library that speaks to many companies' models in one way.
+
+What changes when you do this:
+
+- **The pages and the chat name the company in use** and say that your chat messages and outlines go there, under its terms, instead of to Google. With Ollama they say nothing leaves your computer.
+- **Outlines are sent as text only.** A PDF is sent as the text read out of it, so tables lose their layout. A photo or a scanned PDF cannot be read, and Groot says so before anything is sent. Switch back to a Gemini model for those.
+- **The sensitive-detail check works the same way** for every model.
+- **Nothing here was measured.** Groot's scores come from Gemini models. Another model may choose the wrong tool or misread an outline more often, so check its work, especially the review table.
+- **Each company has its own limits and prices.** Some have a free allowance and some charge for every request. Check before you use a paid key.
+
 What uses a request:
 
 | Action | Requests |
@@ -538,7 +567,7 @@ Starting Groot:
 deadline_agent/
   agent.py           Groot itself: its model, its instruction and its list of tools
   tools.py           the ten tools, the date rules, the reminders and the saving code
-  model_choice.py    which Gemini model Groot uses (the GROOT_MODEL setting)
+  model_choice.py    which AI model Groot uses (the GROOT_MODEL setting)
   friendly_errors.py short chat replies for a used up limit, a key problem or a timeout
   privacy.py         spots card numbers, passwords and other sensitive details, in plain code
   chat_privacy.py    keeps those details in a chat message away from Gemini
@@ -618,6 +647,7 @@ There are about 2,000 tests, run with pytest:
 | `tests/test_importer.py` | 68 | Every row of the date rules, Canvas matching, public holidays, past dates and saving |
 | `tests/test_start_and_setup.py` | 55 | The start files (`start_groot.sh` is run for real) and every part of the setup checker |
 | `tests/test_friendly_errors.py` | 50 | The chat's replies for limits, key problems and timeouts |
+| `tests/test_other_providers.py` | 34 | Models from other companies: their error replies, reading outlines as text, and what the pages say about where your words go |
 | `tests/test_privacy.py` | 93 | Every kind of sensitive detail, ordinary text that must be left alone, whole chat turns that prove nothing is sent to Google, outlines and saving |
 | `tests/test_canvas.py` | 49 | Reading Canvas feeds, time zones, refused links, the size and time limits, and the link never logged |
 | `tests/test_export.py` | 48 | The calendar file: its exact text, folded lines, escaping, IDs, daylight saving and failed saves |

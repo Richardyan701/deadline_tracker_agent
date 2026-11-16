@@ -4,6 +4,7 @@ google-adk==2.11.0
 google-genai==2.34.0
 httpx==0.28.1
 icalendar==7.3.0
+litellm==1.109.1
 olefile==0.47
 openpyxl==3.1.5
 pillow==12.3.0
