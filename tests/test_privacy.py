@@ -56,7 +56,9 @@ def deadlines_file(tmp_path, monkeypatch):
         ("6011111111111117", "card number", "[removed]"),  # Discover
         # Tax file numbers: the Tax Office's check, or the words in front
         (f"my tfn is {TFN}", "tax file number", "my tfn is [removed]"),
-        ("123456782", "tax file number", "[removed]"),
+        # Nine digits that pass the check, with no words saying what they are, could also be a student ID
+        ("123456782", privacy.TFN_OR_ID, "[removed]"),
+        ("my number is 123 456 782", privacy.TFN_OR_ID, "my number is [removed]"),
         ("Tax file number: 12345678", "tax file number", "Tax file number: [removed]"),  # 8 digits after the words
         ("TFN 111-111-111", "tax file number", "TFN [removed]"),  # fails the check, but the words say what it is
         # Medicare numbers: Medicare's check, written like the card or after the word
@@ -158,6 +160,7 @@ def test_anything_that_is_not_text_has_nothing_to_find(value):
         (["API key"], "an API key"),
         (["bank account details"], "bank account details"),
         (["Medicare number", "password"], "a Medicare number and a password"),
+        ([privacy.TFN_OR_ID], "a number that looks like a tax file number or an ID"),
         (["card number", "student ID", "tax file number"], "a card number, a student ID and a tax file number"),
     ],
 )
@@ -348,6 +351,7 @@ def test_an_ordinary_message_is_sent_as_usual():
         (f"my card is {CARD}, add Fees due friday", CARD, "a card number"),
         (f"save my tfn {TFN}", TFN, "a tax file number"),
         ("remember my uni password is hunter2!", "hunter2", "a password"),
+        ("my id is 123456782", "123456782", "a number that looks like a tax file number or an ID"),
         (f"is this key ok? {GOOGLE_KEY}", GOOGLE_KEY, "an API key"),
         (f"card {CARD} and my pin is 4821", CARD, "a card number and a password"),
     ],

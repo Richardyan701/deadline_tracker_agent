@@ -568,7 +568,7 @@ start_groot.sh, start_groot.bat    the start files
   | What | How it is recognised |
   | --- | --- |
   | Card number | 13 to 19 digits that start like a real card and pass the Luhn check every card passes |
-  | Tax file number | 9 digits that pass the Tax Office's check, or 8 to 9 digits after "TFN" or "tax file number" |
+  | Tax file number | 8 to 9 digits after "TFN" or "tax file number". Nine digits that pass the Tax Office's check with no such words are called "a number that looks like a tax file number or an ID", since a nine-digit student ID can pass by chance |
   | Medicare number | 10 or 11 digits that pass Medicare's check, written like the card (4, 5, 1) or after "Medicare" |
   | Password or PIN | What follows "password is", "password:", "PIN is" and so on, when it has a digit or symbol in it |
   | API key | Google (`AIza...`), OpenAI and Anthropic (`sk-...`) and GitHub (`ghp_...`) keys |
@@ -601,7 +601,7 @@ There are about 2,000 tests, run with pytest:
 | `tests/test_importer.py` | 68 | Every row of the date rules, Canvas matching, public holidays, past dates and saving |
 | `tests/test_start_and_setup.py` | 55 | The start files (`start_groot.sh` is run for real) and every part of the setup checker |
 | `tests/test_friendly_errors.py` | 50 | The chat's replies for limits, key problems and timeouts |
-| `tests/test_privacy.py` | 90 | Every kind of sensitive detail, ordinary text that must be left alone, whole chat turns that prove nothing is sent to Google, outlines and saving |
+| `tests/test_privacy.py` | 93 | Every kind of sensitive detail, ordinary text that must be left alone, whole chat turns that prove nothing is sent to Google, outlines and saving |
 | `tests/test_canvas.py` | 49 | Reading Canvas feeds, time zones, refused links, the size and time limits, and the link never logged |
 | `tests/test_export.py` | 48 | The calendar file: its exact text, folded lines, escaping, IDs, daylight saving and failed saves |
 | `tests/test_chat_eval.py` | 31 | The chat evaluation's cases and scoring, with a scripted stand-in for Gemini |

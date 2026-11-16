@@ -15,8 +15,10 @@ What it finds, and how it knows:
 
     card number        13 to 19 digits that start like a real card (Visa, Mastercard, American
                        Express and so on) and pass the Luhn check every card number passes
-    tax file number    9 digits that pass the Tax Office's own check, or 8 to 9 digits
-                       after the words "TFN" or "tax file number"
+    tax file number    8 to 9 digits after the words "TFN" or "tax file number". Nine digits
+                       with no such words that pass the Tax Office's own check are called
+                       "a number that looks like a tax file number or an ID", because a
+                       nine-digit student ID can pass that check by chance
     Medicare number    10 or 11 digits that pass Medicare's own check, either written the
                        way the card shows them (4, 5 and 1 digits) or after the word "Medicare"
     password           what comes after "password is", "password:", "PIN is" and so on,
@@ -112,6 +114,8 @@ TFN_SHAPE = re.compile(r"(?<![0-9])(?<!\+61)(?<!\+61 )[0-9]{3}[ -]?[0-9]{3}[ -]?
 # 8 or 9 digits soon after the words, whatever the check says
 TFN_AFTER_WORDS = re.compile(r"\b(?:tfn|tax file (?:number|no\.?))\b[^0-9\n]{0,20}([0-9](?:[ -]?[0-9]){7,8})(?![0-9])", re.IGNORECASE)
 TFN_WEIGHTS = (1, 4, 3, 7, 5, 8, 6, 9, 10)
+# What nine digits that pass the check are called when no words say they are a tax file number
+TFN_OR_ID = "number that looks like a tax file number or an ID"
 
 
 def _is_tfn(text: str) -> bool:
@@ -189,7 +193,8 @@ def find(text: str) -> list[Found]:
         found.append(Found("tax file number", match.start(1), match.end(1)))
     for match in TFN_SHAPE.finditer(text):
         if _is_tfn(match[0]):
-            found.append(Found("tax file number", match.start(), match.end()))
+            # No words say what it is, and a nine-digit student ID passes the check 1 time in 11
+            found.append(Found(TFN_OR_ID, match.start(), match.end()))
     for match in MEDICARE_ON_CARD.finditer(text):
         if _is_medicare(match[0]):
             found.append(Found("Medicare number", match.start(), match.end()))
