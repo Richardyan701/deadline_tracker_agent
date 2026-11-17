@@ -2,18 +2,18 @@
 
 Model, as reported by Gemini: gemini-3.5-flash-lite.
 
-Cases scored: 63 of 63.
+Cases scored: 69 of 69.
 
 ## Overall
 
 | Check | Passed | Out of | Score |
 | --- | --- | --- | --- |
-| Whole cases (every check passed) | 62 | 63 | 98% |
-| Right tool chosen | 58 | 58 | 100% |
+| Whole cases (every check passed) | 68 | 69 | 99% |
+| Right tool chosen | 64 | 64 | 100% |
 | No tool call for an off-topic message | 5 | 5 | 100% |
-| Due date passed exactly as typed | 36 | 36 | 100% |
-| Saved deadlines correct | 34 | 35 | 97% |
-| Nothing saved that should not be | 28 | 28 | 100% |
+| Due date passed exactly as typed | 39 | 39 | 100% |
+| Saved deadlines correct | 39 | 40 | 98% |
+| Nothing saved that should not be | 29 | 29 | 100% |
 
 ## By category
 
@@ -29,6 +29,7 @@ Cases scored: 63 of 63.
 | delete | 4 | 4 | 100% |
 | off_topic | 5 | 5 | 100% |
 | injection | 4 | 4 | 100% |
+| edit | 6 | 6 | 100% |
 
 ## Failed cases
 

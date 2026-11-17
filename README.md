@@ -69,7 +69,7 @@ Measured with the real Gemini model, not just claimed:
 | --- | --- |
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
 | **Reading 1 real outline each from UNSW, USyd and Macquarie** | Every assessment, weight and week read correctly |
-| **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** with Gemini 3.5 Flash, **62 of 63** with the lighter Flash-Lite |
+| **69 realistic student messages** (dates, listing, editing, marking done, off-topic, prompt-injection attempts) | **68 of 69 passed** with the lighter Flash-Lite. Gemini 3.5 Flash passed all 63 of the earlier cases |
 | **Automated tests** | About 2,100, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
