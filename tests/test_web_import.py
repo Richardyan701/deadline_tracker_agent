@@ -32,7 +32,7 @@ from test_canvas import LINK, SECRET, event, feed
 from test_documents import DOC, FIXTURES, PPT, docx_file, odf_file, ole_file, picture, pptx_file, xlsx_file, zip_file
 from test_timetable import FIXTURE, make_pdf
 
-from deadline_agent import calendars, documents, importer, outline, tools
+from deadline_agent import calendars, documents, importer, outline, privacy, tools
 from web import app as web_app
 from web import preview as web_preview
 from web import uploads
@@ -979,3 +979,48 @@ def test_the_page_script_builds_the_session_code_from_the_typed_dates():
     assert "return `CUSTOM:${customWeek1.value}:${Number(customWeeks.value)}:${Number(customBreakAfter.value)}:${Number(customBreakWeeks.value)}`;" in code
     assert 'form.append("session", sessionCode());' in code
     assert "customField.hidden = sessionSelect.value !== CUSTOM_CHOICE;" in code
+
+
+# ---------- the sample outline ----------
+
+
+def test_the_import_page_links_to_the_sample_outline(client):
+    text = client.get("/groot/import").text
+    assert 'No outline to hand? <a href="/groot/sample-outline">Download a made-up sample outline</a>' in text
+
+
+def test_the_sample_outline_downloads_as_a_word_file(client):
+    response = client.get("/groot/sample-outline")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == web_app.DOCX_TYPE
+    assert response.headers["content-disposition"] == 'attachment; filename="sample-subject-outline-31999.docx"'
+    assert response.content == web_app.SAMPLE_OUTLINE.read_bytes()
+
+
+def test_groot_can_read_its_own_sample_outline():
+    data = web_app.SAMPLE_OUTLINE.read_bytes()
+    assert len(data) < 100 * 1024  # a small file, so it is quick to download and to read
+
+    document = documents.read_document(data, "sample-outline.docx")
+
+    assert document.kind == "docx"
+    assert "31999 Study Skills for University" in document.text
+    assert "The subject, the staff and the tasks do not exist." in document.text  # it says it is made up
+    # One row for each task, so the import shows every kind of date Groot handles
+    for row in [
+        "1 | Weekly quizzes | 10% | Each week from week 2 to week 6, Sunday 11:59pm",  # a weekly item
+        "2 | Study plan | 20% | Friday of week 4, 5:00pm",  # an exact date
+        "3 | Group presentation | 15% | Held in your tutorial in week 8",  # needs the student's date
+        "4 | Research report | 25% | Week 11",  # a week with no day, so Friday is assumed
+        "5 | Final exam | 30% | Centrally conducted exam in the exam period",  # no date yet
+    ]:
+        assert row in document.text
+    assert privacy.kinds(document.text) == []  # nothing in it looks sensitive
+
+
+def test_the_sample_outline_goes_through_the_whole_preview(client, reader):
+    # The fake reader stands in for Gemini, so this checks the upload and the page's side only
+    response = preview(client, ("Sample subject outline (31999).docx", web_app.SAMPLE_OUTLINE.read_bytes()), session="AUT2027")
+    assert response.status_code == 200
+    assert reader.names == ["Sample subject outline (31999).docx"]

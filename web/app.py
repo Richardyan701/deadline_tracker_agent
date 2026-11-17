@@ -5,6 +5,7 @@ and adds Groot's routes under /groot:
 
     GET  /groot               home page: heads up, due soon, all deadlines, add form, grades. Never uses Gemini.
     GET  /groot/import        the outline drop box
+    GET  /groot/sample-outline  download a made-up outline to try the drop box with
     POST /groot/api/add       add a deadline          JSON {"title", "due_date", "subject"}
     POST /groot/api/done      mark a deadline done    JSON {"title"}
     POST /groot/api/delete    delete a deadline       JSON {"title"}
@@ -57,6 +58,11 @@ STATIC_FILES = {
     "home.js": "text/javascript",
     "import.js": "text/javascript",
 }
+
+# A made-up subject outline that comes with Groot, so the import can be tried without a real one
+SAMPLE_OUTLINE = STATIC_DIR / "sample-outline.docx"
+SAMPLE_OUTLINE_NAME = "sample-subject-outline-31999.docx"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 SAVE_FIELDS = {"title", "due_date", "subject"}
 
@@ -142,6 +148,12 @@ def static_file(name: str) -> FileResponse:
     if name not in STATIC_FILES:
         raise HTTPException(status_code=404)
     return FileResponse(STATIC_DIR / name, media_type=STATIC_FILES[name])
+
+
+@router.get("/sample-outline")
+def sample_outline() -> FileResponse:
+    """Download the made-up sample outline. Nothing is sent anywhere until the student previews it."""
+    return FileResponse(SAMPLE_OUTLINE, media_type=DOCX_TYPE, filename=SAMPLE_OUTLINE_NAME)
 
 
 # ---------- the home page's actions ----------

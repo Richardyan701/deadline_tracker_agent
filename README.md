@@ -40,7 +40,7 @@ You need **Python 3.11 or newer** and a free **Gemini API key** from [Google AI 
    - Linux or macOS: run `./start_groot.sh`.
 
    Your browser opens the home page at <http://127.0.0.1:8000/groot>. Press Ctrl+C in the start window to stop.
-3. **Use it.** Add deadlines on the home page, import your outlines, or open the chat and say hello.
+3. **Use it.** Add deadlines on the home page, import your outlines, or open the chat and say hello. No outline to hand? The import page has a made-up sample one you can try.
 
 If something goes wrong, run the setup checker. It tells you what to fix:
 
