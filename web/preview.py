@@ -15,7 +15,7 @@ import importlib
 import logging
 from collections.abc import Callable
 
-from deadline_agent import calendars, canvas, importer, privacy, timetable, tools
+from deadline_agent import calendars, canvas, importer, model_choice, privacy, timetable, tools
 from deadline_agent.import_types import CanvasEvent, ExtractedItem, PreviewRow, TimetableClass
 
 from . import Refused
@@ -106,7 +106,7 @@ def _read_timetable(upload: Upload) -> dict[str, list[TimetableClass]] | None:
         raise Refused(
             400,
             "Groot can only read UTS timetables so far. Remove the timetable, then try again. "
-            "Nothing was sent to Gemini.",
+            f"Nothing was sent to {model_choice.ai_name()}.",
         )
     try:
         return timetable.read_timetable(upload.timetable.data, upload.session)
@@ -114,7 +114,7 @@ def _read_timetable(upload: Upload) -> dict[str, list[TimetableClass]] | None:
         raise Refused(
             400,
             f"Your timetable could not be used. {error} Remove it or choose the right file, "
-            "then try again. Nothing was sent to Gemini.",
+            f"then try again. Nothing was sent to {model_choice.ai_name()}.",
         ) from None
 
 
@@ -143,7 +143,7 @@ def _read_outline(file: UploadedFile, read: OutlineReader) -> tuple[list[Extract
     if removed:
         kinds = privacy.describe(list(dict.fromkeys(removed)))
         message += (
-            f" Before sending it to Gemini, Groot took out what looked like {kinds}, "
+            f" Before sending it to {model_choice.ai_name()}, Groot took out what looked like {kinds}, "
             "so check this outline's rows carefully."
         )
     return found, {"file": file.name, "status": "success", "message": message}

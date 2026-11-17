@@ -343,6 +343,8 @@ def test_connection_error_is_a_clear_error_without_the_link(fake_canvas):
 
 def test_the_link_is_never_logged(fake_canvas, caplog):
     caplog.set_level(logging.DEBUG)
+    # LiteLLM, once imported, turns httpx's own logging down, so turn it back up for this check
+    caplog.set_level(logging.DEBUG, logger="httpx")
     fake_canvas(lambda request: httpx.Response(200, content=feed()))
     canvas.fetch_feed(LINK)
     # httpx still logs requests to other sites, so the check above really looked at its log

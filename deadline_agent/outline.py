@@ -33,12 +33,15 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
 
-from . import documents, privacy
+from . import documents, model_choice, privacy
 from .model_choice import chosen_model
 from .tools import ISO_DATE, SUBJECT_CODE, WEEKDAY_NAMES
 
-# The same model as Groot (agent.py): gemini-3.5-flash, unless GROOT_MODEL in .env names another Gemini model.
+# The same model as Groot (agent.py): gemini-3.5-flash, unless GROOT_MODEL in .env names another model.
 MODEL = chosen_model()
+
+# What the messages call the AI behind that model, like "Gemini" or "Groq"
+AI = model_choice.provider_of(MODEL)["name"]
 
 # The key lives here, the same file adk web loads for Groot.
 ENV_FILE = Path(__file__).resolve().parent / ".env"
@@ -230,19 +233,96 @@ def _ask_gemini(document: documents.Document, client) -> str:
     return response.text
 
 
+# ---------- talking to a model from another company ----------
+
+# Other models are asked for JSON in words, because not all of them accept a response schema.
+# The answer goes through the same checks as Gemini's either way.
+SHAPE_RULE = (
+    "\n\nAnswer with one JSON object and nothing else, in exactly the shape of this JSON Schema:\n"
+    + json.dumps(RESPONSE_SCHEMA)
+)
+
+
+def _text_for_other_model(document: documents.Document) -> str:
+    """The outline as text, which is the only form every model can read.
+
+    Gemini reads a PDF or an image as the file itself. Other models get the
+    PDF's text instead, and an image or a scanned PDF cannot be used with them.
+    """
+    name = model_choice.ai_name()
+    if document.kind == "pdf" and document.mime_type:
+        text = documents.pdf_text(document.data)[: documents.MAX_TEXT_CHARS]
+        if not text.strip():
+            raise OutlineFileError(
+                f"This PDF has no text Groot can read out (it may be a scan), and Groot can only send {name} text. "
+                "Switch Groot back to a Gemini model to read it. Nothing was sent."
+            )
+        return text
+    if document.mime_type:
+        raise OutlineFileError(
+            f"Groot can only send {name} text, so it cannot read a picture with it. "
+            "Switch Groot back to a Gemini model to read pictures. Nothing was sent."
+        )
+    return document.text
+
+
+def _other_error(error: Exception, litellm) -> OutlineError:
+    """Turn an error from LiteLLM into one of our errors with a clear message."""
+    company = model_choice.provider_of(MODEL)
+    name, key = company["name"], company["key"]
+    if isinstance(error, litellm.AuthenticationError):
+        where = f"Check the {key} line in deadline_agent/.env." if key else "Check it is set up and running."
+        return OutlineKeyError(f"{name} did not accept Groot's request. {where}")
+    if isinstance(error, litellm.RateLimitError):
+        return OutlineRateLimitError(f"{name}'s limit has been reached for now. Wait a minute and try again.")
+    if isinstance(error, litellm.Timeout):
+        return OutlineTimeoutError(f"{name} took too long to read this outline. Try again in a minute.")
+    if isinstance(error, litellm.APIConnectionError):
+        return OutlineError(f"Groot could not reach {name}. Check your connection and try again.")
+    return OutlineError(f"{name} could not read this outline ({type(error).__name__}).")
+
+
+def _ask_other_model(document: documents.Document) -> str:
+    """Send the outline's text to the chosen model through LiteLLM, in one request, and return its answer."""
+    text = _text_for_other_model(document)  # refuses a picture before anything is sent
+    try:
+        import litellm
+    except ImportError:
+        raise OutlineError(
+            "The LiteLLM library that this model needs is not installed. Run the setup script again."
+        ) from None
+    load_dotenv(ENV_FILE)  # the company's key is in the same file as the Gemini key
+    text = text.replace(TEXT_START, "").replace(TEXT_END, "")  # so the file cannot fake the markers
+    messages = [
+        {"role": "system", "content": PROMPT + SHAPE_RULE},
+        {"role": "user", "content": f"{TEXT_START}\n{text}\n{TEXT_END}\n\n{QUESTION}"},
+    ]
+    try:
+        response = litellm.completion(
+            model=MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+            timeout=TIMEOUT_SECONDS,
+            num_retries=0,  # never send a second request for the same outline
+        )
+    except Exception as error:  # LiteLLM has its own error for every kind of problem
+        raise _other_error(error, litellm) from error
+    return response.choices[0].message.content
+
+
 # ---------- checking the answer ----------
 
 
 def _parse(text) -> dict:
     """Read the answer as JSON. Anything but an object with a list of items is an error."""
     if not text:
-        raise OutlineError("Gemini gave an empty answer for this outline.")
+        raise OutlineError(f"{AI} gave an empty answer for this outline.")
     try:
         answer = json.loads(text)
     except json.JSONDecodeError as error:
-        raise OutlineError(f"Gemini's answer for this outline was not valid JSON ({error.msg}).") from error
+        raise OutlineError(f"{AI}'s answer for this outline was not valid JSON ({error.msg}).") from error
     if not isinstance(answer, dict) or not isinstance(answer.get("items"), list):
-        raise OutlineError("Gemini's answer for this outline did not contain a list of items.")
+        raise OutlineError(f"{AI}'s answer for this outline did not contain a list of items.")
     return answer
 
 
@@ -304,7 +384,7 @@ def _subject_code(value) -> str:
     code = "".join(value.split()).upper() if isinstance(value, str) else ""
     if not re.fullmatch(SUBJECT_CODE, code):
         raise OutlineError(
-            "Gemini did not find a subject code like 33130 or COMP1511. Is this a subject outline "
+            f"{AI} did not find a subject code like 33130 or COMP1511. Is this a subject outline "
             "(also called a course outline, unit outline or unit guide)?"
         )
     return code
@@ -318,10 +398,10 @@ def check_item(raw, subject_code: str, subject_name: str) -> dict:
     eval/run_eval.py also uses this to check the answer keys by the same rules.
     """
     if not isinstance(raw, dict):
-        raise OutlineError("Gemini's answer for this outline had an item that was not an object.")
+        raise OutlineError(f"{AI}'s answer for this outline had an item that was not an object.")
     name = _clean_text(raw.get("name"), MAX_NAME)
     if not name:
-        raise OutlineError("Gemini's answer for this outline had an item with no name.")
+        raise OutlineError(f"{AI}'s answer for this outline had an item with no name.")
 
     item = {
         "subject_code": subject_code,
@@ -401,9 +481,12 @@ def extract_items(data: bytes, filename: str | None = None, client=None, removed
     document, kinds = without_sensitive_details(document)
     if removed is not None:
         removed += kinds
-    if client is None:
-        client = _default_client()
-    answer = _parse(_ask_gemini(document, client))
+    if client is None and not model_choice.uses_gemini(MODEL):
+        answer = _parse(_ask_other_model(document))  # a model from another company, through LiteLLM
+    else:
+        if client is None:
+            client = _default_client()
+        answer = _parse(_ask_gemini(document, client))
     subject_code = _subject_code(answer.get("subject_code"))
     subject_name = _clean_text(answer.get("subject_name"), MAX_SUBJECT_NAME)
     return [check_item(raw, subject_code, subject_name) for raw in answer["items"]]

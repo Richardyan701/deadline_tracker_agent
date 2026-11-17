@@ -608,14 +608,16 @@ def fake_gemini(monkeypatch):
 
 
 def test_online_check_warns_first_and_sends_exactly_one_request(all_good, fake_gemini, capsys):
+    from deadline_agent.agent import root_agent  # its model is gemini-3.5-flash unless your .env sets GROOT_MODEL
+
     assert check_setup.main(["--online"]) == 0
 
     output = capsys.readouterr().out
     warning = output.index("Now sending one real request to Gemini. This uses 1 of your 20 free requests for today.")
-    assert warning < output.index("✓ Gemini answered, so your key works (gemini-3.5-flash)")
+    assert warning < output.index(f"✓ Gemini answered, so your key works ({root_agent.model})")
     assert len(fake_gemini.requests) == 1
     request = fake_gemini.requests[0]
-    assert request.url.path.endswith("/models/gemini-3.5-flash:generateContent")  # Groot's own model
+    assert request.url.path.endswith(f"/models/{root_agent.model}:generateContent")  # Groot's own model
     assert request.headers["x-goog-api-key"] == FAKE_KEY  # the key from .env was used
     assert FAKE_KEY not in output  # but never shown
 

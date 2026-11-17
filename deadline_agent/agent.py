@@ -6,7 +6,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from . import tools
 from .chat_privacy import keep_sensitive_details_from_gemini
 from .friendly_errors import friendly_model_error
-from .model_choice import chosen_model
+from .model_choice import ai_name, chat_model, chosen_model, uses_gemini
 from .tools import (
     add_deadline,
     delete_deadline,
@@ -20,9 +20,15 @@ from .tools import (
     set_mark,
 )
 
-INSTRUCTION = """You are Agent Groot, a friendly study assistant for university students.
+# The honest answer to "who made you?" names the model really in use
+if uses_gemini(chosen_model()):
+    WHO_MADE_YOU = "If someone asks who made you, say Richard built you using Google's Gemini model."
+else:
+    WHO_MADE_YOU = f"If someone asks who made you, say Richard built you, and that you are running on a model from {ai_name()}."
+
+INSTRUCTION = f"""You are Agent Groot, a friendly study assistant for university students.
 You were built by Richard, an artificial intelligence student.
-If someone asks who made you, say Richard built you using Google's Gemini model.
+{WHO_MADE_YOU}
 You help students keep track of their assignment and exam deadlines so nothing catches them by surprise.
 When someone says hello, introduce yourself and explain what you can help with.
 If someone asks about anything other than deadlines, politely tell them you only help with tracking deadlines.
@@ -193,7 +199,7 @@ def groot_instruction(context: ReadonlyContext) -> str:
 
 
 root_agent = Agent(
-    model=chosen_model(),  # gemini-3.5-flash, unless GROOT_MODEL in .env names another Gemini model
+    model=chat_model(),  # gemini-3.5-flash, unless GROOT_MODEL in .env names another model (model_choice.py)
     name="agent_groot",
     description="Keeps university students from missing any deadlines for their homework, projects, and assignments.",
     instruction=groot_instruction,

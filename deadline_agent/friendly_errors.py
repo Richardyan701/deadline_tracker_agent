@@ -30,7 +30,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import errors, types
 
-from . import tools
+from . import model_choice, tools
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,50 @@ def friendly_model_error(
     return LlmResponse(content=types.Content(role="model", parts=[types.Part.from_text(text=message)]))
 
 
+def other_company_message(error: Exception, model: str | None = None) -> str | None:
+    """The reply for an error from a model that is not Gemini, or None for an error we do not know.
+
+    Models from other companies are run through LiteLLM (see model_choice.py),
+    which raises its own kinds of error. LiteLLM is only imported here, when
+    such a model is in use, so Groot works without it.
+    """
+    model = model or model_choice.chosen_model()
+    if model_choice.uses_gemini(model):
+        return None
+    try:
+        import litellm
+    except ImportError:
+        return None
+    company = model_choice.provider_of(model)
+    name, key = company["name"], company["key"]
+    if isinstance(error, litellm.AuthenticationError):
+        if key is None:
+            return f"{name} refused the request, so please check it is set up and running, then try again."
+        return (
+            f"{name} did not accept your API key, so please check the {key} line in deadline_agent/.env "
+            "has your whole key, then restart Groot."
+        )
+    if isinstance(error, litellm.RateLimitError):
+        return f"{name}'s limit has been reached for now. Wait a minute and try again. " + SAFE
+    if isinstance(error, litellm.Timeout):
+        return f"{name} took too long to answer, so please send your message again."
+    if isinstance(error, litellm.NotFoundError):
+        return (
+            f"{name} does not know the model '{model.partition('/')[2]}', so please check the GROOT_MODEL line in "
+            "deadline_agent/.env, then restart Groot."
+        )
+    if isinstance(error, litellm.APIConnectionError):
+        if key is None:
+            return f"I can't reach {name} on this computer, so please check it is running, then send your message again."
+        return f"I can't reach {name}, so please check your internet connection and send your message again."
+    return None
+
+
 def friendly_message(error: Exception) -> str | None:
     """The reply for an error a student can do something about, or None for any other error."""
+    other = other_company_message(error)
+    if other is not None:
+        return other
     if isinstance(error, ValueError) and str(error).startswith(MISSING_KEY_TEXT):
         return NO_KEY
     if not isinstance(error, errors.APIError):

@@ -70,7 +70,7 @@ Measured with the real Gemini model, not just claimed:
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
 | **Reading 1 real outline each from UNSW, USyd and Macquarie** | Every assessment, weight and week read correctly |
 | **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** with Gemini 3.5 Flash, **62 of 63** with the lighter Flash-Lite |
-| **Automated tests** | About 2,000, run on Python 3.11, 3.13 and 3.14 on every change |
+| **Automated tests** | About 2,100, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
 
@@ -111,6 +111,7 @@ Because both give you one place to keep your study life in order: a list of task
 
 - **The free limit on the default model is small:** about 20 requests a day, which is roughly 8 to 10 chat messages. Groot tells you politely when you hit it, and the home page never uses the AI.
 - **You can get a much bigger limit for free.** Add `GROOT_MODEL=gemini-3.5-flash-lite` to `deadline_agent/.env` and restart. Flash-Lite ran more than 120 requests in one evening without hitting a limit. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
+- **You can use another company's AI instead:** Groq, OpenAI (ChatGPT), Anthropic (Claude), xAI (Grok), DeepSeek, OpenRouter, or a model on your own computer with Ollama. It takes two lines in `.env`, and Groot's pages then say where your words go. Only Gemini models have been measured, and other models read outlines as text only. See [Using a model from another company](docs/reference.md#using-a-model-from-another-company).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
 - **Four Sydney universities are built in, up to the end of 2027.** Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. For any other university or term, you type the session's dates yourself.
 - **Groot runs on Sydney time** and only knows NSW public holidays, so outside the eastern states "due soon" can be a few hours out.

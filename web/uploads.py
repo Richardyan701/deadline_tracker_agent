@@ -25,7 +25,7 @@ from python_multipart import MultipartParser
 from python_multipart.exceptions import FormParserError
 from python_multipart.multipart import parse_options_header
 
-from deadline_agent import documents
+from deadline_agent import documents, model_choice
 
 from . import Refused
 
@@ -190,7 +190,7 @@ def _checked(parts: list[_Part]) -> Upload:
         try:
             documents.detect_kind(outline.data, outline.name)
         except documents.DocumentError as error:
-            raise Refused(400, f"{outline.name}: {error} Nothing was sent to Gemini.") from None
+            raise Refused(400, f"{outline.name}: {error} Nothing was sent to {model_choice.ai_name()}.") from None
     for timetable in files["timetable"]:
         # The timetable reader only reads the PDF export of the UTS timetable, and every PDF starts with %PDF-
         if not timetable.data.startswith(documents.PDF_START):

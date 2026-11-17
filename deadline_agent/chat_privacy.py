@@ -26,7 +26,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from . import privacy
+from . import model_choice, privacy
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 def not_sent_message(found_kinds: list[str]) -> str:
     """What Groot says instead of sending the message on."""
     return (
-        f"I did not send your last message to Gemini, because it looks like it contains {privacy.describe(found_kinds)}. "
+        f"I did not send your last message to {model_choice.ai_name()}, because it looks like it contains "
+        f"{privacy.describe(found_kinds)}. "
         "I never need details like that, and nothing was saved. Please send your message again without it."
     )
 
@@ -88,6 +89,6 @@ def keep_sensitive_details_from_gemini(callback_context: CallbackContext, llm_re
     if contents and contents[-1].role == "user" and found_in[-1]:
         kinds = list(dict.fromkeys(found_in[-1]))
         # Only the kinds are logged, never the details themselves
-        logger.warning("A chat message was not sent to Gemini because it looked like it contained: %s", ", ".join(kinds))
+        logger.warning("A chat message was not sent to the AI model because it looked like it contained: %s", ", ".join(kinds))
         return LlmResponse(content=types.Content(role="model", parts=[types.Part.from_text(text=not_sent_message(kinds))]))
     return None
