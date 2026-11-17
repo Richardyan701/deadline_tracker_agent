@@ -33,6 +33,16 @@ DEFAULT_MODEL = "gemini-3.5-flash"
 # The setting's name in deadline_agent/.env
 SETTING = "GROOT_MODEL"
 
+# The Gemini models Groot moves on to, in this order, when the chosen one is
+# too busy ("high demand", which is common on the free tier) or has used up
+# its free allowance. Google runs each model separately and gives each its
+# own allowance, and they all use the same key, so this costs nothing.
+# Only the first two were measured (see docs/reference.md).
+BACKUP_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+
+# Set GROOT_BACKUPS=off in .env to use only the chosen model
+BACKUPS_SETTING = "GROOT_BACKUPS"
+
 # The same file the keys live in
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 
@@ -105,15 +115,48 @@ def ai_name() -> str:
     return provider_of(chosen_model())["name"]
 
 
+def model_chain() -> list[str]:
+    """The models to try, in order: the chosen one, then the backups.
+
+    Only a Gemini model gets backups, and only Gemini ones, so the student's
+    words never go to a company the pages do not name. GROOT_BACKUPS=off
+    gives the chosen model alone.
+    """
+    model = chosen_model()
+    if not uses_gemini(model) or os.environ.get(BACKUPS_SETTING, "").strip().lower() == "off":
+        return [model]
+    return [model] + [backup for backup in BACKUP_MODELS if backup != model]
+
+
+def chat_model_alone():
+    """The chosen model with no backups, for measuring one model on its own (the chat evaluation)."""
+    model = chosen_model()
+    if uses_gemini(model):
+        return model
+    from google.adk.models.lite_llm import LiteLlm
+
+    return LiteLlm(model=model)
+
+
 def chat_model():
-    """What ADK's Agent needs as its model: the name for a Gemini model, or a LiteLlm object for any other.
+    """What ADK's Agent needs as its model.
+
+    For a Gemini model it is ADK's FallbackModel over model_chain(): each
+    model is tried once, and a busy, used up or missing model hands the
+    request to the next one. For any other company it is a LiteLlm object.
 
     LiteLLM is an extra library. If it is not installed, Groot says so and
     falls back to the default Gemini model instead of failing to start.
     """
     model = chosen_model()
     if uses_gemini(model):
-        return model
+        chain = model_chain()
+        if len(chain) == 1:
+            return model
+        from google.adk.models import FallbackModel
+
+        # 404 is added so a backup that Google has retired is skipped instead of stopping the chat
+        return FallbackModel(models=chain, retriable_status_codes=FallbackModel.DEFAULT_STATUS_CODES | {404})
     try:
         from google.adk.models.lite_llm import LiteLlm
     except ImportError:

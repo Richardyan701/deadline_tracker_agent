@@ -57,7 +57,8 @@ def test_root_agent_has_all_ten_tools():
 def test_name_and_model_are_unchanged():
     assert root_agent.name == "agent_groot"
     # gemini-3.5-flash, unless GROOT_MODEL in your own .env names another Gemini model (see test_model_choice.py)
-    assert root_agent.model == outline.MODEL
+    assert root_agent.model.model == outline.MODEL  # the first model of the chain, see test_model_choice.py
+    assert root_agent.model.models == ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 
 
 def test_instruction_includes_today_in_sydney(monkeypatch):

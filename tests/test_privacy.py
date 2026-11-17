@@ -393,3 +393,44 @@ def test_details_inside_a_tool_result_are_taken_out_too():
         "status": "success", "deadlines": [{"title": "Pay with [removed]", "subject": "", "done": False}], "count": 1,
     }  # fmt: skip
     assert found == ["card number"]
+
+
+# ---------- a busy model hands the chat over to a backup ----------
+
+
+def test_a_busy_model_hands_the_message_to_the_next_one():
+    from google.adk.models import FallbackModel
+
+    asked = []
+
+    def fake_network(request):
+        model = request.url.path.split("/models/")[1].split(":")[0]
+        asked.append(model)
+        if model == "gemini-3.5-flash":
+            return httpx.Response(503, json={"error": {"code": 503, "status": "UNAVAILABLE", "message": "high demand"}})
+        return httpx.Response(200, json=gemini_says("Hi! I'm Groot."))
+
+    async def run():
+        client = genai.Client(
+            api_key="fake-key-for-tests",
+            http_options=types.HttpOptions(async_client_args={"transport": httpx.MockTransport(fake_network)}),
+        )
+        models = [Gemini(model=name, client=client) for name in ("gemini-3.5-flash", "gemini-3.5-flash-lite")]
+        groot = root_agent.model_copy(update={"model": FallbackModel(models=models)})
+        runner = InMemoryRunner(agent=groot, app_name="groot_test")
+        session = await runner.session_service.create_session(app_name="groot_test", user_id="student")
+        content = types.Content(role="user", parts=[types.Part.from_text(text="hi")])
+        texts = []
+        async for event in runner.run_async(user_id="student", session_id=session.id, new_message=content):
+            if event.content and event.content.parts:
+                texts += [part.text for part in event.content.parts if part.text]
+        return texts
+
+    assert asyncio.run(run()) == ["Hi! I'm Groot."]
+    assert asked[0] == "gemini-3.5-flash" and asked[-1] == "gemini-3.5-flash-lite"
+
+
+def test_a_card_number_is_never_sent_to_the_backup_either():
+    # The check runs before the model is chosen, so no model in the chain ever sees the message
+    shown, sent = chat(f"my card is {CARD}")
+    assert sent == []

@@ -434,7 +434,7 @@ def test_an_outline_can_be_any_kind_of_file_groot_reads(tmp_path, monkeypatch):
     (tmp_path / "22222.PDF").write_bytes(pdf("22222"))  # capital letters in the ending are fine
     calls = []
 
-    def fake_extract_items(data, filename=None, client=None):
+    def fake_extract_items(data, filename=None, client=None, backups=True):
         calls.append((data, filename, client))
         return []
 

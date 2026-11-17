@@ -8,6 +8,7 @@ of a long red error:
 - 429 RESOURCE_EXHAUSTED: a free-tier limit is used up, per day or per minute
 - no API key, or a key that Google says is not valid
 - 504 DEADLINE_EXCEEDED: Gemini took too long to answer
+- 503 UNAVAILABLE: Google's servers are too busy ("high demand"), common at busy hours on the free tier
 
 For any other error it returns None, and ADK then raises that error exactly as
 before, so nothing else is hidden.
@@ -49,6 +50,11 @@ BAD_KEY = (
     "paste the whole key and then restart Groot."
 )
 TIMEOUT = "Gemini took too long to answer, so please send your message again."
+# 503: Google's servers are busy, which is not the student's limit
+BUSY = (
+    "Gemini is very busy right now. That is at Google's end, not your limit, "
+    "so please send your message again in a minute. " + SAFE
+)
 DAILY_LIMIT = "Gemini's free daily limit is used up."
 MINUTE_LIMIT = "That was a lot of messages in a minute."
 # For a 429 that does not say which limit ran out
@@ -129,6 +135,8 @@ def friendly_message(error: Exception) -> str | None:
         return BAD_KEY
     if error.code == 504:
         return TIMEOUT
+    if error.code == 503:
+        return BUSY
     return None
 
 

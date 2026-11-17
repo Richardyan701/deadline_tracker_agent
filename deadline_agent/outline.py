@@ -24,6 +24,7 @@ docs/superpowers/specs/2026-11-04-outline-dropbox-design.md):
 
 import dataclasses
 import json
+import logging
 import re
 from datetime import date
 from pathlib import Path
@@ -67,6 +68,18 @@ NEEDED_FIELD = {"date": "date", "week": "week", "recurring": "first_week"}
 KEY_MESSAGE = "Groot could not find a valid Gemini API key. Run the setup script again."
 RATE_LIMIT_MESSAGE = "Gemini's free tier is busy. Wait a minute and try again."
 TIMEOUT_MESSAGE = "Gemini took too long to read this outline. Try again in a minute."
+BUSY_MESSAGE = (
+    "Gemini is very busy right now. That is at Google's end, not your limit, so wait a minute and try again."
+)
+
+# Errors that mean "this model cannot answer right now, another might": too many requests
+# or a used up allowance (429), a problem or overload at Google's end (500, 502, 503), or a
+# model Google has retired (404). The next backup model is tried for these. A timeout (504)
+# is not on the list, because the outline may already have been read, and every other
+# error would happen again with any model.
+TRY_NEXT_MODEL = {404, 429, 500, 502, 503}
+
+logger = logging.getLogger(__name__)
 
 
 class OutlineError(Exception):
@@ -83,6 +96,10 @@ class OutlineRateLimitError(OutlineError):
 
 class OutlineTimeoutError(OutlineError):
     """Gemini did not answer in time."""
+
+
+class OutlineBusyError(OutlineError):
+    """Gemini's servers were too busy to answer (HTTP 503), twice in a row."""
 
 
 class OutlineFileError(OutlineError):
@@ -201,6 +218,8 @@ def _api_error(error: errors.APIError) -> OutlineError:
         return OutlineRateLimitError(RATE_LIMIT_MESSAGE)
     if error.code == 504:  # Gemini's own "took too long" (DEADLINE_EXCEEDED)
         return OutlineTimeoutError(TIMEOUT_MESSAGE)
+    if error.code == 503:  # "This model is currently experiencing high demand"
+        return OutlineBusyError(BUSY_MESSAGE)
     return OutlineError(f"Gemini could not read this outline (error {error.code} {error.status}: {error.message})")
 
 
@@ -212,8 +231,15 @@ def _outline_part(document: documents.Document) -> types.Part:
     return types.Part.from_text(text=f"{TEXT_START}\n{text}\n{TEXT_END}")
 
 
-def _ask_gemini(document: documents.Document, client) -> str:
-    """Send the outline to Gemini in one request and return the text of its answer."""
+def _ask_gemini(document: documents.Document, client, backups: bool = True) -> str:
+    """Send the outline to Gemini in one request and return the text of its answer.
+
+    MODEL is asked first. If it cannot answer right now (see TRY_NEXT_MODEL),
+    for example "This model is currently experiencing high demand", the next
+    of its backup Gemini models (model_choice.BACKUP_MODELS) is asked, with
+    the same key. Each model is asked at most once, and a busy reply is not
+    an answer, so this never reads one outline twice.
+    """
     config = types.GenerateContentConfig(
         system_instruction=PROMPT,
         response_mime_type="application/json",
@@ -222,15 +248,26 @@ def _ask_gemini(document: documents.Document, client) -> str:
         http_options=types.HttpOptions(timeout=TIMEOUT_SECONDS * 1000),  # in milliseconds
     )
     contents = [_outline_part(document), QUESTION]
-    try:
-        response = client.models.generate_content(model=MODEL, contents=contents, config=config)
-    except httpx.TimeoutException as error:
-        raise OutlineTimeoutError(TIMEOUT_MESSAGE) from error
-    except httpx.TransportError as error:  # no internet, for example
-        raise OutlineError("Groot could not reach Gemini. Check your internet connection and try again.") from error
-    except errors.APIError as error:
-        raise _api_error(error) from error
-    return response.text
+    models = _models_to_try() if backups else [MODEL]
+    for model in models:
+        try:
+            response = client.models.generate_content(model=model, contents=contents, config=config)
+        except httpx.TimeoutException as error:
+            raise OutlineTimeoutError(TIMEOUT_MESSAGE) from error
+        except httpx.TransportError as error:  # no internet, for example
+            raise OutlineError("Groot could not reach Gemini. Check your internet connection and try again.") from error
+        except errors.APIError as error:
+            if error.code in TRY_NEXT_MODEL and model != models[-1]:
+                logger.warning("%s could not read the outline (%s %s), so Groot is trying a backup model.",
+                               model, error.code, error.status)
+                continue
+            raise _api_error(error) from error
+        return response.text
+
+
+def _models_to_try() -> list[str]:
+    """MODEL, then its backups. Only Gemini models are tried here, all with the same key."""
+    return [MODEL] + [model for model in model_choice.model_chain()[1:] if model != MODEL]
 
 
 # ---------- talking to a model from another company ----------
@@ -458,7 +495,9 @@ def without_sensitive_details(document: documents.Document) -> tuple[documents.D
 # ---------- reading one outline ----------
 
 
-def extract_items(data: bytes, filename: str | None = None, client=None, removed: list | None = None) -> list[dict]:
+def extract_items(
+    data: bytes, filename: str | None = None, client=None, removed: list | None = None, backups: bool = True
+) -> list[dict]:
     """Ask Gemini for every deadline in one outline file and return them as checked dicts.
 
     data is the file's bytes. filename, for example "33130.docx", is only a
@@ -469,6 +508,7 @@ def extract_items(data: bytes, filename: str | None = None, client=None, removed
     Anything like a card number or a password is taken out before the
     outline is sent (see without_sensitive_details). Pass a list as removed
     to find out what was taken out: the kinds, like "card number", are added to it.
+    With backups=False only MODEL is asked, even if it is busy (eval/run_eval.py uses this).
 
     Raises OutlineError (or one of its kinds above) when the outline cannot be
     read. A file that cannot be used is refused before anything is sent. It
@@ -486,7 +526,7 @@ def extract_items(data: bytes, filename: str | None = None, client=None, removed
     else:
         if client is None:
             client = _default_client()
-        answer = _parse(_ask_gemini(document, client))
+        answer = _parse(_ask_gemini(document, client, backups))
     subject_code = _subject_code(answer.get("subject_code"))
     subject_name = _clean_text(answer.get("subject_name"), MAX_SUBJECT_NAME)
     return [check_item(raw, subject_code, subject_name) for raw in answer["items"]]

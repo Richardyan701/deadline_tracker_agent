@@ -172,7 +172,8 @@ def read_outlines(codes: list, outlines_dir: Path, client=None) -> dict:
                 sleep(wait)
         last_start = monotonic()
         print(f"Reading {path.name} with {outline.MODEL}...")
-        found[code] = outline.extract_items(path.read_bytes(), filename=path.name, client=client)
+        # backups=False measures one model on its own: a busy model stops the run instead of handing over
+        found[code] = outline.extract_items(path.read_bytes(), filename=path.name, client=client, backups=False)
     return found
 
 

@@ -121,7 +121,7 @@ def test_gemini_models_are_googles_and_use_the_google_key():
 def test_chat_model_is_the_name_for_gemini_and_a_litellm_object_for_another_company(monkeypatch):
     from google.adk.models.lite_llm import LiteLlm
 
-    assert model_choice.chat_model() == DEFAULT_MODEL
+    assert model_choice.chat_model_alone() == DEFAULT_MODEL  # chat_model() adds the backups, see below
     monkeypatch.setenv("GROOT_MODEL", "groq/openai/gpt-oss-120b")
     model = model_choice.chat_model()
     assert isinstance(model, LiteLlm)
@@ -136,3 +136,39 @@ def test_without_the_litellm_library_groot_falls_back_to_gemini_with_a_warning(m
     with caplog.at_level(logging.WARNING, logger="deadline_agent.model_choice"):
         assert model_choice.chat_model() == DEFAULT_MODEL
     assert "the LiteLLM library that other companies' models need is not installed" in caplog.text
+
+
+# ---------- backup models for when one is busy ----------
+
+
+def test_a_gemini_model_gets_the_other_gemini_models_as_backups():
+    assert model_choice.model_chain() == ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+
+
+def test_the_chosen_model_goes_first_and_is_not_repeated(monkeypatch):
+    monkeypatch.setenv("GROOT_MODEL", "gemini-3.5-flash-lite")
+    assert model_choice.model_chain() == ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+    monkeypatch.setenv("GROOT_MODEL", "gemma-4-31b-it")
+    assert model_choice.model_chain()[0] == "gemma-4-31b-it" and len(model_choice.model_chain()) == 4
+
+
+@pytest.mark.parametrize("value", ["off", "OFF", " Off "])
+def test_backups_can_be_turned_off(monkeypatch, value):
+    monkeypatch.setenv("GROOT_BACKUPS", value)
+    assert model_choice.model_chain() == ["gemini-3.5-flash"]
+    assert model_choice.chat_model() == "gemini-3.5-flash"
+
+
+def test_another_companys_model_gets_no_backups(monkeypatch):
+    # A backup would send the student's words to Google while the pages name the other company
+    monkeypatch.setenv("GROOT_MODEL", "groq/openai/gpt-oss-120b")
+    assert model_choice.model_chain() == ["groq/openai/gpt-oss-120b"]
+
+
+def test_the_chat_model_moves_on_when_one_is_busy_used_up_or_retired():
+    from google.adk.models import FallbackModel
+
+    model = model_choice.chat_model()
+    assert isinstance(model, FallbackModel)
+    assert model.models == model_choice.model_chain()
+    assert {404, 429, 500, 502, 503, 504} <= model.retriable_status_codes

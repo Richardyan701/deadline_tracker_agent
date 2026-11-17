@@ -110,6 +110,7 @@ Because both give you one place to keep your study life in order: a list of task
 ## Things to know
 
 - **The free limit on the default model is small:** about 20 requests a day, which is roughly 8 to 10 chat messages. Groot tells you politely when you hit it, and the home page never uses the AI.
+- **When Gemini is busy** ("high demand"), Groot quietly hands your message to another free Gemini model with the same key. You only see an error if they are all busy. See [When Gemini is busy](docs/reference.md#when-gemini-is-busy).
 - **You can get a much bigger limit for free.** Add `GROOT_MODEL=gemini-3.5-flash-lite` to `deadline_agent/.env` and restart. Flash-Lite ran more than 120 requests in one evening without hitting a limit. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
 - **You can use another company's AI instead:** Groq, OpenAI (ChatGPT), Anthropic (Claude), xAI (Grok), DeepSeek, OpenRouter, or a model on your own computer with Ollama. It takes two lines in `.env`, and Groot's pages then say where your words go. Only Gemini models have been measured, and other models read outlines as text only. See [Using a model from another company](docs/reference.md#using-a-model-from-another-company).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.

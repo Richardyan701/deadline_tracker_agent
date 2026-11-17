@@ -22,6 +22,8 @@ from google.genai import errors, types
 from deadline_agent import tools
 from deadline_agent.agent import root_agent
 from deadline_agent.friendly_errors import (
+    BUSY,
+    SAFE,
     BAD_KEY,
     NO_KEY,
     SOME_LIMIT,
@@ -199,8 +201,7 @@ def test_limit_after_a_tool_ran_keeps_the_saved_deadline():
 @pytest.mark.parametrize(
     "status, body",
     [
-        (503, error_body(503, "UNAVAILABLE")),  # Gemini is overloaded
-        (500, error_body(500, "INTERNAL")),
+        (501, error_body(501, "NOT_IMPLEMENTED")),
         (404, error_body(404, "NOT_FOUND")),  # for example a model name that does not exist
         (400, error_body(400, "INVALID_ARGUMENT")),  # a bad request that is not about the key
         (403, error_body(403, "PERMISSION_DENIED")),
@@ -355,3 +356,12 @@ def test_replies_are_short_and_have_no_dashes_or_semicolons():
     # The key and timeout replies are one sentence each
     for reply in (BAD_KEY, NO_KEY, TIMEOUT):
         assert reply.count(". ") == 0 and reply.endswith(".")
+
+
+# ---------- a busy model ----------
+
+
+def test_a_busy_model_gets_a_reply_that_says_it_is_not_the_students_limit():
+    texts = chat((503, error_body(503, "UNAVAILABLE")))
+    assert texts == [BUSY]
+    assert "not your limit" in BUSY and SAFE in BUSY

@@ -31,6 +31,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai import errors, types
 
 from deadline_agent import tools
+from deadline_agent import model_choice
 from deadline_agent.agent import root_agent
 
 HERE = Path(__file__).resolve().parent
@@ -304,8 +305,11 @@ def evaluation_agent():
     In normal use a limit error becomes a polite message (deadline_agent/friendly_errors.py). Here that
     message would be scored as if it were Groot's real answer, so the error must reach run_all instead,
     which stops the run without saving the case, and the next run carries on from there.
+
+    The backup models are left out too (model_choice.py), so every case is answered by the one model
+    being measured, and the scores say which model they belong to.
     """
-    return root_agent.model_copy(update={"on_model_error_callback": None})
+    return root_agent.model_copy(update={"on_model_error_callback": None, "model": model_choice.chat_model_alone()})
 
 
 def main(argv=None) -> None:
