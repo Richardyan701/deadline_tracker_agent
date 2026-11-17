@@ -376,14 +376,17 @@ The key stays hidden while you paste it, and `deadline_agent/.env` is made reada
 
 ### What the setup writes
 
-`deadline_agent/.env` holds two lines, the same two that ADK's own `adk create` command writes for a Gemini API key:
+`deadline_agent/.env` holds three lines. The first two are the same two that ADK's own `adk create` command writes for a Gemini API key, and the third is the model you picked when the setup asked:
 
 ```
 GOOGLE_GENAI_USE_ENTERPRISE=0
 GOOGLE_API_KEY=your key
+GROOT_MODEL=gemini-3.5-flash-lite
 ```
 
-`deadline_agent/.env.example` shows the same thing with a placeholder key. Never commit `.env`, because it holds your key. It is already listed in `.gitignore`, and the GitHub Actions check fails if one is committed.
+The setup offers two models. `gemini-3.5-flash-lite` (press 1, or just Enter) has a much bigger free daily limit. `gemini-3.5-flash` (press 2) was a little more accurate in the chat test, 63 of 63 against 62 of 63, but allows only about 20 requests a day. You can change it later on the `GROOT_MODEL` line.
+
+`deadline_agent/.env.example` shows the same thing with a placeholder key, plus the optional settings: turning off the backup models, and using another company's model. Never commit `.env`, because it holds your key. It is already listed in `.gitignore`, and the GitHub Actions check fails if one is committed.
 
 The scripts do not run `adk create`, because the agent already exists in `deadline_agent`, and `adk create` would offer to replace `agent.py` with a blank template.
 

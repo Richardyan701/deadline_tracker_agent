@@ -4,7 +4,8 @@
 # 1. Checks that Python is 3.11 or newer.
 # 2. Creates a virtual environment in .venv.
 # 3. Installs the packages in requirements.txt.
-# 4. Saves your Gemini API key in deadline_agent/.env (hidden while you paste it).
+# 4. Saves your Gemini API key in deadline_agent/.env (hidden while you paste it),
+#    and which Gemini model Groot should use.
 #
 # Run it with:   ./setup.sh
 # To use a different Python, for example:   PYTHON=python3.12 ./setup.sh
@@ -53,7 +54,18 @@ if [ "$replace" = "y" ] || [ "$replace" = "Y" ]; then
     printf 'GOOGLE_GENAI_USE_ENTERPRISE=0\nGOOGLE_API_KEY=%s\n' "$key" > "$ENV_FILE"
     chmod 600 "$ENV_FILE"
     unset key
-    echo "Saved. Only your user account can read $ENV_FILE."
+    echo
+    echo "Which Gemini model should Groot use?"
+    echo "  1. gemini-3.5-flash-lite: a much bigger free daily limit (recommended)"
+    echo "  2. gemini-3.5-flash: a little more accurate, but only about 20 requests a day"
+    model="gemini-3.5-flash-lite"
+    read -r -p "Type 1 or 2 and press Enter (Enter alone picks 1): " choice || true
+    if [ "$choice" = "2" ]; then
+        model="gemini-3.5-flash"
+    fi
+    printf 'GROOT_MODEL=%s\n' "$model" >> "$ENV_FILE"
+    echo "Saved, with $model. Only your user account can read $ENV_FILE."
+    echo "You can change the model later on the GROOT_MODEL line of $ENV_FILE."
 else
     echo "Kept your existing $ENV_FILE."
 fi
