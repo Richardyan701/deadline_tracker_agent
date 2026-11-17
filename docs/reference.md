@@ -411,6 +411,19 @@ This one server runs Groot's own pages and ADK's chat together, on port 8000. It
 
 Groot uses Gemini's free tier, which Google limits to about 5 requests per minute and 20 requests per day for each model. Google resets the daily limit at midnight Pacific time, which is between 5 PM and 7 PM in Sydney. Google sets these limits and can change them, see [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
 
+### When Gemini is busy
+
+On the free tier, Google sometimes answers "This model is currently experiencing high demand" (error 503). That is Google's servers being busy, not your limit running out, and it can happen at any time of day.
+
+Groot handles it for you. Google runs each Gemini model separately, so when one is busy or has used up its free allowance, Groot asks the next one, with the same key and at no cost: your chosen model first, then `gemini-3.5-flash-lite`, `gemini-3.5-flash` and `gemini-3.1-flash-lite`. Each model is asked at most once, so a message or an outline is never answered twice. Only when every one of them is busy does Groot say so, and then it is worth waiting a minute.
+
+Things to know:
+
+- **Only Gemini models are used as backups,** so your words never go to another company without you choosing it.
+- **The backups were not all measured.** The chat was measured with `gemini-3.5-flash` and `gemini-3.5-flash-lite`. `gemini-3.1-flash-lite` is an older, lighter model, so if it ever answers, check its work.
+- **A timeout is not handed over,** because the first model may already have read the outline.
+- **To turn backups off,** add `GROOT_BACKUPS=off` to `deadline_agent/.env`. Both evaluations always turn them off, so their scores belong to one model.
+
 ### Choosing another Gemini model
 
 Google gives each model its own free allowance, so a lighter model can have a much bigger daily limit on the same key. To switch, add one line to `deadline_agent/.env` and restart Groot:

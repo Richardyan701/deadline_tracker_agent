@@ -205,18 +205,20 @@ def check_gemini():
     from google import genai
     from google.genai import errors, types
 
-    from .agent import root_agent
     from .friendly_errors import friendly_message
+    from .model_choice import DEFAULT_MODEL, chosen_model, uses_gemini
 
+    # This checks the Google key, so a model from another company is swapped for the default Gemini one
+    model = chosen_model() if uses_gemini(chosen_model()) else DEFAULT_MODEL
     client = genai.Client(api_key=read_api_key(), http_options=types.HttpOptions(timeout=30_000))  # 30 seconds
     try:
-        client.models.generate_content(model=root_agent.model, contents="Reply with just the word OK.")
+        client.models.generate_content(model=model, contents="Reply with just the word OK.")
     except errors.APIError as error:
         reason = friendly_message(error) or f"Gemini answered with an error: {error.code} {error.status}"
         return False, reason, "Follow the advice above, then run this check again with --online."
     except httpx.HTTPError as error:  # no internet, or no answer in 30 seconds
         return False, f"Could not reach Gemini ({type(error).__name__})", "Check your internet connection, then try again."
-    return True, f"Gemini answered, so your key works ({root_agent.model})", ""
+    return True, f"Gemini answered, so your key works ({model})", ""
 
 
 # ---------- running them ----------

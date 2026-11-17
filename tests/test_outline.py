@@ -555,13 +555,83 @@ def test_api_errors_become_clear_errors(error, kind, message):
 
 
 def test_other_gemini_errors_say_what_went_wrong():
-    error = errors.ServerError(503, {"error": {"code": 503, "status": "UNAVAILABLE",
-                                               "message": "The model is overloaded."}})
+    error = errors.ServerError(501, {"error": {"code": 501, "status": "NOT_IMPLEMENTED",
+                                               "message": "That is not supported."}})
+    client = FakeClient(error=error)
     with pytest.raises(OutlineError) as caught:
-        extract_items(PDF, client=FakeClient(error=error))
+        extract_items(PDF, client=client)
     assert type(caught.value) is OutlineError
-    assert "503 UNAVAILABLE" in str(caught.value)
-    assert "The model is overloaded." in str(caught.value)
+    assert "501 NOT_IMPLEMENTED" in str(caught.value)
+    assert "That is not supported." in str(caught.value)
+    assert len(client.models.calls) == 1  # an error that any model would give is not tried again
+
+
+# ---------- a busy model hands over to a backup ----------
+
+
+def busy(code=503, status="UNAVAILABLE"):
+    return errors.ServerError(code, {"error": {"code": code, "status": status,
+                                               "message": "This model is currently experiencing high demand."}})
+
+
+class ChangingModels:
+    """Stands in for client.models. Gives each request the next of replies: an error to raise, or an answer."""
+
+    def __init__(self, *replies):
+        self.replies = list(replies)
+        self.calls = []
+
+    def generate_content(self, *, model, contents, config):
+        self.calls.append(model)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return SimpleNamespace(text=json.dumps(reply))
+
+
+def changing_client(*replies):
+    return SimpleNamespace(models=ChangingModels(*replies))
+
+
+@pytest.mark.parametrize(
+    "error",
+    [busy(), busy(500, "INTERNAL"), busy(502, "BAD_GATEWAY"), errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED"}}),
+     errors.ClientError(404, {"error": {"code": 404, "status": "NOT_FOUND"}})],
+)
+def test_a_busy_or_used_up_model_hands_the_outline_to_the_next_one(error, caplog):
+    client = changing_client(error, answer(raw_item()))
+
+    items = extract_items(PDF, client=client)
+
+    assert [item["name"] for item in items] == ["Skills Test 1"]
+    assert client.models.calls == ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+    assert "so Groot is trying a backup model" in caplog.text
+
+
+def test_every_backup_is_tried_once_and_then_the_student_is_told_it_is_busy():
+    client = changing_client(busy(), busy(), busy())
+
+    with pytest.raises(outline.OutlineBusyError) as caught:
+        extract_items(PDF, client=client)
+
+    assert client.models.calls == ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+    assert str(caught.value) == outline.BUSY_MESSAGE
+
+
+def test_a_timeout_is_not_tried_on_another_model():
+    # Gemini may already have read it, so asking another model could read one outline twice
+    client = changing_client(busy(504, "DEADLINE_EXCEEDED"), answer(raw_item()))
+    with pytest.raises(outline.OutlineTimeoutError):
+        extract_items(PDF, client=client)
+    assert client.models.calls == ["gemini-3.5-flash"]
+
+
+def test_with_backups_off_only_the_chosen_model_is_asked(monkeypatch):
+    monkeypatch.setenv("GROOT_BACKUPS", "off")
+    client = changing_client(busy(), answer(raw_item()))
+    with pytest.raises(outline.OutlineBusyError):
+        extract_items(PDF, client=client)
+    assert client.models.calls == ["gemini-3.5-flash"]
 
 
 def test_a_bad_request_that_is_not_about_the_key_is_not_called_a_key_problem():
