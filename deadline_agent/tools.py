@@ -49,8 +49,11 @@ PERCENT_KEYS = ("weight_percent", "mark_percent")
 SYDNEY = ZoneInfo("Australia/Sydney")
 
 # What a subject code looks like: five digits at UTS ("33130"), or four
-# letters then four digits at UNSW, USyd and Macquarie ("COMP1511").
-SUBJECT_CODE = r"(?:[0-9]{5}|[A-Z]{4}[0-9]{4})"
+# letters then four digits at UNSW, USyd and Macquarie ("COMP1511"). Other
+# universities vary a little, like "FIT1045" at Monash, "COMP10001" at
+# Melbourne and "KIT101" at Tasmania, so two to five letters then three to
+# five digits is accepted, and so are five or six digits alone.
+SUBJECT_CODE = r"(?:[0-9]{5,6}|[A-Z]{2,5}[0-9]{3,5})"
 
 # The two saved forms, for example "2026-11-05" and "2026-11-05 14:30".
 ISO_DATE = r"[0-9]{4}-[0-9]{2}-[0-9]{2}"

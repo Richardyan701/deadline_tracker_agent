@@ -334,7 +334,7 @@ def test_an_item_with_no_name_is_an_error(name):
 
 @pytest.mark.parametrize(
     "code",
-    ["3313", "331300", "SUBJ 33130", "33l30", 33130, None, "", "COMP151", "COMP15111", "COMPX1511", "CS1511", "1511COMP"],
+    ["3313", "3313000", "SUBJECT 33130", "33l30", 33130, None, "", "COMP15", "COMP151111", "COMPXY1511", "C1511", "1511COMP"],
 )
 def test_a_missing_or_odd_subject_code_is_an_error(code):
     with pytest.raises(OutlineError, match="subject code like 33130 or COMP1511"):
@@ -350,6 +350,10 @@ def test_a_missing_or_odd_subject_code_is_an_error(code):
         ("INFO1110", "INFO1110"),
         ("comp1511", "COMP1511"),  # made capitals
         ("COMP 1511", "COMP1511"),  # some outlines print a space in the code
+        ("FIT1045", "FIT1045"),  # Monash: three letters then four digits
+        ("COMP10001", "COMP10001"),  # Melbourne: four letters then five digits
+        ("KIT101", "KIT101"),  # Tasmania: three letters then three digits
+        ("300580", "300580"),  # six digits alone
     ],
 )
 def test_subject_codes_from_every_university_are_accepted(code, expected):

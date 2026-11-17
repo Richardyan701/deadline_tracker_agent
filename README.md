@@ -4,7 +4,7 @@
 
 **Agent Groot is a free, open-source study assistant that keeps track of your university deadlines.** Drop in your subject outlines and it finds every assessment and its real date, then reminds you before anything is due. You can also just tell it: *"Quiz 2 due next friday 5pm"*.
 
-It works for students at **UTS, UNSW, the University of Sydney and Macquarie University**.
+It has the calendars of **UTS, UNSW, the University of Sydney and Macquarie University** built in. At any other university, you type when week 1 starts and it does the rest.
 
 Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini. It runs on your own computer.
 
@@ -112,7 +112,8 @@ Because both give you one place to keep your study life in order: a list of task
 - **The free limit on the default model is small:** about 20 requests a day, which is roughly 8 to 10 chat messages. Groot tells you politely when you hit it, and the home page never uses the AI.
 - **You can get a much bigger limit for free.** Add `GROOT_MODEL=gemini-3.5-flash-lite` to `deadline_agent/.env` and restart. Flash-Lite ran more than 120 requests in one evening without hitting a limit. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
-- **Four Sydney universities, up to the end of 2027.** Main sessions only, with no summer or winter terms. Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out.
+- **Four Sydney universities are built in, up to the end of 2027.** Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. For any other university or term, you type the session's dates yourself.
+- **Groot runs on Sydney time** and only knows NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
 - **UTS is the best tested.** The other three universities have one real outline each behind them so far.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
 - **Run it on your own computer only.** The chat page has no login.

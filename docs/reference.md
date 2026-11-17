@@ -259,6 +259,8 @@ The sessions Groot knows (each university's main calendar only):
 
 The dates come from each university's own calendar page, and each was checked against a second source, the Universities Australia 2026-27 academic calendar. The links are at the top of `deadline_agent/calendars.py`.
 
+**If your university is not listed,** pick **My university is not listed** at the bottom of the picker and type your own session's dates: any day in week 1, the number of teaching weeks, and which week the mid-session break follows and how long it is (leave both at 0 if there is no break, or if the break weeks keep their week numbers). Groot then turns week numbers into dates the same way. For a session you type yourself, Groot does not know the exam dates or the public holidays, it treats every time as Sydney time, and the timetable and Canvas fields are not offered. Your browser remembers what you typed.
+
 **The calendars run out.** Universities publish new dates every year, and someone has to add them to `calendars.py` by hand. Until then, the picker stops offering a session once its exams are over, and the page says so when a university has no session left. UNSW also changes to two 12-week semesters in 2028, so its 2028 calendar will look different.
 
 The rules, for each item:
@@ -637,7 +639,8 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 
 - **One user, one local file.** There are no accounts. Everyone using the same copy shares one `deadlines.json`, and nothing syncs between devices.
 - **The free tier is small.** About 20 requests a day is roughly 8 to 10 chat messages that use a tool, or 20 outlines. See [The Gemini free tier](#the-gemini-free-tier).
-- **Four Sydney universities, up to the end of 2027.** The calendar knows the main sessions of UTS, UNSW, the University of Sydney and Macquarie University. Summer and winter terms, other calendars (like UTS Health or UNSW Canberra) and other universities are not supported yet, and next year's dates have to be added by hand.
+- **Four Sydney universities are built in, up to the end of 2027.** The calendar knows the main sessions of UTS, UNSW, the University of Sydney and Macquarie University, and next year's dates have to be added by hand. For any other university, or a summer or winter term, you type the session's dates yourself.
+- **Groot runs on Sydney time.** Every date and time is Sydney time, and the only public holidays it knows are the NSW ones. A student in Queensland, South Australia, Western Australia or the Northern Territory will see "due soon" and "overdue" up to three hours out.
 - **The other universities are newer than UTS.** The outline reader's accuracy was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd only.
 - **The outline reader can make mistakes.** Gemini can miss an item or misread a weight or a week, so always check the review table before you save. Rows that are assumed or need your date say so, but a misread week still gives a date that looks fine. On 5 real outlines it found 93% of the assessments and invented none, but one outline (31265) had two missed items and two wrong weights. See [Results so far](#results-so-far).
 - **Old .doc and .ppt files depend on LibreOffice**, which runs with your own permissions. Groot blocks macros, link updates and web addresses, but it cannot rule out every trick a file from someone else might try, for example a link to a network share on Windows, or a bug in an old LibreOffice. Keep LibreOffice up to date, and save an old file from someone you do not trust as a PDF before you import it.

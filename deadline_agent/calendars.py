@@ -231,20 +231,87 @@ PUBLIC_HOLIDAYS = {
 }
 
 
-def session_info(session: str) -> dict:
-    """The calendar for a session code, like "SPR2027" or "UNSW_T1_2027".
+# ---------- a session the student describes themselves ----------
+#
+# A student at any other university can tell Groot their own calendar: when
+# week 1 starts, how many teaching weeks there are, and where the break with
+# no week number falls. The drop box packs that into one session code, like
+#
+#     CUSTOM:2027-03-01:12:6:1
+#
+# which means week 1 starts in the week of 1 March 2027, there are 12 teaching
+# weeks, and a 1-week break comes after week 6. "0" for the last two parts
+# means no break. Everything else then works the same as a built-in session.
 
-    Returns one of the dicts in SESSIONS (its fields are listed above it).
+CUSTOM_PREFIX = "CUSTOM:"
+CUSTOM_CODE = re.compile(r"CUSTOM:([0-9]{4}-[0-9]{2}-[0-9]{2}):([0-9]{1,2}):([0-9]{1,2}):([0-9])")
+MAX_CUSTOM_WEEKS = 20  # the longest session Groot accepts
+MAX_BREAK_WEEKS = 4
+
+
+def custom_code(week_1: date, weeks: int, break_after: int = 0, break_weeks: int = 0) -> str:
+    """The session code for a calendar the student describes. custom_session explains the parts."""
+    return f"{CUSTOM_PREFIX}{week_1.isoformat()}:{weeks}:{break_after}:{break_weeks}"
+
+
+def custom_session(code: str) -> dict:
+    """The calendar for a "CUSTOM:..." session code, in the same shape as the built-in sessions.
+
+    Week 1 starts on the Monday of the week the given date is in. A break
+    after week N pushes every later week back by the length of the break.
+    The exam period is not known, so "exams" is None.
+    Raises ValueError if the code is not well formed or its numbers make no sense.
+    """
+    match = CUSTOM_CODE.fullmatch(code) if isinstance(code, str) else None
+    if not match:
+        raise ValueError(f"Unknown session {code!r}.")
+    try:
+        day = date.fromisoformat(match[1])
+    except ValueError:
+        raise ValueError(f"Unknown session {code!r}. {match[1]} is not a real date.") from None
+    weeks, break_after, break_weeks = int(match[2]), int(match[3]), int(match[4])
+    if not 1 <= weeks <= MAX_CUSTOM_WEEKS:
+        raise ValueError(f"Unknown session {code!r}. A session has 1 to {MAX_CUSTOM_WEEKS} teaching weeks.")
+    if (break_after == 0) != (break_weeks == 0):
+        raise ValueError(f"Unknown session {code!r}. Give both the week the break follows and how long it is, or neither.")
+    if break_after >= weeks or break_weeks > MAX_BREAK_WEEKS:
+        raise ValueError(
+            f"Unknown session {code!r}. The break must come before the last teaching week "
+            f"and be at most {MAX_BREAK_WEEKS} weeks long."
+        )
+    week_1 = day - timedelta(days=day.weekday())  # the Monday of that week
+    mondays = _mondays(week_1, weeks + break_weeks)
+    if break_weeks:
+        breaks = mondays[break_after : break_after + break_weeks]
+        teaching = mondays[:break_after] + mondays[break_after + break_weeks :]
+    else:
+        breaks, teaching = [], mondays
+    return {"university": "other", "name": "your session", "weeks": teaching, "breaks": breaks, "exams": None}
+
+
+def is_custom(session) -> bool:
+    """True for a session the student described themselves ("CUSTOM:...")."""
+    return isinstance(session, str) and session.startswith(CUSTOM_PREFIX)
+
+
+def session_info(session: str) -> dict:
+    """The calendar for a session code, like "SPR2027", "UNSW_T1_2027" or "CUSTOM:2027-03-01:12:6:1".
+
+    Returns one of the dicts in SESSIONS (its fields are listed above it),
+    or the calendar a "CUSTOM:..." code describes.
     Raises ValueError for any other session code.
     """
+    if is_custom(session):
+        return custom_session(session)
     if session not in SESSIONS:
         raise ValueError(f"Unknown session {session!r}. Use one of: {', '.join(SESSIONS)}.")
     return SESSIONS[session]
 
 
 def university_name(session: str) -> str:
-    """The short name of the session's university, like "UTS" or "Macquarie"."""
-    return UNIVERSITIES[session_info(session)["university"]]["name"]
+    """The short name of the session's university, like "UTS" ("your university" for a session the student described)."""
+    key = session_info(session)["university"]
+    return UNIVERSITIES[key]["name"] if key in UNIVERSITIES else "your university"
 
 
 def last_week(session: str) -> int:

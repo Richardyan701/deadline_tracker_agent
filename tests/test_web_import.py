@@ -187,6 +187,14 @@ def test_the_page_script_takes_its_file_endings_from_the_picker():
     assert "is not a PDF" not in code
 
 
+# The last choice in the picker, for a student at any other university
+NOT_LISTED = (
+    '<optgroup label="Another university">'
+    '<option value="CUSTOM" data-university="other">My university is not listed</option>'
+    "</optgroup>"
+)
+
+
 def picker(text: str) -> str:
     """The university and session picker's HTML, cut out of the import page."""
     start = text.index('<select id="session-select"')
@@ -216,7 +224,8 @@ def test_the_session_picker_starts_empty_and_groups_sessions_by_university(clien
         '<option value="MQ_S1_2027" data-university="mq">Session 1 2027</option>'
         '<option value="MQ_S2_2027" data-university="mq">Session 2 2027</option>'
         "</optgroup>"
-        "</select>"
+        + NOT_LISTED
+        + "</select>"
     )
 
 
@@ -257,8 +266,8 @@ def test_the_page_names_every_university_once_all_calendars_have_run_out(client,
     assert "Groot's calendars for UTS, UNSW, USyd and Macquarie have run out" in text
     assert picker(text) == (
         '<select id="session-select" aria-describedby="session-hint">'
-        '<option value="">Choose your university and session</option></select>'
-    )
+        '<option value="">Choose your university and session</option>' + NOT_LISTED + "</select>"
+    )  # a student can still type their own session's dates
 
 
 def test_the_timetable_and_canvas_fields_start_hidden_until_a_university_is_chosen(client):
@@ -273,7 +282,7 @@ def test_the_page_script_shows_each_university_only_the_fields_it_can_use():
     assert 'const USES_CANVAS = ["uts", "usyd"];' in code  # UNSW and Macquarie use Moodle
     assert set(json.loads(code.split("const USES_CANVAS = ")[1].split(";")[0])) <= set(calendars.UNIVERSITIES)
     # No preview without a session
-    assert 'previewButton.disabled = count === 0 || sessionSelect.value === "";' in code
+    assert 'previewButton.disabled = count === 0 || sessionCode() === "";' in code
 
 
 def test_the_page_warns_about_gemini_requests_before_preview(client):
@@ -897,3 +906,76 @@ def test_the_import_page_says_what_groot_holds_back_and_what_it_cannot(client):
     text = client.get("/groot/import").text
     assert "Groot takes out card numbers, tax file numbers, passwords and similar details it spots before sending" in text
     assert "it cannot check a photo or a scanned page" in text
+
+
+# ---------- a session the student types themselves ----------
+
+
+def test_the_page_has_the_date_fields_for_a_university_that_is_not_listed(client):
+    text = client.get("/groot/import").text
+    assert '<fieldset id="custom-field" class="field" hidden>' in text  # hidden until "My university is not listed" is picked
+    assert '<input id="custom-week1" type="date">' in text
+    assert '<input id="custom-weeks" type="number" min="1" max="20" value="12" inputmode="numeric">' in text
+    assert '<input id="custom-break-after" type="number" min="0" max="19" value="0" inputmode="numeric">' in text
+    assert '<input id="custom-break-weeks" type="number" min="0" max="4" value="0" inputmode="numeric">' in text
+    assert "Groot does not know the exam dates or the public holidays, and it treats every time as Sydney time." in text
+
+
+def test_preview_with_a_session_the_student_typed(client, reader):
+    # Week 1 is the week of Wed 3 Mar 2027, with 12 teaching weeks and a 1-week break after week 6
+    reader.answer = lambda data: [
+        item("Assignment 1", "week", code="FIT1045", subject="Introduction to Programming", week=6),
+        item("Assignment 2", "week", code="FIT1045", subject="Introduction to Programming", week=7),
+        item("Final exam", "exam_period", code="FIT1045", subject="Introduction to Programming"),
+    ]
+
+    response = preview(client, ("outline.pdf", pdf("outline")), session="CUSTOM:2027-03-03:12:6:1")
+
+    assert response.status_code == 200
+    rows = response.json()["rows"]
+    assert [(row["title"], row["due_text"]) for row in rows] == [
+        ("FIT1045 Assignment 1", "Friday 9 Apr 2027, 11:59 PM"),
+        ("FIT1045 Assignment 2", "Friday 23 Apr 2027, 11:59 PM"),  # the break week of 12 Apr has no number
+        ("FIT1045 Final exam", ""),
+    ]
+    assert rows[2]["note"] == (
+        "The outline says this is in the exam period, so check your university's exam timetable for the date."
+    )
+
+
+@pytest.mark.parametrize(
+    "session",
+    [
+        "CUSTOM",  # the picker's own value, sent without the dates
+        "CUSTOM:",
+        "CUSTOM:2027-02-30:12:0:0",  # not a real date
+        "CUSTOM:2027-03-01:0:0:0",
+        "CUSTOM:2027-03-01:21:0:0",
+        "CUSTOM:2027-03-01:12:6:0",  # a break with no length
+        "CUSTOM:2027-03-01:12:0:1",
+        "CUSTOM:2027-03-01:12:12:1",  # a break after the last week
+        "CUSTOM:2027-03-01:12:6:5",
+        "CUSTOM:2027-03-01:12:6:1:extra",
+        "custom:2027-03-01:12:6:1",
+    ],
+)
+def test_a_typed_session_that_makes_no_sense_is_refused_before_gemini(client, reader, session):
+    response = preview(client, ("outline.pdf", pdf("outline")), session=session)
+
+    assert response.status_code == 400
+    assert response.json()["message"] == "Choose your university and session, then try again."
+    assert reader == []
+
+
+def test_a_timetable_cannot_be_used_with_a_typed_session(client, reader):
+    response = preview(client, ("outline.pdf", pdf("outline")), session="CUSTOM:2027-03-01:12:0:0", timetable=make_pdf(["9:00 - 11:00"]))
+    assert response.status_code == 400
+    assert response.json()["message"].startswith("Groot can only read UTS timetables so far.")
+
+
+def test_the_page_script_builds_the_session_code_from_the_typed_dates():
+    code = (web_app.STATIC_DIR / "import.js").read_text(encoding="utf-8")
+    assert 'const CUSTOM_CHOICE = "CUSTOM";' in code
+    assert "return `CUSTOM:${customWeek1.value}:${Number(customWeeks.value)}:${Number(customBreakAfter.value)}:${Number(customBreakWeeks.value)}`;" in code
+    assert 'form.append("session", sessionCode());' in code
+    assert "customField.hidden = sessionSelect.value !== CUSTOM_CHOICE;" in code
