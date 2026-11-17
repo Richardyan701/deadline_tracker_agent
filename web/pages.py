@@ -436,6 +436,7 @@ def import_page(sessions: dict, finished: list[str]) -> str:
 <input id="outline-input" class="visually-hidden" type="file" accept="{escape(documents.HTML_ACCEPT)}" multiple aria-describedby="outline-hint">
 <label for="outline-input" class="button">Choose outline files</label>
 <p id="outline-hint" class="hint">1 to 8 outlines, each up to 10 MB. {escape(documents.describe_supported())}</p>
+<p class="hint">No outline to hand? <a href="/groot/sample-outline">Download a made-up sample outline</a>, then drop it in to see how the import works.</p>
 </div>
 <p id="file-message" class="message" role="status"></p>
 <ul id="outline-list" class="file-list"></ul>
