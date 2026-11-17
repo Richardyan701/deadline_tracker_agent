@@ -34,7 +34,7 @@ You need **Python 3.11 or newer** and a free **Gemini API key** from [Google AI 
    - Windows: double-click `setup_windows.bat`.
    - Linux or macOS: run `./setup.sh`.
 
-   It installs everything and asks for your key.
+   It installs everything, asks for your key, and asks which Gemini model to use. Press Enter for the recommended one, which has a much bigger free daily limit.
 2. **Start Groot.**
    - Windows: double-click `start_groot.bat`.
    - Linux or macOS: run `./start_groot.sh`.

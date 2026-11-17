@@ -33,7 +33,17 @@ if not defined GEMINI_KEY goto no_key
 >> "deadline_agent\.env" echo GOOGLE_API_KEY=%GEMINI_KEY%
 set "GEMINI_KEY="
 if not exist "deadline_agent\.env" goto failed
-echo Saved.
+echo.
+echo Which Gemini model should Groot use?
+echo   1. gemini-3.5-flash-lite: a much bigger free daily limit (recommended)
+echo   2. gemini-3.5-flash: a little more accurate, but only about 20 requests a day
+set "GROOT_CHOICE="
+set /p "GROOT_CHOICE=Type 1 or 2 and press Enter (Enter alone picks 1): "
+set "GROOT_PICK=gemini-3.5-flash-lite"
+if "%GROOT_CHOICE%"=="2" set "GROOT_PICK=gemini-3.5-flash"
+>> "deadline_agent\.env" echo GROOT_MODEL=%GROOT_PICK%
+echo Saved, with %GROOT_PICK%.
+echo You can change the model later on the GROOT_MODEL line of deadline_agent\.env.
 goto done
 
 :keep_key

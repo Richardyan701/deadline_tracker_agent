@@ -709,3 +709,68 @@ def test_the_port_check_never_crashes(monkeypatch, error, free):
         raise error
     monkeypatch.setattr(socket, "create_connection", refuse)
     assert port_8000_is_free() is free
+
+
+# ---------- setup.sh asks which Gemini model to use ----------
+
+# Stands in for Python, so setup.sh can be run in seconds with nothing installed
+FAKE_PYTHON = """#!/bin/bash
+case "$1" in
+    --version) echo "Python 3.12.0" ;;
+    -c) exit 0 ;;
+    -m)
+        if [ "$2" = "venv" ]; then
+            mkdir -p .venv/bin
+            printf '#!/bin/bash\\nexit 0\\n' > .venv/bin/python
+            chmod +x .venv/bin/python
+        fi ;;
+esac
+"""
+
+
+def run_setup(tmp_path, typed: str) -> tuple[subprocess.CompletedProcess, Path]:
+    """Run a copy of setup.sh in tmp_path, typing what is given, and return the result and the .env it made."""
+    shutil.copy(PROJECT / "setup.sh", tmp_path / "setup.sh")
+    (tmp_path / "requirements.txt").write_text("")
+    (tmp_path / "deadline_agent").mkdir()
+    fake = tmp_path / "fake-python"
+    fake.write_text(FAKE_PYTHON)
+    fake.chmod(0o755)
+    result = subprocess.run(
+        ["bash", "setup.sh"], cwd=tmp_path, input=typed, capture_output=True, text=True, timeout=60,
+        env={**os.environ, "PYTHON": str(fake)},
+    )
+    return result, tmp_path / "deadline_agent" / ".env"
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    "choice, model",
+    [("1", "gemini-3.5-flash-lite"), ("", "gemini-3.5-flash-lite"), ("2", "gemini-3.5-flash"), ("7", "gemini-3.5-flash-lite")],
+)
+def test_setup_saves_the_key_and_the_chosen_model(tmp_path, choice, model):
+    result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n{choice}\n")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_text() == f"GOOGLE_GENAI_USE_ENTERPRISE=0\nGOOGLE_API_KEY={FAKE_KEY}\nGROOT_MODEL={model}\n"
+    assert f"Saved, with {model}." in result.stdout
+    assert FAKE_KEY not in result.stdout  # the key is never shown
+    assert oct(env_file.stat().st_mode & 0o777) == "0o600"
+
+
+@needs_bash
+def test_setup_picks_the_bigger_limit_when_nothing_more_is_typed(tmp_path):
+    result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n")  # the input ends before the model question
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_text().endswith("GROOT_MODEL=gemini-3.5-flash-lite\n")
+
+
+def test_both_setup_files_offer_the_same_two_models():
+    for name in ("setup.sh", "setup_windows.bat"):
+        text = (PROJECT / name).read_text(encoding="utf-8")
+        assert "1. gemini-3.5-flash-lite: a much bigger free daily limit (recommended)" in text
+        assert "2. gemini-3.5-flash: a little more accurate, but only about 20 requests a day" in text
+        assert "GROOT_MODEL=" in text
+    windows = (PROJECT / "setup_windows.bat").read_text(encoding="utf-8")
+    assert 'set "GROOT_PICK=gemini-3.5-flash-lite"' in windows
+    assert 'if "%GROOT_CHOICE%"=="2" set "GROOT_PICK=gemini-3.5-flash"' in windows
