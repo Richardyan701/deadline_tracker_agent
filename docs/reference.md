@@ -454,6 +454,12 @@ What changes when you do this:
 - **Nothing here was measured.** Groot's scores come from Gemini models. Another model may choose the wrong tool or misread an outline more often, so check its work, especially the review table.
 - **Each company has its own limits and prices.** Some have a free allowance and some charge for every request. Check before you use a paid key.
 
+What a live test on 17 Nov 2026 with Groq's free tier (`groq/openai/gpt-oss-120b`) showed:
+
+- **It works.** Groot chose the right tools, saved the deadline correctly, read a UNSW outline correctly and refused a test card number.
+- **The free allowance is too tight for chatting.** Groq's free tier allowed 1,000 requests a day but only 8,000 tokens a minute, and one Groot request is about 3,000 tokens, because every request carries Groot's instruction and the descriptions of its ten tools. A message that uses a tool needs two requests, so Groot reached the limit after about one message a minute. Reading outlines one at a time is fine.
+- So on a free key, a Gemini model is still the better choice for the chat.
+
 What uses a request:
 
 | Action | Requests |
@@ -517,7 +523,7 @@ On Linux or macOS:
 .venv/bin/python -m pytest
 ```
 
-The last line should say that every test passed (about 2,000). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
+The last line should say that every test passed (about 2,100). A test that needs something your computer does not have is skipped instead, and then the line says how many: the tests that run `start_groot.sh` or a stand-in LibreOffice need Linux or macOS, one test needs LibreOffice itself, and the start file tests also skip while Groot is running on port 8000.
 
 ## Troubleshooting
 
@@ -589,7 +595,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 2,000 tests, no API key needed
+tests/               about 2,100 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -633,7 +639,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are about 2,000 tests, run with pytest:
+There are about 2,100 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
