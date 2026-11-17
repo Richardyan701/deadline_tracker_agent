@@ -521,7 +521,8 @@ def test_a_subject_is_found_by_a_letter_style_code(deadlines_file, wanted):
         ("COMP1511 Programming Fundamentals", ("COMP1511", "Programming Fundamentals")),
         ("info1110 Introduction to Programming", ("info1110", "Introduction to Programming")),
         ("Writing", (None, "Writing")),
-        ("COMP151 Short code", (None, "COMP151 Short code")),
+        ("FIT1045 Introduction to Programming", ("FIT1045", "Introduction to Programming")),
+        ("COMP15 Short code", (None, "COMP15 Short code")),
         ("2026 Plans", (None, "2026 Plans")),
     ],
 )
