@@ -23,7 +23,7 @@ from eval.chat import run_chat_eval
 CASES = run_chat_eval.load_cases(run_chat_eval.CASES_FILE)
 CATEGORIES = {
     "add_dates", "add_subject", "strict_rules", "list", "next",
-    "reminders", "mark_done", "delete", "off_topic", "injection",
+    "reminders", "mark_done", "edit", "delete", "off_topic", "injection",
 }
 TOOL_NAMES = {tool.__name__ for tool in root_agent.tools}
 

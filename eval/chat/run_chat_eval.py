@@ -44,6 +44,9 @@ KEY_FILE = HERE.parent.parent / "deadline_agent" / ".env"  # the same key file a
 # expected tool is fine, for example listing first to check a title.
 READ_ONLY_TOOLS = {"list_deadlines", "next_deadline", "get_reminders"}
 
+# The argument that carries the student's date words, for each tool that takes one
+DATE_ARGUMENT = {"add_deadline": "due_date", "edit_deadline": "new_due_date"}
+
 # Every check, with the words used for it in results.md
 CHECKS = {
     "right_tool": "Right tool chosen",
@@ -196,10 +199,11 @@ def score(case: dict, record: dict) -> dict:
         # Off topic: no tool at all, and Groot still said something back
         checks["no_tool"] = not record["calls"] and bool(record["reply"].strip())
 
-    typed = [call["args"]["due_date"] for call in expected_calls if call["tool"] == "add_deadline"]
+    typed = [call["args"][DATE_ARGUMENT[call["tool"]]] for call in expected_calls if DATE_ARGUMENT.get(call["tool"]) in call["args"]]
     if typed:
-        # Every add_deadline call (a retry too) must carry the student's own words, not a converted date
-        sent = [call["args"].get("due_date") for call in record["calls"] if call["tool"] == "add_deadline"]
+        # Every call that sets a date (a retry too) must carry the student's own words, not a converted date
+        sent = [call["args"].get(DATE_ARGUMENT[call["tool"]]) for call in record["calls"] if call["tool"] in DATE_ARGUMENT]
+        sent = [words for words in sent if words]  # an edit that only renames sends no date
         checks["date_as_typed"] = bool(sent) and all(date_words(words) == date_words(typed[0]) for words in sent)
 
     seed = case.get("seed", [])

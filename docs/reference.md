@@ -439,7 +439,7 @@ Groot then uses that model for the chat and for reading outlines. Any model of G
 
 What was measured on 17 Nov 2026 with `gemini-3.5-flash-lite`:
 
-- **Chat:** 62 of 63 cases passed (98%), against 63 of 63 for `gemini-3.5-flash`. The one miss saved the right deadline and date but also used the title as the subject. The full table is in [eval/chat/results-gemini-3.5-flash-lite.md](../eval/chat/results-gemini-3.5-flash-lite.md).
+- **Chat:** 68 of 69 cases passed (99%), including all 6 editing cases. `gemini-3.5-flash` passed all 63 of the cases that existed before editing was added. The one miss saved the right deadline and date but also used the title as the subject. The full table is in [eval/chat/results-gemini-3.5-flash-lite.md](../eval/chat/results-gemini-3.5-flash-lite.md).
 - **Daily limit:** the run sent more than 120 requests in one evening on the free tier with no limit error, so its daily limit is at least six times the 20 of `gemini-3.5-flash`. Google does not publish the exact number, and it can change. Your own limits are shown in Google AI Studio.
 - **Outlines:** not measured. One UNSW outline was read correctly in a live test, but the outline evaluation was only run with `gemini-3.5-flash`, so check the review table with extra care.
 
@@ -702,7 +702,7 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 - **Sydney time only.** The time zone is fixed in the code.
 - **English only.** Date words like "friday" and "tomorrow" must be in English.
 - **Editing changes the title, due date and subject only.** Weights and marks are changed in the Grades section or with `set_mark`. Renaming a deadline gives it a new calendar ID, so a calendar that already imported it will show both the old and the new event.
-- **The chat evaluation was run before `edit_deadline` existed.** The 63 of 63 result was measured with nine tools, and it has no editing cases yet.
+- **The editing cases were only run on Flash-Lite.** The 63 of 63 result for `gemini-3.5-flash` was measured before `edit_deadline` and its 6 cases existed, because that model's free limit is about 20 requests a day.
 - **No past deadlines.** You cannot add a deadline whose time has already passed, and imported rows that have passed start unticked.
 - **Reminders only appear in Groot.** The chat and the home page show them, but Groot sends no notifications. Export to your calendar for those.
 - **The Windows setup script shows your key on screen** while you paste it.
