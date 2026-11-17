@@ -336,6 +336,34 @@ def _edit_button(deadline: dict) -> str:
     )
 
 
+# The picker's value for "My university is not listed". import.js then builds the real
+# session code ("CUSTOM:2027-03-01:12:6:1", see calendars.py) from the fields below.
+CUSTOM_CHOICE = "CUSTOM"
+
+CUSTOM_FIELDS = f"""<fieldset id="custom-field" class="field" hidden>
+<legend>Your session's dates</legend>
+<p class="hint">Groot does not have your university's calendar, so tell it how your session runs. Your subject outline or your university's key dates page has these.</p>
+<div class="field">
+<label for="custom-week1">Any day in week 1</label>
+<input id="custom-week1" type="date">
+</div>
+<div class="field">
+<label for="custom-weeks">Number of teaching weeks</label>
+<input id="custom-weeks" type="number" min="1" max="{calendars.MAX_CUSTOM_WEEKS}" value="12" inputmode="numeric">
+</div>
+<div class="field">
+<label for="custom-break-after">The mid-session break comes after week <span class="optional">(0 if there is no break, or if the break weeks keep their numbers)</span></label>
+<input id="custom-break-after" type="number" min="0" max="{calendars.MAX_CUSTOM_WEEKS - 1}" value="0" inputmode="numeric">
+</div>
+<div class="field">
+<label for="custom-break-weeks">How many weeks the break lasts</label>
+<input id="custom-break-weeks" type="number" min="0" max="{calendars.MAX_BREAK_WEEKS}" value="0" inputmode="numeric">
+</div>
+<p class="hint">For a session you type yourself, Groot does not know the exam dates or the public holidays, and it treats every time as Sydney time.</p>
+<p id="custom-message" class="message" role="status"></p>
+</fieldset>"""
+
+
 def _session_picker(sessions: dict) -> str:
     """The options of the university and session picker, grouped by university.
 
@@ -354,6 +382,12 @@ def _session_picker(sessions: dict) -> str:
         )
         if options:
             groups += f'<optgroup label="{escape(university["full_name"])}">{options}</optgroup>'
+    # A student anywhere else types their own session's dates into the fields below the picker
+    groups += (
+        '<optgroup label="Another university">'
+        f'<option value="{CUSTOM_CHOICE}" data-university="other">My university is not listed</option>'
+        "</optgroup>"
+    )
     return '<option value="">Choose your university and session</option>' + groups
 
 
@@ -395,6 +429,7 @@ def import_page(sessions: dict, finished: list[str]) -> str:
 <select id="session-select" aria-describedby="session-hint">{_session_picker(sessions)}</select>
 <p id="session-hint" class="hint">Groot turns a week number, like "due in week 7", into a real date with this university's official calendar. Sessions that have finished are not listed.</p>
 </div>
+{CUSTOM_FIELDS}
 {_finished_warning(finished)}
 <div id="drop-zone" class="drop-zone">
 <p class="drop-title">Drag your subject outlines here, or</p>

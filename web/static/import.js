@@ -31,6 +31,12 @@ const timetableInput = document.getElementById("timetable-input");
 const canvasField = document.getElementById("canvas-field");
 const canvasInput = document.getElementById("canvas-input");
 const sessionSelect = document.getElementById("session-select");
+const customField = document.getElementById("custom-field");
+const customWeek1 = document.getElementById("custom-week1");
+const customWeeks = document.getElementById("custom-weeks");
+const customBreakAfter = document.getElementById("custom-break-after");
+const customBreakWeeks = document.getElementById("custom-break-weeks");
+const customMessage = document.getElementById("custom-message");
 const requestCount = document.getElementById("request-count");
 const previewButton = document.getElementById("preview-button");
 const previewMessage = document.getElementById("preview-message");
@@ -49,6 +55,9 @@ const USES_CANVAS = ["uts", "usyd"];
 const AI = document.body.dataset.ai || "Gemini";
 // Where the browser remembers the session picked last time, so it is only chosen once
 const REMEMBERED_SESSION = "groot-session";
+// The picker's value for "My university is not listed", and where its typed dates are remembered
+const CUSTOM_CHOICE = "CUSTOM";
+const REMEMBERED_CUSTOM = "groot-custom-session";
 
 // The file endings Groot reads, like ".pdf" and ".docx". The server puts them in the
 // file picker's accept list. It still checks what each file really is from its contents.
@@ -65,6 +74,45 @@ function chosenUniversity() {
   return option ? option.dataset.university || "" : "";
 }
 
+// What is wrong with the dates typed for "My university is not listed", or "" if they are fine.
+// The server checks the same rules again (calendars.py).
+function customProblem() {
+  const weeks = Number(customWeeks.value);
+  const after = Number(customBreakAfter.value);
+  const length = Number(customBreakWeeks.value);
+  if (!customWeek1.value) {
+    return "Choose a day in week 1.";
+  }
+  if (!Number.isInteger(weeks) || weeks < 1 || weeks > Number(customWeeks.max)) {
+    return `The number of teaching weeks must be from 1 to ${customWeeks.max}.`;
+  }
+  if (!Number.isInteger(after) || !Number.isInteger(length) || after < 0 || length < 0) {
+    return "The break must be given in whole weeks.";
+  }
+  if ((after === 0) !== (length === 0)) {
+    return "Fill in both break boxes, or leave both at 0 for no break.";
+  }
+  if (after >= weeks) {
+    return "The break must come before the last teaching week.";
+  }
+  if (length > Number(customBreakWeeks.max)) {
+    return `The break can be at most ${customBreakWeeks.max} weeks long.`;
+  }
+  return "";
+}
+
+// The session code to send: the picker's value, or for "My university is not listed" the code
+// built from the typed dates, like "CUSTOM:2027-03-01:12:6:1". "" means nothing usable is chosen yet.
+function sessionCode() {
+  if (sessionSelect.value !== CUSTOM_CHOICE) {
+    return sessionSelect.value;
+  }
+  if (customProblem()) {
+    return "";
+  }
+  return `CUSTOM:${customWeek1.value}:${Number(customWeeks.value)}:${Number(customBreakAfter.value)}:${Number(customBreakWeeks.value)}`;
+}
+
 // Show only the extra fields the chosen university can use, and empty the ones
 // that are hidden, so a file or link chosen for another university is never sent.
 function showFieldsForUniversity() {
@@ -77,19 +125,35 @@ function showFieldsForUniversity() {
   if (canvasField.hidden) {
     canvasInput.value = "";
   }
+  customField.hidden = sessionSelect.value !== CUSTOM_CHOICE;
 }
 
 // Preview needs a session and at least one outline. Say which one is missing.
 function updatePreviewButton() {
   const count = outlines.length;
+  const typing = sessionSelect.value === CUSTOM_CHOICE;
+  show(customMessage, {status: "error", message: typing ? customProblem() : ""});
   if (sessionSelect.value === "") {
     requestCount.textContent = "Choose your university and session to preview.";
+  } else if (sessionCode() === "") {
+    requestCount.textContent = "Fill in your session's dates to preview.";
   } else if (count === 0) {
     requestCount.textContent = "Choose at least one outline to preview.";
   } else {
     requestCount.textContent = `Preview will use ${count} ${AI} ${count === 1 ? "request" : "requests"}, one for each outline.`;
   }
-  previewButton.disabled = count === 0 || sessionSelect.value === "";
+  previewButton.disabled = count === 0 || sessionCode() === "";
+}
+
+// Typing a date for "My university is not listed" is remembered too, so it is only typed once
+for (const input of [customWeek1, customWeeks, customBreakAfter, customBreakWeeks]) {
+  input.addEventListener("input", () => {
+    try {
+      const typed = [customWeek1.value, customWeeks.value, customBreakAfter.value, customBreakWeeks.value];
+      localStorage.setItem(REMEMBERED_CUSTOM, JSON.stringify(typed));
+    } catch {}
+    updatePreviewButton();
+  });
 }
 
 sessionSelect.addEventListener("change", () => {
@@ -106,6 +170,12 @@ try {
   const remembered = localStorage.getItem(REMEMBERED_SESSION);
   if (remembered && [...sessionSelect.options].some((option) => option.value === remembered)) {
     sessionSelect.value = remembered;
+  }
+} catch {}
+try {
+  const typed = JSON.parse(localStorage.getItem(REMEMBERED_CUSTOM) || "null");
+  if (Array.isArray(typed) && typed.length === 4) {
+    [customWeek1.value, customWeeks.value, customBreakAfter.value, customBreakWeeks.value] = typed;
   }
 } catch {}
 showFieldsForUniversity();
@@ -190,7 +260,7 @@ previewButton.addEventListener("click", async () => {
   if (link) {
     form.append("canvas_url", link);
   }
-  form.append("session", sessionSelect.value);
+  form.append("session", sessionCode());
 
   previewButton.disabled = true;
   review.hidden = true;

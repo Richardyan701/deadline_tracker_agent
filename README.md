@@ -4,23 +4,27 @@
 
 **Agent Groot is a free, open-source study assistant that keeps track of your university deadlines.** Drop in your subject outlines and it finds every assessment and its real date, then reminds you before anything is due. You can also just tell it: *"Quiz 2 due next friday 5pm"*.
 
-Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini 3.5 Flash. It runs on your own computer.
+It has the calendars of **UTS, UNSW, the University of Sydney and Macquarie University** built in. At any other university, you type when week 1 starts and it does the rest.
+
+Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini. It runs on your own computer.
 
 ![Groot's home page with example deadlines](docs/images/groot-home.png)
 
 *The home page, shown with made-up example deadlines.*
 
-> **Privacy:** your deadlines stay on your computer, but every chat message and every outline you preview is sent to Google's Gemini. On the free tier, Google may use and review it. Never enter anything sensitive, such as your student ID, passwords, health or money details. As a safety net, Groot checks on your own computer for card numbers, tax file numbers, Medicare numbers, passwords, API keys, bank details and student IDs, and keeps them away from Gemini and out of your saved deadlines. It only knows patterns, so it cannot catch everything.
+> **Privacy:** your deadlines stay on your computer. Chat messages and outlines you preview go to Google's Gemini, and on the free tier Google may use and review them. So don't type anything private, like your student ID, passwords, or health and money details.
+>
+> Groot has a safety net: before anything is sent or saved, it checks on your own computer for card numbers, tax file numbers, Medicare numbers, passwords, API keys, bank details and student IDs, and holds them back. It only recognises patterns, so it won't catch everything.
 
 ## What it does
 
-- **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date using your university's official calendar. It knows **UTS, UNSW, the University of Sydney and Macquarie University**.
+- **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date. Each university counts its weeks differently, so you pick yours and Groot uses its official 2027 calendar.
 - **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
 - **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up.
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
-- **Exports to your calendar** (.ics) and imports your timetable and Canvas calendar.
+- **Feeds the calendar you already use.** One click exports your deadlines to Google Calendar, Outlook or your phone. It also imports your Canvas calendar (UTS and USyd) and your UTS timetable.
 - **Has a home page that uses no AI**, plus a chat with Groot.
-- **Holds back sensitive details.** A chat message with something like a card number or a password in it is never sent to the AI, and such details are taken out of outlines and never saved.
+- **Holds back sensitive details.** A chat message with a card number or password in it is never sent to the AI. The same details are removed from outlines and never saved.
 
 ## Quick start
 
@@ -64,7 +68,8 @@ Measured with the real Gemini model, not just claimed:
 | Test | Result |
 | --- | --- |
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
-| **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** |
+| **Reading 1 real outline each from UNSW, USyd and Macquarie** | Every assessment, weight and week read correctly |
+| **63 realistic student messages** (dates, listing, marking done, off-topic, prompt-injection attempts) | **63 of 63 passed** with Gemini 3.5 Flash, **62 of 63** with the lighter Flash-Lite |
 | **Automated tests** | About 2,000, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
@@ -104,10 +109,12 @@ Because both give you one place to keep your study life in order: a list of task
 
 ## Things to know
 
-- **The Gemini free tier is small:** about 5 requests a minute and 20 a day, which is roughly 8 to 10 chat messages that use a tool. Groot says so politely when you hit a limit. The home page never uses Gemini. For a much bigger daily limit, you can switch to a lighter Gemini model with one line in `.env`, which passed 62 of 63 chat cases. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
+- **The free limit on the default model is small:** about 20 requests a day, which is roughly 8 to 10 chat messages. Groot tells you politely when you hit it, and the home page never uses the AI.
+- **You can get a much bigger limit for free.** Add `GROOT_MODEL=gemini-3.5-flash-lite` to `deadline_agent/.env` and restart. Flash-Lite ran more than 120 requests in one evening without hitting a limit. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
-- **Four Sydney universities, up to the end of 2027.** UTS, UNSW, the University of Sydney and Macquarie University, main sessions only. Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out.
-- **UTS is the best tested.** The accuracy above was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd.
+- **Four Sydney universities are built in, up to the end of 2027.** Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. For any other university or term, you type the session's dates yourself.
+- **Groot runs on Sydney time** and only knows NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
+- **UTS is the best tested.** The other three universities have one real outline each behind them so far.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
 - **Run it on your own computer only.** The chat page has no login.
 - **The grade calculator can't check minimum rules** (like a minimum exam mark). Read your subject outline.

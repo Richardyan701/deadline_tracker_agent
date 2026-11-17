@@ -485,3 +485,71 @@ def test_no_other_day_is_listed_as_a_public_holiday():
 )
 def test_ordinary_days_are_not_public_holidays(day):
     assert not calendars.is_public_holiday(day)
+
+
+# ---------- a session the student describes themselves ----------
+
+
+def test_a_custom_session_with_no_break_has_its_weeks_in_a_row():
+    code = calendars.custom_code(d(1, 3), 13)
+    assert code == "CUSTOM:2027-03-01:13:0:0"
+    info = calendars.session_info(code)
+    assert info["weeks"] == [d(1, 3) + timedelta(weeks=week) for week in range(13)]
+    assert info["breaks"] == []
+    assert info["exams"] is None  # Groot does not know another university's exam dates
+    assert calendars.last_week(code) == 13
+
+
+def test_a_custom_session_skips_its_break():
+    # 12 teaching weeks from Mon 1 Mar 2027, with a 2-week break after week 6
+    code = calendars.custom_code(d(1, 3), 12, break_after=6, break_weeks=2)
+    assert calendars.week_start(code, 6) == d(5, 4)
+    assert calendars.session_info(code)["breaks"] == [d(12, 4), d(19, 4)]
+    assert calendars.week_start(code, 7) == d(26, 4)
+    assert calendars.week_start(code, 12) == d(31, 5)
+    assert calendars.teaching_weeks(code, 6, 7) == [(6, d(5, 4)), (7, d(26, 4))]
+    assert calendars.week_date(code, 7, "friday", "23:59") == datetime(2027, 4, 30, 23, 59)
+
+
+@pytest.mark.parametrize("day", [d(1, 3), d(3, 3), d(5, 3), d(7, 3)])  # Monday, Wednesday, Friday, Sunday of the same week
+def test_week_1_starts_on_the_monday_of_the_week_the_student_gave(day):
+    code = calendars.custom_code(day, 12)
+    assert calendars.week_start(code, 1) == d(1, 3)
+
+
+def test_a_custom_session_matches_a_built_in_one_with_the_same_shape():
+    # USyd Semester 1 2027 typed by hand: week 1 on 22 Feb, 13 weeks, a 1-week break after week 5
+    typed = calendars.session_info(calendars.custom_code(d(22, 2), 13, 5, 1))
+    official = calendars.session_info("USYD_S1_2027")
+    assert typed["weeks"] == official["weeks"]
+    assert typed["breaks"] == official["breaks"][:1]  # the built-in one also lists STUVAC
+
+
+def test_a_custom_session_is_known_as_custom_and_has_no_university_name():
+    code = "CUSTOM:2027-03-01:12:6:1"
+    assert calendars.is_custom(code)
+    assert not calendars.is_custom("SPR2027") and not calendars.is_custom(None)
+    assert calendars.university_name(code) == "your university"
+    assert calendars.quiet_week(code, 6) is None
+    assert code not in calendars.open_sessions(date(2027, 1, 1))
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "CUSTOM", "CUSTOM:", "CUSTOM:2027-03-01", "CUSTOM:2027-03-01:12", "CUSTOM:2027-03-01:12:6",
+        "CUSTOM:2027-02-30:12:0:0", "CUSTOM:2027-13-01:12:0:0", "CUSTOM:27-3-1:12:0:0",
+        "CUSTOM:2027-03-01:0:0:0", "CUSTOM:2027-03-01:21:0:0", "CUSTOM:2027-03-01:-1:0:0",
+        "CUSTOM:2027-03-01:12:6:0", "CUSTOM:2027-03-01:12:0:1", "CUSTOM:2027-03-01:12:12:1",
+        "CUSTOM:2027-03-01:12:13:1", "CUSTOM:2027-03-01:12:6:5", "CUSTOM:2027-03-01:12:6:1:9",
+        "CUSTOM:2027-03-01:12:6:1 ", "custom:2027-03-01:12:6:1", "CUSTOM:2027-03-01:1.5:0:0",
+    ],
+)  # fmt: skip
+def test_a_custom_code_that_makes_no_sense_is_a_clear_error(code):
+    with pytest.raises(ValueError, match="Unknown session"):
+        calendars.session_info(code)
+
+
+def test_the_longest_and_shortest_custom_sessions_are_accepted():
+    assert calendars.last_week("CUSTOM:2027-03-01:1:0:0") == 1
+    assert calendars.last_week("CUSTOM:2027-03-01:20:19:4") == 20

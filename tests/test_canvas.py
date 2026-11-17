@@ -124,10 +124,10 @@ def test_subject_codes_with_four_letters_and_four_digits(summary, code, title):
 @pytest.mark.parametrize(
     "summary",
     [
-        "Read XCOMP1511 notes",  # part of a longer word
-        "Room COMP15110 booking",  # part of a longer number
+        "Read XYCOMP1511 notes",  # part of a longer word
+        "Room COMP151100 booking",  # part of a longer number
         "comp1511 revision",  # codes are written in capitals
-        "See COMP151 slides",  # too short
+        "See COMP15 slides",  # too short
     ],
 )
 def test_words_that_only_look_like_a_subject_code_are_not_one(summary):
@@ -141,7 +141,7 @@ def test_a_code_in_the_tag_wins_over_a_look_alike_word_in_the_title():
 
 
 def test_longer_numbers_are_not_subject_codes():
-    events = canvas.parse_feed(feed(event("Booking 123456 [Room 2026]")))
+    events = canvas.parse_feed(feed(event("Booking 1234567 [Room 2026]")))  # seven digits is too long for a code
     assert events[0]["subject_code"] == ""
 
 

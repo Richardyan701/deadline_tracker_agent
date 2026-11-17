@@ -316,8 +316,26 @@ label {
   font-size: 0.9rem;
 }
 
+/* The box of date fields for "My university is not listed" */
+fieldset.field {
+  padding: 0.75rem 1rem 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+fieldset.field legend {
+  padding: 0 0.4rem;
+  font-weight: 600;
+}
+
+fieldset.field input {
+  max-width: 14rem;
+}
+
 input[type="text"],
 input[type="url"],
+input[type="date"],
+input[type="number"],
 input:not([type]),
 select {
   width: 100%;

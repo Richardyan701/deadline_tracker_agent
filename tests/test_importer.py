@@ -709,3 +709,31 @@ def test_one_bad_row_does_not_stop_the_others():
 
 def test_save_rows_with_no_rows():
     assert importer.save_rows([]) == []
+
+
+# ---------- a session the student typed themselves ----------
+
+TYPED = "CUSTOM:2027-03-01:12:6:1"  # week 1 Mon 1 Mar 2027, 12 weeks, a 1-week break after week 6
+
+
+def test_a_typed_session_gives_dates_and_skips_its_break():
+    rows = preview(
+        item("Weekly quiz", "recurring", code="FIT1045", subject="Programming", first_week=6, last_week=7, weekday="monday", time="09:00"),
+        session=TYPED,
+    )
+    assert [row["due_date"] for row in rows] == ["2027-04-05 09:00", "2027-04-19 09:00"]
+
+
+def test_a_typed_session_does_not_flag_nsw_public_holidays():
+    # Fri 26 Mar 2027 is Good Friday in NSW, but the student may be in another state, so Groot says nothing
+    [row] = preview(item("Report", "week", code="FIT1045", subject="Programming", week=4, weekday="friday", time="17:00"), session=TYPED)
+    assert (row["due_date"], row["status"]) == ("2027-03-26 17:00", "exact")
+    assert "public holiday" not in row["note"]
+
+
+def test_a_typed_session_names_its_own_last_week_and_has_no_exam_dates():
+    [late] = preview(item("Report", "week", code="FIT1045", subject="Programming", week=13), session=TYPED)
+    assert late["note"] == "The outline says week 13, but your session only has teaching weeks 1 to 12, so the date is unknown."
+    [exam] = preview(item("Final exam", "exam_period", code="FIT1045", subject="Programming"), session=TYPED)
+    assert (exam["due_date"], exam["status"]) == (None, "unknown")
+    assert exam["note"] == "The outline says this is in the exam period, so check your university's exam timetable for the date."

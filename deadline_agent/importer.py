@@ -75,8 +75,10 @@ def build_preview(
     canvas_rows = _apply_canvas(outline, events, subject_names)
 
     rows = [row for _, row in outline] + canvas_rows
+    # Groot only knows the NSW public holidays, and a session the student described may be in another state
+    holidays = not calendars.is_custom(session)
     for row in rows:
-        _check_date(row, now)
+        _check_date(row, now, holidays)
         row["include"] = row["status"] in ("exact", "assumed")
     return rows
 
@@ -153,7 +155,11 @@ def _outline_rows(item: ExtractedItem, session: str, classes: list[TimetableClas
     if when == "recurring":
         return _recurring_rows(item, session)
     if when == "exam_period":
-        first, last = calendars.session_info(session)["exams"]
+        exams = calendars.session_info(session)["exams"]
+        if exams is None:  # a session the student described, where Groot does not know the exam dates
+            note = "The outline says this is in the exam period, so check your university's exam timetable for the date."
+            return [_row(item, "unknown", None, note)]
+        first, last = exams
         note = (
             f"The outline says this is in the exam period ({tools._friendly_day(first)} to "
             f"{tools._friendly_day(last)}), so check the {calendars.university_name(session)} exam timetable for the date."
@@ -418,12 +424,12 @@ def _canvas_row(event: CanvasEvent, subject_names: dict[str, str], note: str) ->
 # ---------- checks for every row with a date ----------
 
 
-def _check_date(row: PreviewRow, now: datetime) -> None:
-    """Flag a date on a public holiday, and mark a date that has passed as past."""
+def _check_date(row: PreviewRow, now: datetime, holidays: bool = True) -> None:
+    """Flag a date on a NSW public holiday (unless holidays is False), and mark a date that has passed as past."""
     if row["due_date"] is None:
         return
     due = tools._parse_due_date(row["due_date"])
-    if calendars.is_public_holiday(due.date()):
+    if holidays and calendars.is_public_holiday(due.date()):
         holiday = calendars.PUBLIC_HOLIDAYS[due.date()]
         row["note"] += f" {tools._friendly_day(due)} is a NSW public holiday ({holiday}), so check this date."
         if row["status"] == "exact":
