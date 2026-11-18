@@ -135,15 +135,15 @@ The [full reference](docs/reference.md) covers:
 
 ## How this was built
 
-Richard designed and directed Groot. He decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. He also reviewed and tested each change before it was merged.
+I'm Richard Yan, and I designed and directed Groot. I decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. I also reviewed and tested each change before it was merged.
 
-Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to Richard's instructions. Every change had to pass three kinds of checks before it went in:
+Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. Every change had to pass three kinds of checks before it went in:
 
 - **About 2,100 automated tests**, run by GitHub Actions on every change.
 - **Live tests with the real AI model**, for example real outlines from UNSW, USyd and Macquarie.
 - **The measured evaluations** above, which score the agent on real outlines and realistic chat messages, mistakes included.
 
-The git history shows this openly: commits are authored by Richard, with Claude credited as co-author where it wrote the code.
+The git history shows this openly: the commits are authored by me, with Claude credited as co-author where it wrote the code.
 
 ## Licence
 
