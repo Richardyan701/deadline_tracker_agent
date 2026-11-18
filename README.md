@@ -6,7 +6,7 @@
 
 It has the calendars of **UTS, UNSW, the University of Sydney and Macquarie University** built in. At any other university, you type when week 1 starts and it does the rest.
 
-Designed and built by Richard Yan, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini, and with Claude as a coding partner (see [How this was built](#how-this-was-built)). It runs on your own computer.
+Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydney. I'm learning programming, mathematics and data analytics, and I built Groot to put them to work on a real problem uni students have: keeping track of every deadline across their subjects. I designed it and directed its building, with Google's Agent Development Kit (ADK), Gemini, and Claude as a coding partner (see [How this was built](#how-this-was-built)). It runs on your own computer.
 
 ![Groot in action: the home page, then importing a sample outline](docs/images/groot-demo.gif)
 
@@ -135,17 +135,15 @@ The [full reference](docs/reference.md) covers:
 
 ## How this was built
 
-Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydney. I'm learning programming, mathematics and data analytics, and I built Groot to put them to work on a real problem uni students have: keeping track of every deadline across their subjects.
+I designed and directed Groot. I decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. I approved every change that went in, and I use Groot for my own deadlines.
 
-I designed and directed Groot. I decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. I also reviewed and tested each change before it was merged.
+Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. To make sure it works, not just looks right:
 
-Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. Every change had to pass three kinds of checks before it went in:
+- **Every change had to pass about 2,100 automated tests**, which GitHub runs before anything can be merged.
+- **The parts that use AI were also tried live with the real model**, for example on real outlines from UNSW, USyd and Macquarie.
+- **The evaluations above measure how accurate the AI parts are**, mistakes included.
 
-- **About 2,100 automated tests**, run by GitHub Actions on every change.
-- **Live tests with the real AI model**, for example real outlines from UNSW, USyd and Macquarie.
-- **The measured evaluations** above, which score the agent on real outlines and realistic chat messages, mistakes included.
-
-The git history shows this openly: the commits are authored by me, with Claude credited as co-author where it wrote the code.
+The git history shows this openly: Claude is credited as co-author on the commits where it wrote code, and some commits made in Claude's cloud sessions carry Claude's name.
 
 ## Licence
 
