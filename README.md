@@ -10,7 +10,7 @@ Designed and built by Richard Yan, a first-year Artificial Intelligence student 
 
 ![Groot in action: the home page, then importing a sample outline](docs/images/groot-demo.gif)
 
-*Importing the made-up sample outline that comes with Groot. Every deadline shown is made up.*
+*Highlights: the home page, adding a deadline in plain English, importing the sample outline, and asking Groot what's due. Every deadline shown is made up. [Watch the full 70-second demo](docs/media/groot-demo.mp4) (MP4, 6 MB).*
 
 > **Privacy:** your deadlines stay on your computer. Chat messages and outlines you preview go to Google's Gemini, and on the free tier Google may use and review them. So don't type anything private, like your student ID, passwords, or health and money details.
 >
