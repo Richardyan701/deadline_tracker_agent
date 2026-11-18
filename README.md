@@ -135,7 +135,9 @@ The [full reference](docs/reference.md) covers:
 
 ## How this was built
 
-I'm Richard Yan, and I designed and directed Groot. I decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. I also reviewed and tested each change before it was merged.
+Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydney. I'm learning programming, mathematics and data analytics, and I built Groot to put them to work on a real problem uni students have: keeping track of every deadline across their subjects.
+
+I designed and directed Groot. I decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. I also reviewed and tested each change before it was merged.
 
 Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. Every change had to pass three kinds of checks before it went in:
 
