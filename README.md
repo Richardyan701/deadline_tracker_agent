@@ -6,11 +6,11 @@
 
 It has the calendars of **UTS, UNSW, the University of Sydney and Macquarie University** built in. At any other university, you type when week 1 starts and it does the rest.
 
-Built by Richard, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini. It runs on your own computer.
+Designed and built by Richard Yan, a first-year Artificial Intelligence student at UTS in Sydney, with Google's Agent Development Kit (ADK) and Gemini, and with Claude as a coding partner (see [How this was built](#how-this-was-built)). It runs on your own computer.
 
-![Groot's home page with example deadlines](docs/images/groot-home.png)
+![Groot in action: the home page, then importing a sample outline](docs/images/groot-demo.gif)
 
-*The home page, shown with made-up example deadlines.*
+*Importing the made-up sample outline that comes with Groot. Every deadline shown is made up.*
 
 > **Privacy:** your deadlines stay on your computer. Chat messages and outlines you preview go to Google's Gemini, and on the free tier Google may use and review them. So don't type anything private, like your student ID, passwords, or health and money details.
 >
@@ -132,6 +132,18 @@ The [full reference](docs/reference.md) covers:
 - [Setup details](docs/reference.md#setup) and [troubleshooting](docs/reference.md#troubleshooting)
 - [How it is built](docs/reference.md#how-it-is-built), [security and privacy](docs/reference.md#security-and-privacy) and [known limitations](docs/reference.md#limitations-and-known-gaps)
 - [The tests](docs/reference.md#tests-and-ci) and [how the accuracy was measured](docs/reference.md#measuring-how-well-it-works)
+
+## How this was built
+
+Richard designed and directed Groot. He decided what it should do and what it must never do: hold no one's data, cost nothing to run, keep sensitive details away from the AI, and check facts against real sources before building on them. He also reviewed and tested each change before it was merged.
+
+Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to Richard's instructions. Every change had to pass three kinds of checks before it went in:
+
+- **About 2,100 automated tests**, run by GitHub Actions on every change.
+- **Live tests with the real AI model**, for example real outlines from UNSW, USyd and Macquarie.
+- **The measured evaluations** above, which score the agent on real outlines and realistic chat messages, mistakes included.
+
+The git history shows this openly: commits are authored by Richard, with Claude credited as co-author where it wrote the code.
 
 ## Licence
 
