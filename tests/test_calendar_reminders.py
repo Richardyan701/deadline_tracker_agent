@@ -59,15 +59,14 @@ def test_choosing_reminder_times():
     result = tools.choose_reminders(["30m", "1d", "5h"])  # any order
     assert result == {
         "status": "success",
-        "message": "Your calendar will remind you 1 day, 5 hours and 30 minutes before each deadline. "
-        "Export to calendar again to update it.",
+        "message": "Reminders set for 1 day, 5 hours and 30 minutes before. Export again to update your calendar.",
     }
     assert tools.chosen_reminders() == ["1d", "5h", "30m"]  # longest first
 
 
 def test_no_reminders():
     assert tools.choose_reminders([])["message"] == (
-        "Reminders are off. Export to calendar again to update your calendar."
+        "Reminders turned off. Export again to update your calendar."
     )
     assert tools.chosen_reminders() == []
 
@@ -157,11 +156,11 @@ def test_the_note_keeps_fingerprints_not_deadlines(deadlines_file):
 def test_the_page_says_when_to_export(client):
     assert '<p id="export-nudge" class="nudge" hidden></p>' in client.get("/groot").text  # nothing to export
     tools.add_deadline("Essay", "20 nov 5pm")
-    assert "Export to calendar so your calendar app can remind you before each deadline." in client.get("/groot").text
+    assert "Export to calendar to get reminders on your phone or laptop." in client.get("/groot").text
     client.post("/groot/api/export", json={})
     assert '<p id="export-nudge" class="nudge" hidden></p>' in client.get("/groot").text
     tools.add_deadline("Quiz", "friday")
-    assert "Your deadlines or reminder times changed since your last export." in client.get("/groot").text
+    assert "Your calendar is out of date. Export again to update it." in client.get("/groot").text
 
 
 def test_the_reminder_picker(client):

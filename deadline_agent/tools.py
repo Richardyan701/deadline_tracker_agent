@@ -469,11 +469,10 @@ def choose_reminders(reminders) -> dict:
     except OSError as error:
         return _not_saved(error)
     if not keys:
-        return {"status": "success", "message": "Reminders are off. Export to calendar again to update your calendar."}
+        return {"status": "success", "message": "Reminders turned off. Export again to update your calendar."}
     return {
         "status": "success",
-        "message": f"Your calendar will remind you {reminder_words(keys)} before each deadline. "
-        "Export to calendar again to update it.",
+        "message": f"Reminders set for {reminder_words(keys)} before. Export again to update your calendar.",
     }
 
 
