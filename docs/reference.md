@@ -214,9 +214,9 @@ The Import from outlines page (<http://127.0.0.1:8000/groot/import>) works in fo
 
 **No outline to hand?** The page has a link to download a made-up sample outline (`web/static/sample-outline.docx`, for a subject called 31999 Study Skills for University that does not exist). Drop it in to see how the import works. Its five tasks were chosen to show every kind of row: exact dates, an assumed Friday, a weekly quiz, a tutorial that needs your date and an exam with no date yet.
 
-1. **Choose your university and files.** First pick **your university and session**: UTS, UNSW, the University of Sydney or Macquarie University, each with its 2027 sessions. Nothing is chosen for you, because each university counts its weeks differently and a wrong guess would give wrong dates. Your browser remembers your pick for next time, and sessions that have finished are not listed. Then drag 1 to 8 subject outlines onto the box, or click **Choose outline files**. Each one can be up to 10 MB and any kind of file in [Supported file types](#supported-file-types), for example the PDF from your university, a Word file or a photo of the assessment table. A subject outline is what UTS calls it. A UNSW course outline, a USyd unit outline and a Macquarie unit guide all work the same way. Depending on your university, you can also add:
+1. **Choose your university and files.** First pick **your university and session**: UTS, UNSW, the University of Sydney or Macquarie University in Australia, or NUS, NTU or SMU in Singapore, each with its 2027 sessions. The picker is grouped by country, with your own country first. Nothing is chosen for you, because each university counts its weeks differently and a wrong guess would give wrong dates. Your browser remembers your pick for next time, and sessions that have finished are not listed. Then drag 1 to 8 subject outlines onto the box, or click **Choose outline files**. Each one can be up to 10 MB and any kind of file in [Supported file types](#supported-file-types), for example the PDF from your university, a Word file or a photo of the assessment table. A subject outline is what UTS calls it. A UNSW course outline, a USyd unit outline and a Macquarie unit guide all work the same way. Depending on your university, you can also add:
    - **Your UTS timetable** (UTS only so far), as the PDF export of your timetable. Only a PDF works here. Groot reads it with plain code to find the day and time of your tutorials, so it never uses Gemini.
-   - **Your Canvas calendar feed link** (UTS and USyd, because UNSW and Macquarie use Moodle, which Groot cannot read yet). In Canvas, open Calendar, then Calendar Feed, and copy the link. Groot fetches it once to get Canvas's exact due dates. It only accepts `https` links to `canvas.uts.edu.au`, `canvas.sydney.edu.au` or an `instructure.com` address, waits at most 10 seconds, reads at most 2 MB and never follows a redirect. The link works like a password, so Groot never saves it, logs it or shows it again, and you should keep it private.
+   - **Your Canvas calendar feed link** (UTS, USyd and NUS. UNSW and Macquarie use Moodle, NTU uses Blackboard (NTULearn) and SMU uses D2L Brightspace (eLearn), which Groot cannot read yet). In Canvas, open Calendar, then Calendar Feed, and copy the link. Groot fetches it once to get Canvas's exact due dates. It only accepts `https` links to `canvas.uts.edu.au`, `canvas.sydney.edu.au`, `canvas.nus.edu.sg` or an `instructure.com` address, waits at most 10 seconds, reads at most 2 MB and never follows a redirect. The link works like a password, so Groot never saves it, logs it or shows it again, and you should keep it private.
 2. **Preview.** Groot sends each outline to Gemini once, and Gemini lists every assessment item with the outline's own words for when it happens. Gemini is told to copy what the outline says and never to work out a date, and its answer is checked in plain Python before it is used. The page tells you how many requests Preview will use before you click. Every file is checked before anything is sent: a kind of file Groot cannot read stops the whole preview straight away, and a file that turns out to have no readable text is reported without using a request. One outline that Gemini cannot read never stops the others.
 3. **Check.** The review table has one row for each deadline, with a note that says where its date came from and how sure Groot is:
 
@@ -242,6 +242,9 @@ Each university counts its weeks differently:
 | UNSW | 10 | None. Week 6 is "flexibility week", which keeps its number even though most classes do not run |
 | University of Sydney | 13 | A one-week mid-semester break with no number |
 | Macquarie University | 13 | A two-week mid-session recess with no number |
+| NUS | 13 | Recess week after week 6, and reading week before the exams, both with no number |
+| NTU | 13 | Recess week after week 7, with no number |
+| SMU | 13, numbered 1 to 14 | Week 8 is recess week and keeps its number. Weeks 15 and 16 are the exam weeks |
 
 The sessions Groot knows (each university's main calendar only):
 
@@ -258,8 +261,14 @@ The sessions Groot knows (each university's main calendar only):
 | USyd Semester 2 2027 | Monday 2 Aug 2027 | Mid-semester break 27 Sep to 4 Oct (Mon 4 Oct is Labour Day, and week 9 is that week) | 15 to 27 Nov |
 | Macquarie Session 1 2027 | Monday 22 Feb 2027 | Recess 12 to 25 Apr | 7 to 25 Jun |
 | Macquarie Session 2 2027 | Monday 26 Jul 2027 | Recess 20 Sep to 4 Oct (Mon 4 Oct is Labour Day, and week 9 is that week) | 8 to 26 Nov |
+| NUS AY2026/27 Semester 2 | Monday 11 Jan 2027 | Recess week 20 to 28 Feb, reading week 17 to 23 Apr | 24 Apr to 8 May |
+| NUS AY2027/28 Semester 1 | Monday 9 Aug 2027 | Recess week 18 to 26 Sep, reading week 13 to 19 Nov | 20 Nov to 4 Dec |
+| NTU AY2026/27 Semester 2 | Monday 11 Jan 2027 | Recess week 1 to 5 Mar | Revision and exams 19 Apr to 7 May |
+| NTU AY2027/28 Semester 1 (indicative) | Monday 9 Aug 2027 | Recess week 27 Sep to 1 Oct | Revision and exams 15 Nov to 3 Dec |
+| SMU AY2026/27 Term 2 | Monday 11 Jan 2027 | None (week 8, 1 to 7 Mar, is recess week) | 19 Apr to 2 May |
+| SMU AY2027/28 Term 1 | Monday 16 Aug 2027 | None (week 8, 4 to 10 Oct, is recess week) | 22 Nov to 5 Dec |
 
-The dates come from each university's own calendar page, and each was checked against a second source, the Universities Australia 2026-27 academic calendar. The links are at the top of `deadline_agent/calendars.py`.
+The dates come from each university's own calendar page. The Australian ones were checked against a second source, the Universities Australia 2026-27 academic calendar. The Singapore ones come from each university's official calendar PDF, agree with third-party summaries such as NTUMods where those cover them, and SMU's week numbering matches a real SMU course outline ("8 (Recess Week)", "15 - 16 (Exam Weeks)"). NTU marks its AY2027/28 calendar as **indicative**, so those dates may still change. The links are at the top of `deadline_agent/calendars.py`.
 
 **If your university is not listed,** pick **My university is not listed** at the bottom of the picker and type your own session's dates: any day in week 1, the number of teaching weeks, and which week the mid-session break follows and how long it is (leave both at 0 if there is no break, or if the break weeks keep their week numbers). Groot then turns week numbers into dates the same way. For a session you type yourself, Groot does not know the exam dates or the public holidays, it treats every time as Sydney time, and the timetable and Canvas fields are not offered. Your browser remembers what you typed.
 
@@ -274,7 +283,8 @@ The rules, for each item:
 - **An exam in the exam period** has no date yet. The note tells you to check your university's exam timetable.
 - **A date in UNSW's flexibility week** (week 6) keeps its date, because the week keeps its number, but it is flagged and at best Assumed, since a weekly quiz or class test may skip that week.
 - **A Canvas event** that clearly matches a row, in the same subject and with a similar name, gives that row Canvas's exact date. A Canvas event that matches nothing gets a row of its own. When two rows are equally close, nothing is merged and both are flagged so you can check for a duplicate.
-- **A date on a NSW public holiday**, like Labour Day on Monday 5 Oct 2026, is flagged in the note and is at best Assumed.
+- **A date on a public holiday where the university is** is flagged in the note and is at best Assumed: NSW public holidays for the Australian universities (like Labour Day on Monday 5 Oct 2026), and Singapore's 2027 public holidays for NUS, NTU and SMU (from the Ministry of Manpower's official list, like Hari Raya Puasa on Wednesday 10 Mar 2027).
+- **A week in SMU's numbered exam weeks** (15 and 16) has no date yet, and the note says it falls in the exam period and to check the SMU exam timetable.
 
 ## Supported file types
 

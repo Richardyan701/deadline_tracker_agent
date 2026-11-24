@@ -47,15 +47,17 @@ PERCENT_KEYS = ("weight_percent", "mark_percent")
 
 # Every date and time is local time where the student studies: Sydney time unless
 # GROOT_COUNTRY in .env says otherwise (see region.py). It is read once, when Groot starts.
-PLACE = region.country()  # {"name": "Australia", "time_zone": "Australia/Sydney", "city": "Sydney"}
+PLACE = region.country()  # {"name": "Australia", "time_zone": "Australia/Sydney", "city": "Sydney", ...}
 LOCAL_TIME = ZoneInfo(PLACE["time_zone"])
 
 # What a subject code looks like: five digits at UTS ("33130"), or four
 # letters then four digits at UNSW, USyd and Macquarie ("COMP1511"). Other
 # universities vary a little, like "FIT1045" at Monash, "COMP10001" at
 # Melbourne and "KIT101" at Tasmania, so two to five letters then three to
-# five digits is accepted, and so are five or six digits alone.
-SUBJECT_CODE = r"(?:[0-9]{5,6}|[A-Z]{2,5}[0-9]{3,5})"
+# five digits is accepted, and so are five or six digits alone. In Singapore,
+# NUS codes can end in a letter or two ("CS1010S"), NTU codes are like
+# "SC1003", and SMU's core courses have a prefix and a hyphen ("COR-IS1704").
+SUBJECT_CODE = r"(?:[0-9]{5,6}|(?:[A-Z]{2,5}-)?[A-Z]{2,5}[0-9]{3,5}[A-Z]{0,2})"
 
 # The two saved forms, for example "2026-11-05" and "2026-11-05 14:30".
 ISO_DATE = r"[0-9]{4}-[0-9]{2}-[0-9]{2}"
@@ -100,6 +102,19 @@ GRADE_BANDS = {
     "distinction": ("Distinction", 75),
     "high distinction": ("High Distinction", 85),
 }
+# The grade calculator only knows these Australian bands. Universities elsewhere, like NUS,
+# NTU and SMU in Singapore, give letter grades and a GPA instead, so it is switched off there.
+GRADES_OFF = (
+    "The grade calculator only knows Australian grade bands (Pass 50, Credit 65, Distinction 75 and "
+    "High Distinction 85), so it is switched off outside Australia. Your marks and weights are still saved."
+)
+
+
+def _grade_bands_apply() -> bool:
+    """True when the student is in Australia (their time zone is an Australian one), where the bands apply."""
+    return PLACE["time_zone"].startswith("Australia/")
+
+
 # Short names students use for the bands
 BAND_NICKNAMES = {"p": "pass", "c": "credit", "cr": "credit", "d": "distinction", "hd": "high distinction"}
 
@@ -1456,6 +1471,8 @@ def grade_needed(subject: str, target: str = "credit") -> dict:
         (for example weights that are missing or do not add up to 100).
         Always pass the warnings on.
     """
+    if not _grade_bands_apply():
+        return {"status": "error", "message": GRADES_OFF}
     try:
         subject = _text(subject, "subject")
         target_text = _text(target, "target").lower() or "credit"

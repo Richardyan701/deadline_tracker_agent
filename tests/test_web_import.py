@@ -187,6 +187,22 @@ def test_the_page_script_takes_its_file_endings_from_the_picker():
     assert "is not a PDF" not in code
 
 
+# The Singapore universities in the picker, after the Australian ones for a student in Australia
+SINGAPORE_GROUPS = (
+    '<optgroup label="Singapore: National University of Singapore (NUS)">'
+    '<option value="NUS_AY2627_S2" data-university="nus">AY2026/27 Semester 2 (Jan to May 2027)</option>'
+    '<option value="NUS_AY2728_S1" data-university="nus">AY2027/28 Semester 1 (Aug to Dec 2027)</option>'
+    "</optgroup>"
+    '<optgroup label="Singapore: Nanyang Technological University (NTU)">'
+    '<option value="NTU_AY2627_S2" data-university="ntu">AY2026/27 Semester 2 (Jan to May 2027)</option>'
+    '<option value="NTU_AY2728_S1" data-university="ntu">AY2027/28 Semester 1 (Aug to Dec 2027, indicative)</option>'
+    "</optgroup>"
+    '<optgroup label="Singapore: Singapore Management University (SMU)">'
+    '<option value="SMU_AY2627_T2" data-university="smu">AY2026/27 Term 2 (Jan to May 2027)</option>'
+    '<option value="SMU_AY2728_T1" data-university="smu">AY2027/28 Term 1 (Aug to Dec 2027)</option>'
+    "</optgroup>"
+)
+
 # The last choice in the picker, for a student at any other university
 NOT_LISTED = (
     '<optgroup label="Another university">'
@@ -206,24 +222,25 @@ def test_the_session_picker_starts_empty_and_groups_sessions_by_university(clien
     assert picker(client.get("/groot/import").text) == (
         '<select id="session-select" aria-describedby="session-hint">'
         '<option value="">Choose your university and session</option>'
-        '<optgroup label="University of Technology Sydney (UTS)">'
+        '<optgroup label="Australia: University of Technology Sydney (UTS)">'
         '<option value="SPR2026" data-university="uts">Spring 2026</option>'
         '<option value="AUT2027" data-university="uts">Autumn 2027</option>'
         '<option value="SPR2027" data-university="uts">Spring 2027</option>'
         "</optgroup>"
-        '<optgroup label="UNSW Sydney">'
+        '<optgroup label="Australia: UNSW Sydney">'
         '<option value="UNSW_T1_2027" data-university="unsw">Term 1 2027</option>'
         '<option value="UNSW_T2_2027" data-university="unsw">Term 2 2027</option>'
         '<option value="UNSW_T3_2027" data-university="unsw">Term 3 2027</option>'
         "</optgroup>"
-        '<optgroup label="University of Sydney">'
+        '<optgroup label="Australia: University of Sydney">'
         '<option value="USYD_S1_2027" data-university="usyd">Semester 1 2027</option>'
         '<option value="USYD_S2_2027" data-university="usyd">Semester 2 2027</option>'
         "</optgroup>"
-        '<optgroup label="Macquarie University">'
+        '<optgroup label="Australia: Macquarie University">'
         '<option value="MQ_S1_2027" data-university="mq">Session 1 2027</option>'
         '<option value="MQ_S2_2027" data-university="mq">Session 2 2027</option>'
         "</optgroup>"
+        + SINGAPORE_GROUPS
         + NOT_LISTED
         + "</select>"
     )
@@ -263,7 +280,7 @@ def test_the_page_says_when_a_universitys_calendar_has_run_out(client, monkeypat
 def test_the_page_names_every_university_once_all_calendars_have_run_out(client, monkeypatch):
     monkeypatch.setattr(tools, "_now", lambda: datetime(2028, 1, 10, 9, 0))
     text = client.get("/groot/import").text
-    assert "Groot's calendars for UTS, UNSW, USyd and Macquarie have run out" in text
+    assert "Groot's calendars for UTS, UNSW, USyd, Macquarie, NUS, NTU and SMU have run out" in text
     assert picker(text) == (
         '<select id="session-select" aria-describedby="session-hint">'
         '<option value="">Choose your university and session</option>' + NOT_LISTED + "</select>"
@@ -279,7 +296,7 @@ def test_the_timetable_and_canvas_fields_start_hidden_until_a_university_is_chos
 def test_the_page_script_shows_each_university_only_the_fields_it_can_use():
     code = (web_app.STATIC_DIR / "import.js").read_text(encoding="utf-8")
     assert 'const USES_TIMETABLE = ["uts"];' in code  # only UTS timetables can be read
-    assert 'const USES_CANVAS = ["uts", "usyd"];' in code  # UNSW and Macquarie use Moodle
+    assert 'const USES_CANVAS = ["uts", "usyd", "nus"];' in code  # UNSW and Macquarie use Moodle, NTU Blackboard, SMU Brightspace
     assert set(json.loads(code.split("const USES_CANVAS = ")[1].split(";")[0])) <= set(calendars.UNIVERSITIES)
     # No preview without a session
     assert 'previewButton.disabled = count === 0 || sessionCode() === "";' in code
@@ -420,7 +437,7 @@ def test_the_canvas_feed_is_merged_and_its_link_is_never_echoed_or_logged(client
         (f"http://canvas.uts.edu.au/feeds/calendars/{SECRET}.ics", "The Canvas link must start with https://."),
         (
             f"https://evil.example/{SECRET}.ics",
-            "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au or instructure.com can be used.",
+            "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au, canvas.nus.edu.sg or instructure.com can be used.",
         ),
     ],
 )

@@ -22,9 +22,10 @@ from . import tools
 
 
 # Only links to these hosts are fetched, so the server cannot be tricked into
-# visiting some other site. UTS and USyd use Canvas. UNSW and Macquarie use
-# Moodle instead, which Groot cannot read yet.
-CANVAS_HOSTS = ("canvas.uts.edu.au", "canvas.sydney.edu.au")
+# visiting some other site. UTS, USyd and NUS use Canvas. UNSW and Macquarie use
+# Moodle, NTU uses Blackboard (NTULearn) and SMU uses D2L Brightspace (eLearn),
+# which Groot cannot read yet.
+CANVAS_HOSTS = ("canvas.uts.edu.au", "canvas.sydney.edu.au", "canvas.nus.edu.sg")
 INSTRUCTURE_DOMAIN = ".instructure.com"  # any host ending in this, like uts.instructure.com
 
 TIMEOUT_SECONDS = 10

@@ -9,7 +9,7 @@ The browser then shows that text as it is and never runs it as code.
 from datetime import datetime
 from html import escape
 
-from deadline_agent import calendars, documents, model_choice, tools
+from deadline_agent import calendars, documents, model_choice, region, tools
 
 # Opens ADK's chat with Groot already chosen
 CHAT_PATH = "/dev-ui/?app=deadline_agent"
@@ -191,7 +191,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 </section>
 <section aria-labelledby="grades-heading">
 <h2 id="grades-heading">Grades</h2>
-<p class="hint">{escape(GRADES_NOTE)}</p>
+<p class="hint">{escape(GRADES_NOTE if tools._grade_bands_apply() else tools.GRADES_OFF)}</p>
 <p id="mark-message" class="message" role="status"></p>
 {grades_section(deadlines, grades or [])}
 </section>
@@ -236,7 +236,14 @@ def heads_up(clashes: list[dict]) -> str:
 
 
 def grades_section(deadlines: list[dict], grades: list[dict]) -> str:
-    """The form to enter a mark or weight, then a summary for each subject."""
+    """The form to enter a mark or weight, then a summary for each subject.
+
+    Outside Australia the Australian grade bands do not apply, so the section
+    is left empty (the note above it says why). It is still drawn, because
+    home.js swaps in a fresh copy after each change.
+    """
+    if not tools._grade_bands_apply():
+        return '<div id="grades"></div>'
     if not deadlines:
         return '<div id="grades"><p class="empty">Add some deadlines first, then enter your marks here.</p></div>'
     options = "".join(
@@ -383,23 +390,29 @@ CUSTOM_FIELDS = f"""<fieldset id="custom-field" class="field" hidden>
 
 
 def _session_picker(sessions: dict) -> str:
-    """The options of the university and session picker, grouped by university.
+    """The options of the university and session picker, grouped by country, then university.
 
-    It starts on an empty choice on purpose. Each university counts its
+    The student's own country (tools.PLACE) comes first, so a student in
+    Singapore sees NUS, NTU and SMU at the top. It starts on an empty choice on purpose. Each university counts its
     weeks differently, so a wrong guess would give wrong dates, and the
     student has to pick. import.js remembers their pick for next time.
     Each option carries its university, which import.js uses to show only
     the extra fields that university can use.
     """
     groups = ""
-    for key, university in calendars.UNIVERSITIES.items():
+    home_first = sorted(
+        calendars.UNIVERSITIES.items(),
+        key=lambda item: region.COUNTRIES[item[1]["country"]]["name"] != tools.PLACE["name"],  # sorted keeps the order otherwise
+    )
+    for key, university in home_first:
+        country = region.COUNTRIES[university["country"]]["name"]
         options = "".join(
             f'<option value="{escape(code)}" data-university="{escape(key)}">{escape(info["name"])}</option>'
             for code, info in sessions.items()
             if info["university"] == key
         )
         if options:
-            groups += f'<optgroup label="{escape(university["full_name"])}">{options}</optgroup>'
+            groups += f'<optgroup label="{escape(country)}: {escape(university["full_name"])}">{options}</optgroup>'
     # A student anywhere else types their own session's dates into the fields below the picker
     groups += (
         '<optgroup label="Another university">'

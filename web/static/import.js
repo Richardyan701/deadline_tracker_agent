@@ -47,10 +47,10 @@ const reviewBody = document.getElementById("review-body");
 const saveButton = document.getElementById("save-button");
 const saveMessage = document.getElementById("save-message");
 
-// What each university can add to its outlines. Only UTS timetables can be
-// read so far, and only UTS and USyd use Canvas (UNSW and Macquarie use Moodle).
+// What each university can add to its outlines. Only UTS timetables can be read so far,
+// and only UTS, USyd and NUS use Canvas (UNSW and Macquarie use Moodle, NTU Blackboard, SMU Brightspace).
 const USES_TIMETABLE = ["uts"];
-const USES_CANVAS = ["uts", "usyd"];
+const USES_CANVAS = ["uts", "usyd", "nus"];
 // What Groot calls the AI it is using, like "Gemini" or "Groq". The server puts it on the page.
 const AI = document.body.dataset.ai || "Gemini";
 // Where the browser remembers the session picked last time, so it is only chosen once

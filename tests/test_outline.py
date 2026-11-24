@@ -350,6 +350,12 @@ def test_a_missing_or_odd_subject_code_is_an_error(code):
         ("INFO1110", "INFO1110"),
         ("comp1511", "COMP1511"),  # made capitals
         ("COMP 1511", "COMP1511"),  # some outlines print a space in the code
+        ("CS1010S", "CS1010S"),  # NUS: a letter after the digits
+        ("cs2030s", "CS2030S"),
+        ("SC1003", "SC1003"),  # NTU: two letters then four digits
+        ("COR-IS1704", "COR-IS1704"),  # SMU core course: a prefix and a hyphen
+        ("COR\u2010IS1704", "COR-IS1704"),  # the same with a Unicode hyphen, as some SMU documents print it
+        ("ACCT102", "ACCT102"),  # SMU discipline course
         ("FIT1045", "FIT1045"),  # Monash: three letters then four digits
         ("COMP10001", "COMP10001"),  # Melbourne: four letters then five digits
         ("KIT101", "KIT101"),  # Tasmania: three letters then three digits

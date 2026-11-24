@@ -110,3 +110,34 @@ def test_singapore_is_always_gmt_plus_8_as_its_label_says():
     zone = ZoneInfo("Asia/Singapore")
     for month in range(1, 13):
         assert datetime(2027, month, 15, tzinfo=zone).utcoffset() == timedelta(hours=8)
+
+
+# ---------- what changes for a student in Singapore ----------
+
+
+def test_the_grade_calculator_is_switched_off_outside_australia(singapore):
+    result = tools.grade_needed("CS1010S")
+    assert result == {"status": "error", "message": tools.GRADES_OFF}
+    assert "switched off outside Australia" in tools.GRADES_OFF
+
+
+def test_the_grade_calculator_works_in_australia():
+    assert tools._grade_bands_apply()
+
+
+def test_the_picker_lists_singapore_first_for_a_student_in_singapore(singapore):
+    from web import pages
+    from deadline_agent import calendars
+    from datetime import date as day
+    html = pages._session_picker(calendars.open_sessions(day(2026, 12, 1)))
+    assert html.index('label="Singapore: National University of Singapore (NUS)"') < html.index('label="Australia: University of Technology Sydney (UTS)"')
+    assert html.index('label="Singapore: Singapore Management University (SMU)"') < html.index('label="Australia:')
+
+
+def test_the_home_page_grades_section_explains_why_it_is_off(singapore, monkeypatch):
+    from web import pages
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 3, 1, 9, 0))
+    html = pages.home_page({"status": "success", "message": "", "overdue": [], "due_today": [], "due_soon": [], "clashes": []},
+                           [], datetime(2027, 3, 1, 9, 0), [])
+    assert tools.GRADES_OFF in html
+    assert '<div id="grades"></div>' in html

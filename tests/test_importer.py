@@ -737,3 +737,72 @@ def test_a_typed_session_names_its_own_last_week_and_has_no_exam_dates():
     [exam] = preview(item("Final exam", "exam_period", code="FIT1045", subject="Programming"), session=TYPED)
     assert (exam["due_date"], exam["status"]) == (None, "unknown")
     assert exam["note"] == "The outline says this is in the exam period, so check your university's exam timetable for the date."
+
+
+# ---------- Singapore ----------
+#
+# 2027 dates used below (from each university's official calendar):
+# NUS AY2026/27 Semester 2: week 6 Mon 15 Feb, recess 20 to 28 Feb, week 7 Mon 1 Mar.
+# SMU AY2026/27 Term 2: weeks 1 to 14 from Mon 11 Jan, week 8 (Mon 1 Mar) is recess week.
+
+NUS = {"code": "CS1010S", "subject": "Programming Methodology", "session": "NUS_AY2627_S2"}
+SMU = {"code": "COR-IS1704", "subject": "Computational Thinking and Programming", "session": "SMU_AY2627_T2"}
+
+
+def test_a_date_on_a_singapore_holiday_is_flagged_as_a_singapore_holiday():
+    # Wed 10 Mar 2027 is Hari Raya Puasa in Singapore (week 8 of NUS Semester 2)
+    [row] = other_rows("Lab 4", "week", NUS, week=8, weekday="wednesday", time="23:59")
+    assert (row["due_date"], row["status"]) == ("2027-03-10 23:59", "assumed")
+    assert row["note"].endswith("Wednesday 10 Mar 2027 is a Singapore public holiday (Hari Raya Puasa), so check this date.")
+
+
+def test_an_nsw_holiday_is_not_flagged_for_a_singapore_university():
+    # Mon 29 Mar 2027 is Easter Monday in NSW but not a public holiday in Singapore
+    [row] = other_rows("Quiz", "week", NUS, week=11, weekday="monday", time="10:00")
+    assert (row["due_date"], row["status"]) == ("2027-03-29 10:00", "exact")
+    assert "holiday" not in row["note"]
+
+
+def test_the_nus_recess_week_is_skipped_by_a_weekly_item():
+    rows = other_rows("Tutorial worksheet", "recurring", NUS, first_week=5, last_week=8, weekday="friday", time="18:00")
+    assert [row["due_date"] for row in rows] == ["2027-02-12 18:00", "2027-02-19 18:00", "2027-03-05 18:00", "2027-03-12 18:00"]
+
+
+def test_smu_week_8_is_flagged_as_recess_week():
+    [row] = other_rows("Reflection", "week", SMU, week=8, weekday="friday", time="23:59")
+    assert (row["due_date"], row["status"]) == ("2027-03-05 23:59", "assumed")
+    assert "Week 8 is SMU's recess week, when most classes do not run, so check this date." in row["note"]
+
+
+def test_singapore_titles_keep_their_course_codes():
+    [row] = other_rows("Project", "week", SMU, week=10)
+    assert (row["title"], row["subject"]) == ("COR-IS1704 Project", "COR-IS1704 Computational Thinking and Programming")
+
+
+def test_the_exam_note_names_the_singapore_university():
+    [row] = other_rows("Final assessment", "exam_period", NUS)
+    assert row["note"] == (
+        "The outline says this is in the exam period (Saturday 24 Apr 2027 to Saturday 8 May 2027), "
+        "so check the NUS exam timetable for the date."
+    )
+
+
+@pytest.mark.parametrize("week", [15, 16])
+def test_an_smu_exam_week_points_to_the_exam_timetable(week):
+    # From a real SMU outline: "15 - 16 (Exam Weeks) Final Exam"
+    [row] = other_rows("Final Exam", "week", SMU, week=week)
+    assert (row["due_date"], row["status"]) == (None, "unknown")
+    assert row["note"] == (
+        f"The outline says week {week}, but AY2026/27 Term 2 (Jan to May 2027) only has teaching weeks 1 to 14, "
+        f"so the date is unknown. Week {week} falls in the exam period (Monday 19 Apr 2027 to Sunday 2 May 2027), "
+        "so check the SMU exam timetable for the date."
+    )
+
+
+def test_only_a_calendar_that_numbers_its_exam_weeks_gets_the_exam_hint():
+    # NUS, UNSW and Macquarie do not number their exam weeks, so a week past teaching there stays a plain "unknown"
+    for university, week in ((NUS, 14), (UNSW, 12)):
+        [row] = other_rows("Report", "week", university, week=week)
+        assert "exam period" not in row["note"]
+    [row] = other_rows("Report", "week", SMU, week=17)  # SMU numbers only weeks 15 and 16 as exam weeks
+    assert "exam period" not in row["note"]
