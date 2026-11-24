@@ -732,7 +732,7 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
 | `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
-| `tests/test_browser.py` | 30 | Groot's website: every request, backups and restores, the standard-library-only check, the build's exact file list, the page's security rules and the app icon |
+| `tests/test_browser.py` | 29 | Groot's website: every request, backups and restores, the standard-library-only check, the build's exact file list, the page's security rules and the app icon |
 | `tests/test_week_dates.py` | 62 | Week-number dates at every university, the question when no day is given, quiet weeks, public holidays, refused weeks, the saved choice and where a day falls in a session |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.

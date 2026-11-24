@@ -182,12 +182,21 @@ def test_example_deadlines_are_added_once():
 # Groot's own code, tzdata (app.js loads it into the browser) and the stand-in for python-dotenv.
 ONLY_THE_STANDARD_LIBRARY = textwrap.dedent(
     """
-    import importlib.abc, json, os, sys, tempfile, types
+    import importlib.abc, importlib.machinery, json, os, sys, sysconfig, tempfile, types
     ALLOWED = set(sys.stdlib_module_names) | {"deadline_agent", "web", "dotenv", "tzdata"}
+    # A few standard library files have names that depend on the machine, like Linux's
+    # _sysconfigdata__linux_x86_64-linux-gnu, so they are not in sys.stdlib_module_names.
+    # Those are allowed when they really are in Python's own standard library folder.
+    STDLIB = {os.path.normcase(sysconfig.get_paths()[key]) for key in ("stdlib", "platstdlib")}
+
+    def in_the_standard_library(name, path):
+        spec = importlib.machinery.PathFinder.find_spec(name, path)
+        origin = os.path.normcase(getattr(spec, "origin", None) or "")
+        return bool(origin) and "site-packages" not in origin and any(origin.startswith(folder) for folder in STDLIB)
 
     class Refuse(importlib.abc.MetaPathFinder):
         def find_spec(self, name, path, target=None):
-            if name.split(".")[0] not in ALLOWED:
+            if name.split(".")[0] not in ALLOWED and not in_the_standard_library(name, path):
                 raise ImportError(f"the website cannot import {name}")
 
     sys.meta_path.insert(0, Refuse())
