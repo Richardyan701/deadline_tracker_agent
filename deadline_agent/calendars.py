@@ -426,16 +426,36 @@ def university_name(session: str) -> str:
 
 
 def last_week(session: str) -> int:
-    """The number of the session's last teaching week: 12 at UTS, 10 at UNSW, 13 at USyd and Macquarie."""
+    """The number of the session's last teaching week: 12 at UTS, 10 at UNSW, 13 at USyd, Macquarie, NUS and NTU, 14 at SMU."""
     return len(session_info(session)["weeks"])
 
 
 def quiet_week(session: str, week: int) -> str | None:
     """What a numbered week with few classes is called, or None for an ordinary week.
 
-    Only UNSW has one: week 6 of every term is "flexibility week".
+    UNSW's week 6 of every term is "flexibility week", and SMU's week 8 is "recess week".
     """
     return session_info(session).get("quiet_weeks", {}).get(week)
+
+
+def where_is(session: str, day: date) -> str:
+    """Where a day falls in a session, in words.
+
+    One of "week 5", "week 6, UNSW's flexibility week", "a break with no week
+    number", "the exam period", "before week 1" or "after the session".
+    """
+    info = session_info(session)
+    for number, monday in enumerate(info["weeks"], 1):
+        if monday <= day <= monday + timedelta(days=6):
+            called = quiet_week(session, number)
+            return f"week {number}, {university_name(session)}'s {called}" if called else f"week {number}"
+    if any(monday <= day <= monday + timedelta(days=6) for monday in info["breaks"]):
+        return "a break with no week number"
+    if info["exams"] and info["exams"][0] <= day <= info["exams"][1]:
+        return "the exam period"
+    if day < info["weeks"][0]:
+        return "before week 1"
+    return "after the session"
 
 
 def open_sessions(today: date) -> dict:

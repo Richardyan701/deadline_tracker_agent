@@ -11,6 +11,7 @@ and adds Groot's routes under /groot:
     POST /groot/api/delete    delete a deadline       JSON {"title"}
     POST /groot/api/edit      change a deadline       JSON {"title", "new_title", "due_date", "subject"}
     POST /groot/api/mark      save a mark or weight   JSON {"title", "mark_percent", "weight_percent"}
+    POST /groot/api/session   choose the session week numbers count in  JSON {"session"}
     POST /groot/api/export    download deadlines.ics  JSON {}
     POST /groot/api/preview   read outlines (Gemini)  multipart form, see uploads.py
     POST /groot/api/save      save the ticked rows    JSON {"rows": [{"title", "due_date", "subject", "weight_percent"}]}
@@ -190,6 +191,12 @@ def edit(data: dict = Depends(json_from_groot)) -> dict:
         subject,
         remove_subject=isinstance(subject, str) and not subject.strip(),
     )
+
+
+@router.post("/api/session")
+def session(data: dict = Depends(json_from_groot)) -> dict:
+    """Choose the university session that week numbers, like "friday week 7", count in. "" switches them off."""
+    return tools.choose_session(data.get("session"))
 
 
 @router.post("/api/mark")

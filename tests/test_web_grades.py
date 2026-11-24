@@ -124,7 +124,8 @@ def test_grades_form_lists_every_deadline(client, deadlines_file):
     save(deadlines_file, deadline("Exam", weight_percent=60), deadline("Quiz", "2026-11-10", "", weight_percent=40))
     page = client.get("/groot").text
 
-    assert re.findall(r'<option value="(.*?)">', page) == ["Quiz", "Exam"]  # soonest first
+    mark_form = page[page.index('<form id="mark-form"'):page.index("</form>", page.index('<form id="mark-form"'))]
+    assert re.findall(r'<option value="(.*?)">', mark_form) == ["Quiz", "Exam"]  # soonest first
     assert '<input id="mark-mark" name="mark_percent"' in page
     assert '<input id="mark-weight" name="weight_percent"' in page
 
@@ -272,5 +273,5 @@ def test_import_page_script_sends_the_weight():
 
 def test_home_page_script_refreshes_the_new_parts():
     script = (web_app.STATIC_DIR / "home.js").read_text(encoding="utf-8")
-    assert '["heads-up", "due-soon-list", "deadline-table", "grades"]' in script
+    assert '["heads-up", "due-soon-list", "deadline-table", "grades", "week-line"]' in script
     assert 'post("/groot/api/mark"' in script

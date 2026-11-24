@@ -81,6 +81,15 @@ MONTHS |= {"sept": 9}
 # Little words students add that do not change the date, as in "due on friday at 5pm".
 FILLER_WORDS = {"due", "by", "on", "at"}
 
+# "friday week 7", "friday of week 7", "week 7 friday", "fri wk 7", or just "week 7" (the time is
+# taken out first). The week numbers come from the student's chosen university session (see
+# choose_session), so the breaks with no number, like StuVac or recess week, are skipped.
+# "week 7" with no day is recognised only so Groot can ask which day, rather than guess.
+WEEK_WORDS = re.compile(r"(?:(?P<before>(?!of\b)[a-z]+) )?(?:of )?(?:week|wk) ?(?P<week>[0-9]{1,2})(?: (?P<after>[a-z]+))?")
+
+# Where the chosen session is saved: next to the deadlines file, so the website keeps it too
+SETTINGS_NAME = "groot_settings.json"
+
 # Added to the end of every date error so the student knows what to type.
 DATE_EXAMPLES = "Try something like 'next friday 5pm', 'in 3 days' or '20 nov'."
 
@@ -346,6 +355,131 @@ def _read_day(text: str, today: date):
     return None
 
 
+def _settings_file() -> Path:
+    """The small settings file next to the deadlines file. It holds the chosen university session."""
+    return _data_file().with_name(SETTINGS_NAME)
+
+
+def _chosen_session() -> str | None:
+    """The session code chosen on the home page, like "NUS_AY2627_S2", or None if none is chosen.
+
+    A code Groot no longer knows (for example after an old calendar is
+    removed) counts as none chosen. A broken settings file is ignored.
+    """
+    from . import calendars  # here, not at the top, because calendars.py imports this module
+
+    try:
+        session = json.loads(_settings_file().read_text(encoding="utf-8")).get("session")
+        calendars.session_info(session)
+    except (OSError, ValueError, AttributeError, TypeError):
+        return None
+    return session
+
+
+def choose_session(session: str) -> dict:
+    """Choose the university session that week numbers, like "friday week 7", are counted in.
+
+    session is a code from calendars.SESSIONS, like "NUS_AY2627_S2", or "" to
+    stop using week numbers. Returns "status" and a "message".
+    """
+    from . import calendars
+
+    session = session.strip() if isinstance(session, str) else ""
+    if session:
+        try:
+            info = calendars.session_info(session)
+        except ValueError:
+            return {"status": "error", "message": "Groot does not know that session. Choose one from the list."}
+        message = (
+            f"Week numbers now count in {calendars.university_name(session)} {info['name']}. "
+            'For example, "friday week 7 5pm" works when you add a deadline.'
+        )
+    else:
+        message = "Week numbers are switched off. Choose your university and session to use them again."
+    try:
+        with _file_lock:
+            _replace_file(_settings_file(), json.dumps({"session": session}, indent=2) + "\n")
+    except OSError as error:
+        return _not_saved(error)
+    return {"status": "success", "message": message}
+
+
+def _read_week(text: str, today: date):
+    """The date for week words like "friday week 7" in the chosen session, or None if they are not week words.
+
+    Raises ValueError with a clear message when no session is chosen, the
+    week is not one of the session's weeks, the day is not a weekday name,
+    or no day is given. Groot never guesses the day: some subjects are due
+    on Friday, others on Sunday, so a guess could make reminders come late.
+    """
+    match = WEEK_WORDS.fullmatch(text)
+    if not match:
+        return None
+    from . import calendars
+
+    if match["before"] and match["after"]:
+        raise ValueError(f"Give the day once, like 'friday week 7'. {DATE_EXAMPLES}")
+    day_word = match["before"] or match["after"]
+    if day_word is not None and day_word not in WEEKDAYS:
+        raise ValueError(f"'{day_word}' is not a day of the week. Try something like 'friday week 7'.")
+    session = _chosen_session()
+    if session is None:
+        raise ValueError(
+            "To use week numbers like 'week 7', first choose your university and session on Groot's home page. "
+            "Or give the date, like '20 nov'."
+        )
+    week = int(match["week"])
+    try:
+        monday = calendars.week_start(session, week)
+    except ValueError:
+        info = calendars.session_info(session)
+        last = calendars.last_week(session)
+        message = f"{calendars.university_name(session)} {info['name']} has weeks 1 to {last}, so there is no week {week}."
+        if week in info.get("exam_weeks", ()):
+            message += " That week is in the exam period, so check the exam timetable for the date."
+        raise ValueError(message) from None
+    if day_word is None:
+        sunday = monday + timedelta(days=6)
+        raise ValueError(
+            f"Which day of week {week} is it due? Week {week} runs from Monday {monday.day} {monday.strftime('%b')} "
+            f"to Sunday {sunday.day} {sunday.strftime('%b %Y')}. Type the day too, like 'friday week {week}' "
+            f"or 'sunday week {week} 11:59pm'."
+        )
+    return monday + timedelta(days=WEEKDAYS[day_word])
+
+
+def _week_note(phrase: str, saved: str) -> str:
+    """The extra words for a deadline added with week numbers, or "" for any other date.
+
+    It names the week and session used, and warns about a quiet week (like
+    SMU's recess week) or a public holiday.
+    """
+    from . import calendars
+
+    if not isinstance(phrase, str):
+        return ""
+    words = " ".join(word for word in phrase.lower().replace(",", " ").split() if word not in FILLER_WORDS)
+    try:
+        _, words = _split_time(words)
+    except ValueError:
+        return ""
+    match = WEEK_WORDS.fullmatch(" ".join(words.split()))
+    session = _chosen_session()
+    if not match or session is None:
+        return ""
+    week = int(match["week"])
+    name = calendars.university_name(session)
+    note = f" That's week {week} of {name} {calendars.session_info(session)['name']}."
+    called = calendars.quiet_week(session, week)
+    if called:
+        note += f" Week {week} is {name}'s {called}, when most classes do not run, so check this date."
+    due = _parse_due_date(saved)
+    holiday = calendars.holiday_on(session, due.date())
+    if holiday:
+        note += f" {_friendly_day(due)} is a {holiday[0]} public holiday ({holiday[1]}), so check this date."
+    return note
+
+
 def _read_words(text: str, now: datetime):
     """Turn friendly words like 'next friday 5pm' into the saved form.
 
@@ -374,7 +508,9 @@ def _read_words(text: str, now: datetime):
     if not date_text and time is None:
         return None  # nothing was typed
     # Just a time like "5pm" means today
-    day = _read_day(date_text, now.date()) if date_text else now.date()
+    day = _read_week(date_text, now.date()) if date_text else None
+    if day is None:
+        day = _read_day(date_text, now.date()) if date_text else now.date()
     if day is None:
         return None
     if time is None:
@@ -1087,6 +1223,9 @@ def add_deadline(title: str, due_date: str, subject: str = "", weight_percent: f
             "in 30 minutes", "friday" (the next Friday after today),
             "next friday" (the Friday of next week), "20 nov",
             "20 november 2026", "20/11", "20/11/2026" (day first),
+            "friday week 7" or "sunday week 7 11:59pm" (a teaching week of
+            the university session the student chose on Groot's home page;
+            the day must be given, so ask the student if they leave it out),
             "end of the week", "end of next week", or "2026-11-20" and
             "2026-11-20 14:30". A day and month with no year means the next
             time that date comes round, so in November "20 jan" is next year.
@@ -1141,6 +1280,7 @@ def add_deadline(title: str, due_date: str, subject: str = "", weight_percent: f
     message = f"Saved '{title}', due {_friendly(due)}."
     if due.year > now.year:
         message += f" That's in {due.year}, not this year."
+    message += _week_note(due_date, saved_date)
     return {"status": "success", "message": message + _backup_note(backup), "deadline": new_deadline}
 
 
@@ -1336,7 +1476,12 @@ def edit_deadline(
             return _not_saved(error)
 
     listed = changes[0] if len(changes) == 1 else ", ".join(changes[:-1]) + " and " + changes[-1]
-    return {"status": "success", "message": f"Updated '{old_title}': {listed}." + _backup_note(backup), "deadline": found}
+    week_note = _week_note(date_words, new_date) if new_date else ""
+    return {
+        "status": "success",
+        "message": f"Updated '{old_title}': {listed}." + week_note + _backup_note(backup),
+        "deadline": found,
+    }
 
 
 def get_reminders(days_ahead: int = REMINDER_DAYS) -> dict:

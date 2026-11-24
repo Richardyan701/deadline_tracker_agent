@@ -20,6 +20,7 @@ Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydne
 
 - **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date. Each university counts its weeks differently, so you pick yours and Groot uses its official 2027 calendar.
 - **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
+- **Understands week numbers too, with no AI.** Pick your university and session once, then type "friday week 7 5pm". Groot skips the breaks with no week number, shows which week it is now, and warns you about public holidays and recess weeks.
 - **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up.
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
 - **Feeds the calendar you already use.** One click exports your deadlines to Google Calendar, Outlook or your phone. It also imports your Canvas calendar (UTS, USyd and NUS) and your UTS timetable.
@@ -140,7 +141,7 @@ I designed and directed Groot. I decided what it should do and what it must neve
 
 Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. To make sure it works, not just looks right:
 
-- **Every change had to pass about 2,100 automated tests**, which GitHub runs before anything can be merged.
+- **Every change had to pass about 2,400 automated tests**, which GitHub runs before anything can be merged.
 - **The parts that use AI were also tried live with the real model**, for example on real outlines from UNSW, USyd and Macquarie.
 - **The evaluations above measure how accurate the AI parts are**, mistakes included.
 
