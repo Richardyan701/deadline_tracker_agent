@@ -273,5 +273,5 @@ def test_import_page_script_sends_the_weight():
 
 def test_home_page_script_refreshes_the_new_parts():
     script = (web_app.STATIC_DIR / "home.js").read_text(encoding="utf-8")
-    assert '["heads-up", "due-soon-list", "deadline-table", "grades", "week-line"]' in script
+    assert '["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip"]' in script
     assert 'post("/groot/api/mark"' in script
