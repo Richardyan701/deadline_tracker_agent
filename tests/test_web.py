@@ -274,7 +274,9 @@ def test_the_home_page_trailing_slash_goes_to_the_home_page(client):
 def test_browser_files_are_served_with_their_content_type(client, name, content_type):
     response = client.get(f"/groot/static/{name}")
     assert response.status_code == 200
-    assert response.headers["content-type"] == f"{content_type}; charset=utf-8"
+    # Text files say which encoding they use. An image is not text, so it does not.
+    expected = content_type if content_type.startswith("image/") else f"{content_type}; charset=utf-8"
+    assert response.headers["content-type"] == expected
     assert response.content == (web_app.STATIC_DIR / name).read_bytes()
 
 
@@ -286,6 +288,8 @@ def test_only_the_listed_browser_files_are_served(client, name):
 def test_browser_code_never_turns_text_into_html():
     # Text is always put on the page with textContent, which shows it as it is
     for name in web_app.STATIC_FILES:
+        if not name.endswith((".js", ".css")):
+            continue  # the tab icon is a picture, not code
         code = (web_app.STATIC_DIR / name).read_text(encoding="utf-8")
         for risky in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval("):
             assert risky not in code, f"{name} uses {risky}"

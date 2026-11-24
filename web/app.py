@@ -58,6 +58,7 @@ STATIC_FILES = {
     "common.js": "text/javascript",
     "home.js": "text/javascript",
     "import.js": "text/javascript",
+    "icon-32.png": "image/png",  # the tab icon (drawn by website/make_icons.py)
 }
 
 # A made-up subject outline that comes with Groot, so the import can be tried without a real one

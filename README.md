@@ -4,6 +4,8 @@
 
 **Agent Groot is a free, open-source study assistant that keeps track of your university deadlines.** Drop in your subject outlines and it finds every assessment and its real date, then reminds you before anything is due. You can also just tell it: *"Quiz 2 due next friday 5pm"*.
 
+**[Try it in your browser](https://richardyan701.github.io/deadline_tracker_agent/)**, with nothing to install. The website has your deadline list, reminders, week numbers and calendar export, and your deadlines stay in your own browser. Importing outlines and the chat need the version on your computer for now.
+
 It has the 2027 calendars of **UTS, UNSW, the University of Sydney and Macquarie University** in Australia, and **NUS, NTU and SMU** in Singapore, built in. At any other university, you type when week 1 starts and it does the rest.
 
 Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydney. I'm learning programming, mathematics and data analytics, and I built Groot to put them to work on a real problem uni students have: keeping track of every deadline across their subjects. I designed it and directed its building, with Google's Agent Development Kit (ADK), Gemini, and Claude as a coding partner (see [How this was built](#how-this-was-built)). It runs on your own computer.
@@ -120,6 +122,7 @@ Because both give you one place to keep your study life in order: a list of task
 - **Groot runs on Sydney time, or Singapore time** if you pick Singapore during setup. In Australia it always uses Sydney's time and NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
 - **UTS is the best tested.** UNSW, USyd, Macquarie and SMU have one real outline each behind them so far, and NUS and NTU none yet.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
+- **On the website, your deadlines live in that browser only.** Download a backup now and then. On an iPhone or iPad, add Groot to your Home Screen: Safari can erase a website's data if you use Safari for 7 days without visiting it, and a Home Screen app is counted separately. See [Groot's website](docs/reference.md#groots-website).
 - **Run it on your own computer only.** The chat page has no login.
 - **The grade calculator can't check minimum rules** (like a minimum exam mark). Read your subject outline.
 

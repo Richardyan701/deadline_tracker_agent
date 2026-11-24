@@ -9,7 +9,7 @@ The browser then shows that text as it is and never runs it as code.
 from datetime import datetime
 from html import escape
 
-from deadline_agent import calendars, documents, model_choice, region, tools
+from deadline_agent import calendars, model_choice, region, tools
 
 # Opens ADK's chat with Groot already chosen
 CHAT_PATH = "/dev-ui/?app=deadline_agent"
@@ -193,16 +193,56 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
     from tools.list_deadlines() (soonest first), now is local time and
     grades is tools._all_grade_reports() (one report per subject).
     """
-    body = f"""<header class="top">
+    return _layout("Agent Groot", "home.js", home_body(reminders, deadlines, now, grades))
+
+
+# What Groot's website says about where the deadlines are kept (see browser.py)
+WEBSITE_NOTE = (
+    "Your deadlines are saved only in this browser, on this device. Nothing is sent anywhere, "
+    "so no one else can see them, but clearing this browser's data erases them, so download a backup now and then."
+)
+
+# The website's own section: backups and example deadlines. site/app.js gives the buttons their actions.
+WEBSITE_SECTION = """<section aria-labelledby="browser-heading">
+<h2 id="browser-heading">Your data in this browser</h2>
+<p class="hint">A backup keeps your deadlines safe if this browser's data is cleared, and moves them to another device or browser. Restoring a backup replaces the deadlines here.</p>
+<div class="actions">
+<button type="button" id="backup-button" class="secondary">Download backup</button>
+<input id="restore-input" class="visually-hidden" type="file" accept=".json,application/json">
+<label for="restore-input" class="button secondary">Restore a backup</label>
+<button type="button" id="examples-button" class="secondary">Add example deadlines</button>
+</div>
+<p id="browser-message" class="message" role="status"></p>
+</section>"""
+
+
+def home_body(
+    reminders: dict, deadlines: list[dict], now: datetime, grades: list[dict] | None = None, website: bool = False
+) -> str:
+    """The inside of the home page, which home_page wraps in the shared <head>.
+
+    With website=True it is the version on Groot's website (browser.py), where
+    everything runs in the student's own browser: no outline import or chat
+    yet, a note that the deadlines stay in this browser, and backup buttons.
+    """
+    if website:
+        actions = '<button type="button" id="export-button">Export to calendar</button>'
+        note = WEBSITE_NOTE
+    else:
+        actions = (
+            '<button type="button" id="export-button">Export to calendar</button>\n'
+            '<a class="button" href="/groot/import">Import from outlines</a>\n'
+            f'<a class="button" href="{CHAT_PATH}">Chat with Groot</a>'
+        )
+        note = home_privacy_note()
+    return f"""<header class="top">
 <h1>Agent Groot</h1>
 <p class="tagline">Your study deadlines, all in one place.</p>
 {week_line(now)}
 <div class="actions">
-<button type="button" id="export-button">Export to calendar</button>
-<a class="button" href="/groot/import">Import from outlines</a>
-<a class="button" href="{CHAT_PATH}">Chat with Groot</a>
+{actions}
 </div>
-<p class="privacy-note">{escape(home_privacy_note(), quote=False)} Every date and time here is {escape(tools.PLACE["clock"])}.</p>
+<p class="privacy-note">{escape(note, quote=False)} Every date and time here is {escape(tools.PLACE["clock"])}.</p>
 {time_zone_notice()}
 <p id="top-message" class="message" role="status"></p>
 </header>
@@ -215,7 +255,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <section aria-labelledby="all-heading">
 <h2 id="all-heading">All deadlines</h2>
 <p id="table-message" class="message" role="status" tabindex="-1"></p>
-{deadline_table(deadlines, now)}
+{deadline_table(deadlines, now, website)}
 {EDIT_DIALOG}
 </section>
 <section aria-labelledby="add-heading">
@@ -229,8 +269,8 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <p id="mark-message" class="message" role="status"></p>
 {grades_section(deadlines, grades or [])}
 </section>
+{WEBSITE_SECTION if website else ""}
 </main>"""
-    return _layout("Agent Groot", "home.js", body)
 
 
 def week_line(now: datetime) -> str:
@@ -381,9 +421,18 @@ def _grade_summary(report: dict) -> str:
     )
 
 
-def deadline_table(deadlines: list[dict], now: datetime) -> str:
-    """Every deadline, soonest first, with Mark done, Edit and Delete buttons. Finished ones are greyed."""
+def deadline_table(deadlines: list[dict], now: datetime, website: bool = False) -> str:
+    """Every deadline, soonest first, with Mark done, Edit and Delete buttons. Finished ones are greyed.
+
+    With no deadlines, it suggests the outline import, or on the website
+    (which has no import yet) the example deadlines.
+    """
     if not deadlines:
+        if website:
+            return (
+                '<div id="deadline-table"><p class="empty">You have no deadlines saved yet. Add one below, '
+                'or try "Add example deadlines" at the bottom of this page.</p></div>'
+            )
         return (
             '<div id="deadline-table"><p class="empty">You have no deadlines saved yet. Add one below, '
             'or <a href="/groot/import">import them from your subject outlines</a>.</p></div>'
@@ -532,7 +581,11 @@ def import_page(sessions: dict, finished: list[str]) -> str:
 
     The outline picker accepts every file ending documents.py reads, and the
     hint lists them, so the page always matches what the reader can do.
+    documents.py is imported here, not at the top, because it needs the
+    document-reading libraries, which the home page (and the website) does not.
     """
+    from deadline_agent import documents
+
     body = f"""<header class="top">
 <p><a href="/groot">Back to your deadlines</a></p>
 <h1>Import from outlines</h1>
@@ -604,6 +657,7 @@ def _layout(title: str, script: str, body: str) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(title)}</title>
+<link rel="icon" href="/groot/static/icon-32.png" type="image/png">
 <link rel="stylesheet" href="/groot/static/groot.css">
 <script type="module" src="/groot/static/{script}"></script>
 </head>

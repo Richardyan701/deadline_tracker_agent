@@ -120,7 +120,8 @@ button:hover,
   background: var(--green-dark);
 }
 
-button.secondary {
+button.secondary,
+.button.secondary {
   background: var(--card);
   color: var(--green-dark);
 }
@@ -132,6 +133,7 @@ button.danger {
 }
 
 button.secondary:hover,
+.button.secondary:hover,
 button.danger:hover {
   background: var(--page);
 }
@@ -392,7 +394,8 @@ input[type="checkbox"] {
 }
 
 /* The file input is hidden, so its label looks like a button and shows the focus ring instead */
-#outline-input:focus-visible + .button {
+#outline-input:focus-visible + .button,
+#restore-input:focus-visible + .button {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -631,6 +634,33 @@ input[type="checkbox"] {
 
 .time-zone-notice p {
   margin: 0;
+}
+
+/* ---------- Groot's website (website/index.html) ---------- */
+
+/* The loading message, the iPhone tip and the footer sit outside the page's header and main */
+.loading,
+.site-footer {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Lined up with the page's content: 58rem wide at most, with 1rem either side on a phone */
+#install-tip {
+  max-width: 58rem;
+  margin: 0.75rem auto 0;
+}
+
+@media (max-width: 60rem) {
+  #install-tip {
+    margin: 0.75rem 1rem 0;
+  }
+}
+
+.site-footer {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 /* Which week of the chosen session it is, under the tagline */
