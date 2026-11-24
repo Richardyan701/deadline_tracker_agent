@@ -322,9 +322,9 @@ def export_nudge() -> str:
     """
     state = tools.calendar_state()
     if state == "never":
-        text = "Export to calendar so your calendar app can remind you before each deadline."
+        text = "Export to calendar to get reminders on your phone or laptop."
     elif state == "changed":
-        text = "Your deadlines or reminder times changed since your last export. Export again so your calendar has them all."
+        text = "Your calendar is out of date. Export again to update it."
     else:
         return '<p id="export-nudge" class="nudge" hidden></p>'
     return f'<p id="export-nudge" class="nudge">{escape(text)}</p>'
@@ -352,8 +352,7 @@ def reminder_picker() -> str:
         '<details id="reminder-picker" class="reminders">'
         f'<summary id="reminder-summary">{escape(reminder_summary(chosen))}</summary>'
         f'<fieldset><legend>Remind me this long before each deadline:</legend><div class="checks">{boxes}</div></fieldset>'
-        '<p class="hint">Your calendar app shows these reminders, even when Groot is closed. '
-        "After changing them, export to calendar again.</p>"
+        '<p class="hint">Your calendar app shows these reminders, even when Groot is closed.</p>'
         '<p id="reminder-message" class="message" role="status"></p>'
         "</details>"
     )
