@@ -157,21 +157,24 @@ def check_port():
 
 
 def check_timezone():
-    """Python can find the Australia/Sydney time zone, which every date in Groot uses.
+    """Python can find the time zone every date in Groot uses (Australia/Sydney, unless GROOT_COUNTRY says otherwise).
 
     no_cache makes it really load the time zone, instead of reusing one loaded earlier.
     """
     import zoneinfo
 
+    from .region import country
+
+    zone = country()["time_zone"]
     try:
-        zoneinfo.ZoneInfo.no_cache("Australia/Sydney")
+        zoneinfo.ZoneInfo.no_cache(zone)
     except zoneinfo.ZoneInfoNotFoundError:
         return (
             False,
-            "Python cannot find the Australia/Sydney time zone",
+            f"Python cannot find the {zone} time zone",
             f"{RUN_SETUP} again (it installs tzdata), {USE_VENV}.",
         )
-    return True, "The Australia/Sydney time zone is available", ""
+    return True, f"The {zone} time zone is available", ""
 
 
 def check_deadlines_file():
@@ -179,7 +182,7 @@ def check_deadlines_file():
     import zoneinfo
 
     try:
-        from . import tools  # tools.py loads the Sydney time zone as soon as it is imported
+        from . import tools  # tools.py loads the local time zone as soon as it is imported
     except zoneinfo.ZoneInfoNotFoundError:
         return (
             False,

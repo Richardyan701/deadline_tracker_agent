@@ -605,6 +605,24 @@ input[type="checkbox"] {
   color: var(--warn-ink);
 }
 
+/* The notice that Groot's clock is not Sydney's */
+.time-zone-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.time-zone-notice[hidden] {
+  display: none;
+}
+
+.time-zone-notice p {
+  margin: 0;
+}
+
 /* The short privacy note under the buttons on the home page */
 .privacy-note {
   margin: 0.75rem 0 0;

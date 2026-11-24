@@ -9,7 +9,7 @@ read at the start of every tool call and written after every change. Each
 save writes a complete new file and swaps it in, and a file that cannot be
 read is copied to a backup before it is replaced.
 
-Due dates are always saved as "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" in Sydney
+Due dates are always saved as "YYYY-MM-DD" or "YYYY-MM-DD HH:MM" in local
 time. Students can type friendlier things like "next friday 5pm", and the
 code below (not the AI model) turns those words into that saved form.
 
@@ -34,7 +34,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import privacy
+from . import privacy, region
 
 # The four things we store for every deadline.
 REQUIRED_KEYS = {"title", "due_date", "subject", "done"}
@@ -45,8 +45,10 @@ REQUIRED_KEYS = {"title", "due_date", "subject", "done"}
 #   mark_percent: the student's result for it, once known
 PERCENT_KEYS = ("weight_percent", "mark_percent")
 
-# Every university Groot knows (UTS, UNSW, USyd and Macquarie) is in Sydney, so every date and time is Sydney time.
-SYDNEY = ZoneInfo("Australia/Sydney")
+# Every date and time is local time where the student studies: Sydney time unless
+# GROOT_COUNTRY in .env says otherwise (see region.py). It is read once, when Groot starts.
+PLACE = region.country()  # {"name": "Australia", "time_zone": "Australia/Sydney", "city": "Sydney"}
+LOCAL_TIME = ZoneInfo(PLACE["time_zone"])
 
 # What a subject code looks like: five digits at UTS ("33130"), or four
 # letters then four digits at UNSW, USyd and Macquarie ("COMP1511"). Other
@@ -124,22 +126,22 @@ def _data_file() -> Path:
 
 
 def _now() -> datetime:
-    """The current time in Sydney. Tests replace this so they do not depend on today's date.
+    """The current local time (see LOCAL_TIME). Tests replace this so they do not depend on today's date.
 
     The timezone is removed afterwards, so it can be compared with the saved
-    due dates, which are plain Sydney times with no timezone attached.
+    due dates, which are plain local times with no timezone attached.
     """
-    return datetime.now(SYDNEY).replace(tzinfo=None)
+    return datetime.now(LOCAL_TIME).replace(tzinfo=None)
 
 
 def _utc(moment: datetime) -> datetime:
-    """The same Sydney time as a moment in UTC.
+    """The same local time as a moment in UTC.
 
-    Sydney clocks jump an hour on the two daylight saving nights each year,
-    but UTC never jumps. So lengths of time, like "in 3 hours" or "2 hours
+    Sydney clocks jump an hour on the two daylight saving nights each year
+    (Singapore's never do), but UTC never jumps. So lengths of time, like "in 3 hours" or "2 hours
     overdue", are worked out in UTC to stay right on those nights.
     """
-    return moment.replace(tzinfo=SYDNEY).astimezone(timezone.utc)
+    return moment.replace(tzinfo=LOCAL_TIME).astimezone(timezone.utc)
 
 
 def _nothing_sensitive(value: str, name: str) -> str:
@@ -343,7 +345,7 @@ def _read_words(text: str, now: datetime):
     if match:
         amount = _number(match[1])
         length = timedelta(hours=amount) if match[2].startswith("hour") else timedelta(minutes=amount)
-        return (_utc(now) + length).astimezone(SYDNEY).strftime("%Y-%m-%d %H:%M")
+        return (_utc(now) + length).astimezone(LOCAL_TIME).strftime("%Y-%m-%d %H:%M")
 
     # "end of the week" is this Sunday, "end of next week" is next Sunday.
     # Saved with no time, so it lasts until 23:59 that Sunday.
@@ -1065,7 +1067,7 @@ def add_deadline(title: str, due_date: str, subject: str = "", weight_percent: f
             (upper/lower case and extra spaces are ignored).
         due_date: When it is due, in the student's own words exactly as they
             typed them. Do not convert it yourself, this tool works out the
-            date using today's date in Sydney. Understood forms:
+            date using today's local date. Understood forms:
             "today", "tomorrow", "in 3 days", "in 2 weeks", "in 4 hours",
             "in 30 minutes", "friday" (the next Friday after today),
             "next friday" (the Friday of next week), "20 nov",
@@ -1135,7 +1137,7 @@ def list_deadlines() -> dict:
     Returns:
         A dict with "status", a "message" and "deadlines", a list where each
         item has "title", "due_date", "subject" and "done" (True if finished).
-        A due_date is Sydney time, either "YYYY-MM-DD HH:MM" or just
+        A due_date is local time, either "YYYY-MM-DD HH:MM" or just
         "YYYY-MM-DD", which means due by 11:59 PM that day.
     """
     with _file_lock:

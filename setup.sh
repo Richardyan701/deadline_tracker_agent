@@ -5,7 +5,7 @@
 # 2. Creates a virtual environment in .venv.
 # 3. Installs the packages in requirements.txt.
 # 4. Saves your Gemini API key in deadline_agent/.env (hidden while you paste it),
-#    and which Gemini model Groot should use.
+#    which Gemini model Groot should use, and which country you study in (its time zone).
 #
 # Run it with:   ./setup.sh
 # To use a different Python, for example:   PYTHON=python3.12 ./setup.sh
@@ -64,8 +64,23 @@ if [ "$replace" = "y" ] || [ "$replace" = "Y" ]; then
         model="gemini-3.5-flash"
     fi
     printf 'GROOT_MODEL=%s\n' "$model" >> "$ENV_FILE"
+    echo
+    echo "Where do you study? Groot uses that country's time for every date and reminder."
+    echo "  1. Australia (Sydney time)"
+    echo "  2. Singapore (Singapore time, GMT+8)"
+    country="AU"
+    read -r -p "Type 1 or 2 and press Enter (Enter alone picks 1): " where || true
+    if [ "$where" = "2" ]; then
+        country="SG"
+    fi
+    printf 'GROOT_COUNTRY=%s\n' "$country" >> "$ENV_FILE"
+    if [ "$country" = "SG" ]; then
+        echo "Your time zone is now Singapore time (GMT+8)."
+    else
+        echo "Your time zone is Sydney time."
+    fi
     echo "Saved, with $model. Only your user account can read $ENV_FILE."
-    echo "You can change the model later on the GROOT_MODEL line of $ENV_FILE."
+    echo "You can change these later on the GROOT_MODEL and GROOT_COUNTRY lines of $ENV_FILE."
 else
     echo "Kept your existing $ENV_FILE."
 fi

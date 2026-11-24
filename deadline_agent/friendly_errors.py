@@ -200,7 +200,7 @@ def _limit_message(details: list) -> str:
             return f"{DAILY_LIMIT} Please try again later. {SAFE}"
         return (
             f"{DAILY_LIMIT} It resets in {_how_long(seconds)} "
-            f"(around {_sydney_time(seconds)} Sydney time). {SAFE}"
+            f"(around {_local_time(seconds)} {tools.PLACE['city']} time). {SAFE}"
         )
     if any("PerMinute" in quota_id for quota_id in quota_ids):
         wait = "about a minute" if seconds is None else _how_long(seconds)
@@ -220,14 +220,14 @@ def _how_long(seconds: float) -> str:
     return "about " + " ".join(parts)
 
 
-def _sydney_time(seconds: float) -> str:
-    """The Sydney clock time that many seconds from now, to the nearest minute.
+def _local_time(seconds: float) -> str:
+    """The local clock time (Sydney's, or Singapore's) that many seconds from now, to the nearest minute.
 
     For example '7:00 PM', '7:00 PM tomorrow', or the whole date if it is further away.
     """
     now = tools._now()
     # Added in UTC, so it is still right on the nights the clocks change for daylight saving
-    later = (tools._utc(now) + timedelta(seconds=seconds)).astimezone(tools.SYDNEY)
+    later = (tools._utc(now) + timedelta(seconds=seconds)).astimezone(tools.LOCAL_TIME)
     later += timedelta(seconds=30)  # with the seconds then ignored, this rounds to the nearest minute
     clock = f"{later.hour % 12 or 12}:{later.minute:02d} {'AM' if later.hour < 12 else 'PM'}"
     if later.date() == now.date():

@@ -60,12 +60,12 @@ def test_reads_an_assignment():
         ("20260405T135900Z", "2026-04-05 23:59"),  # +10
     ],
 )
-def test_utc_times_become_sydney_times_across_daylight_saving(utc, sydney):
+def test_utc_times_become_local_times_across_daylight_saving(utc, sydney):
     events = canvas.parse_feed(feed(event("Quiz [33130_SPR_U_1_S]", start=f"DTSTART:{utc}")))
     assert events[0]["due"] == sydney
 
 
-def test_time_with_a_sydney_timezone():
+def test_time_with_a_local_timezone():
     events = canvas.parse_feed(feed(event("Quiz [33130]", start="DTSTART;TZID=Australia/Sydney:20261005T170000")))
     assert events[0]["due"] == "2026-10-05 17:00"
 

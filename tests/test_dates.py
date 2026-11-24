@@ -443,7 +443,7 @@ def test_old_deadlines_file_still_loads(monkeypatch, deadlines_file):
 # ---------- the real clock ----------
 
 
-def test_now_is_sydney_time_without_a_timezone():
+def test_now_is_local_time_without_a_timezone():
     now = tools._now()
     sydney = datetime.now(ZoneInfo("Australia/Sydney")).replace(tzinfo=None)
 

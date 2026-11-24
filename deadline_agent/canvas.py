@@ -18,8 +18,8 @@ import icalendar
 
 from .import_types import CanvasEvent
 from .tools import SUBJECT_CODE as CODE_SHAPE
+from . import tools
 
-SYDNEY = ZoneInfo("Australia/Sydney")
 
 # Only links to these hosts are fetched, so the server cannot be tricked into
 # visiting some other site. UTS and USyd use Canvas. UNSW and Macquarie use
@@ -98,18 +98,18 @@ def fetch_feed(link: str) -> bytes:
 
 
 def _sydney_due(start) -> str:
-    """An event's start as Sydney time "YYYY-MM-DD HH:MM"."""
+    """An event's start as local time "YYYY-MM-DD HH:MM" (see tools.LOCAL_TIME)."""
     if isinstance(start, datetime):
         if start.tzinfo is not None:
-            start = start.astimezone(SYDNEY)
-        # A time with no timezone ("floating") already means local time, and every university Groot knows is in Sydney
+            start = start.astimezone(tools.LOCAL_TIME)
+        # A time with no timezone ("floating") already means local time
         return start.strftime("%Y-%m-%d %H:%M")
     # An all-day event has a date but no time, so it is due by the end of that day
     return f"{start.isoformat()} 23:59"
 
 
 def parse_feed(data: bytes) -> list[CanvasEvent]:
-    """The events in a Canvas calendar feed, in Sydney time.
+    """The events in a Canvas calendar feed, in local time.
 
     Canvas titles end with the course in square brackets, like
     "Assignment 2 [33130_SPR_U_1_S]". The tag is removed from the title. The

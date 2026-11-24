@@ -23,7 +23,7 @@ import os
 import re
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,18 @@ OTHER_MODEL_NAME = re.compile(r"([a-z_]{2,20})/[A-Za-z0-9][A-Za-z0-9._:/-]{0,100
 GEMINI = {"name": "Gemini", "key": "GOOGLE_API_KEY"}
 
 
+def _setting(name: str) -> str:
+    """One setting: from the environment if it is set there, otherwise from deadline_agent/.env.
+
+    Only this one line of the file is read. Nothing else in it, like an API
+    key, is loaded into the environment.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        value = dotenv_values(ENV_FILE).get(name) or ""
+    return value.strip()
+
+
 def _use_default(value: str, why: str) -> str:
     logger.warning("%s is set to %r, %s, so Groot is using %s.", SETTING, value, why, DEFAULT_MODEL)
     return DEFAULT_MODEL
@@ -85,8 +97,7 @@ def chosen_model() -> str:
     the file. A name Groot does not know is ignored with a warning, so a
     typo never stops Groot from starting.
     """
-    load_dotenv(ENV_FILE)
-    value = os.environ.get(SETTING, "").strip()
+    value = _setting(SETTING)
     if not value:
         return DEFAULT_MODEL
     if MODEL_NAME.fullmatch(value):
@@ -126,7 +137,7 @@ def model_chain() -> list[str]:
     gives the chosen model alone.
     """
     model = chosen_model()
-    if not uses_gemini(model) or os.environ.get(BACKUPS_SETTING, "").strip().lower() == "off":
+    if not uses_gemini(model) or _setting(BACKUPS_SETTING).lower() == "off":
         return [model]
     return [model] + [backup for backup in BACKUP_MODELS if backup != model]
 

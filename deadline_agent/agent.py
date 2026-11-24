@@ -181,9 +181,10 @@ def groot_instruction(context: ReadonlyContext) -> str:
     not needed here.
     """
     today = tools._friendly_day(tools._now())
+    place = tools.PLACE  # read once when Groot starts, the same as its clock
     text = (
         INSTRUCTION
-        + f"\nToday is {today} in Sydney, Australia (timezone Australia/Sydney)."
+        + f"\nToday is {today} in {place['city']}, {place['name']} (timezone {place['time_zone']})."
         + "\nWhen a student gives a due date, pass their words to add_deadline exactly as typed, do not convert the date yourself."
         + OUTLINE_RULES
         + REMINDER_RULES

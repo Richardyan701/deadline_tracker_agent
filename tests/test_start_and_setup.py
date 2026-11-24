@@ -437,7 +437,7 @@ def no_time_zones(tmp_path, monkeypatch):
     zoneinfo.reset_tzpath()  # back to normal
 
 
-def test_sydney_time_zone_passes():
+def test_local_time_zone_passes():
     assert check_setup.check_timezone() == (True, "The Australia/Sydney time zone is available", "")
 
 
@@ -749,10 +749,12 @@ def run_setup(tmp_path, typed: str) -> tuple[subprocess.CompletedProcess, Path]:
     [("1", "gemini-3.5-flash-lite"), ("", "gemini-3.5-flash-lite"), ("2", "gemini-3.5-flash"), ("7", "gemini-3.5-flash-lite")],
 )
 def test_setup_saves_the_key_and_the_chosen_model(tmp_path, choice, model):
-    result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n{choice}\n")
+    result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n{choice}\n")  # nothing typed for the country, so Australia
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert env_file.read_text() == f"GOOGLE_GENAI_USE_ENTERPRISE=0\nGOOGLE_API_KEY={FAKE_KEY}\nGROOT_MODEL={model}\n"
+    assert env_file.read_text() == (
+        f"GOOGLE_GENAI_USE_ENTERPRISE=0\nGOOGLE_API_KEY={FAKE_KEY}\nGROOT_MODEL={model}\nGROOT_COUNTRY=AU\n"
+    )
     assert f"Saved, with {model}." in result.stdout
     assert FAKE_KEY not in result.stdout  # the key is never shown
     assert oct(env_file.stat().st_mode & 0o777) == "0o600"
@@ -762,7 +764,32 @@ def test_setup_saves_the_key_and_the_chosen_model(tmp_path, choice, model):
 def test_setup_picks_the_bigger_limit_when_nothing_more_is_typed(tmp_path):
     result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n")  # the input ends before the model question
     assert result.returncode == 0, result.stdout + result.stderr
-    assert env_file.read_text().endswith("GROOT_MODEL=gemini-3.5-flash-lite\n")
+    assert env_file.read_text().endswith("GROOT_MODEL=gemini-3.5-flash-lite\nGROOT_COUNTRY=AU\n")  # and Australia, the default
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    "where, country, said",
+    [("1", "AU", "Your time zone is Sydney time."), ("", "AU", "Your time zone is Sydney time."),
+     ("2", "SG", "Your time zone is now Singapore time (GMT+8)."), ("9", "AU", "Your time zone is Sydney time.")],
+)
+def test_setup_saves_the_country_and_says_which_time_zone_it_set(tmp_path, where, country, said):
+    result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n1\n{where}\n")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert env_file.read_text().endswith(f"GROOT_MODEL=gemini-3.5-flash-lite\nGROOT_COUNTRY={country}\n")
+    assert said in result.stdout
+
+
+def test_both_setup_files_ask_the_same_country_question():
+    for name in ("setup.sh", "setup_windows.bat"):
+        text = (PROJECT / name).read_text(encoding="utf-8")
+        assert "Where do you study? Groot uses that country's time for every date and reminder." in text
+        assert "1. Australia (Sydney time)" in text
+        assert "2. Singapore (Singapore time, GMT+8)" in text
+        assert "GROOT_COUNTRY=" in text
+    windows = (PROJECT / "setup_windows.bat").read_text(encoding="utf-8")
+    assert 'if "%GROOT_WHERE%"=="2" set "GROOT_COUNTRY=SG"' in windows
 
 
 def test_both_setup_files_offer_the_same_two_models():
