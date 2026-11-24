@@ -714,7 +714,7 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_reminders.py` | 113 | Reminder groups, exact edges like 11:59 PM, the friendly phrases, the reminders block, and the prompt injection protection |
 | `tests/test_outline.py` | 109 | What the outline reader sends to Gemini, how the answer is checked, prompt injection and API errors, with a fake Gemini |
 | `tests/test_calendars.py` | 443 | Every week of every session at all four universities against the official calendars, the breaks, UNSW's flexibility week, the exams, finished sessions and public holidays |
-| `tests/test_web.py` | 151 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
+| `tests/test_web.py` | 152 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
 | `tests/test_tools.py` | 80 | The tools, title matching, saving, backups of unreadable files, failed saves and many threads at once |
 | `tests/test_eval.py` | 77 | The outline evaluation's pairing, scores, real dates and spacing of requests |
 | `tests/test_web_import.py` | 102 | The import page: every file kind, refused files, the timetable, Canvas, Preview and Save |
