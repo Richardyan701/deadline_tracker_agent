@@ -147,7 +147,8 @@ def test_a_gemini_model_gets_the_other_gemini_models_as_backups():
 
 def test_the_chosen_model_goes_first_and_is_not_repeated(monkeypatch):
     monkeypatch.setenv("GROOT_MODEL", "gemini-3.5-flash-lite")
-    assert model_choice.model_chain() == ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+    # 3.1 Flash-Lite comes before 3.5 Flash, because it failed far less often in the week of hourly checks
+    assert model_choice.model_chain() == ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"]
     monkeypatch.setenv("GROOT_MODEL", "gemma-4-31b-it")
     assert model_choice.model_chain()[0] == "gemma-4-31b-it" and len(model_choice.model_chain()) == 4
 
