@@ -42,8 +42,18 @@ set /p "GROOT_CHOICE=Type 1 or 2 and press Enter (Enter alone picks 1): "
 set "GROOT_PICK=gemini-3.5-flash-lite"
 if "%GROOT_CHOICE%"=="2" set "GROOT_PICK=gemini-3.5-flash"
 >> "deadline_agent\.env" echo GROOT_MODEL=%GROOT_PICK%
+echo.
+echo Where do you study? Groot uses that country's time for every date and reminder.
+echo   1. Australia (Sydney time)
+echo   2. Singapore (Singapore time, GMT+8)
+set "GROOT_WHERE="
+set /p "GROOT_WHERE=Type 1 or 2 and press Enter (Enter alone picks 1): "
+set "GROOT_COUNTRY=AU"
+if "%GROOT_WHERE%"=="2" set "GROOT_COUNTRY=SG"
+>> "deadline_agent\.env" echo GROOT_COUNTRY=%GROOT_COUNTRY%
+if "%GROOT_COUNTRY%"=="SG" (echo Your time zone is now Singapore time ^(GMT+8^).) else (echo Your time zone is Sydney time.)
 echo Saved, with %GROOT_PICK%.
-echo You can change the model later on the GROOT_MODEL line of deadline_agent\.env.
+echo You can change these later on the GROOT_MODEL and GROOT_COUNTRY lines of deadline_agent\.env.
 goto done
 
 :keep_key

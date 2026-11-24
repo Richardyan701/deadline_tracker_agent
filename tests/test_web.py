@@ -541,3 +541,36 @@ def test_home_and_import_pages_warn_about_what_goes_to_gemini(client):
     assert "go to Google's Gemini" in home and "student ID" in home
     importer = client.get("/groot/import").text
     assert "Privacy: outlines you preview are sent to Google's Gemini" in importer
+
+
+# ---------- the time zone ----------
+
+
+def test_the_home_page_names_the_time_zone(client):
+    assert "Every date and time here is Sydney time." in client.get("/groot").text
+
+
+def test_no_time_zone_notice_for_australia(client):
+    assert "time-zone-notice" not in client.get("/groot").text
+
+
+def test_singapore_gets_a_notice_that_the_time_zone_changed(client, monkeypatch):
+    from deadline_agent import region
+    monkeypatch.setattr(tools, "PLACE", region.COUNTRIES["SG"])
+
+    text = client.get("/groot").text
+
+    assert "Every date and time here is Singapore time (GMT+8)." in text
+    assert (
+        '<div id="time-zone-notice" class="warning time-zone-notice" role="status" data-zone="Asia/Singapore" hidden>'
+        "<p>Your time zone is now <strong>Singapore time (GMT+8)</strong>. Every due date, reminder "
+        "and calendar export uses it.</p>"
+        '<button type="button" id="time-zone-ok" class="secondary">OK</button></div>'
+    ) in text
+
+
+def test_the_page_script_shows_the_notice_until_ok_is_clicked():
+    code = (web_app.STATIC_DIR / "home.js").read_text(encoding="utf-8")
+    assert 'const SEEN = "groot-time-zone-seen";' in code
+    assert "zoneNotice.hidden = seen === zoneNotice.dataset.zone;" in code
+    assert "localStorage.setItem(SEEN, zoneNotice.dataset.zone);" in code

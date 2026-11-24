@@ -127,6 +127,23 @@ def import_warnings() -> list[str]:
     return warnings
 
 
+def time_zone_notice() -> str:
+    """A notice for a student whose Groot is set to a country other than Australia, or "".
+
+    It says once, clearly, that Groot's clock has changed. home.js shows it
+    until the student clicks OK, and shows it again if the time zone changes.
+    """
+    if tools.PLACE["time_zone"] == "Australia/Sydney":
+        return ""
+    zone = escape(tools.PLACE["time_zone"])
+    return (
+        f'<div id="time-zone-notice" class="warning time-zone-notice" role="status" data-zone="{zone}" hidden>'
+        f'<p>Your time zone is now <strong>{escape(tools.PLACE["clock"])}</strong>. Every due date, reminder '
+        "and calendar export uses it.</p>"
+        '<button type="button" id="time-zone-ok" class="secondary">OK</button></div>'
+    )
+
+
 # The honest note under the Grades heading
 GRADES_NOTE = (
     "Groot works out the average you need on the tasks still to come for each grade band: "
@@ -141,7 +158,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
     """The home page.
 
     reminders is what tools.get_reminders() returns, deadlines is the list
-    from tools.list_deadlines() (soonest first), now is Sydney time and
+    from tools.list_deadlines() (soonest first), now is local time and
     grades is tools._all_grade_reports() (one report per subject).
     """
     body = f"""<header class="top">
@@ -152,7 +169,8 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <a class="button" href="/groot/import">Import from outlines</a>
 <a class="button" href="{CHAT_PATH}">Chat with Groot</a>
 </div>
-<p class="privacy-note">{escape(home_privacy_note(), quote=False)}</p>
+<p class="privacy-note">{escape(home_privacy_note(), quote=False)} Every date and time here is {escape(tools.PLACE["clock"])}.</p>
+{time_zone_notice()}
 <p id="top-message" class="message" role="status"></p>
 </header>
 <main>
@@ -359,7 +377,7 @@ CUSTOM_FIELDS = f"""<fieldset id="custom-field" class="field" hidden>
 <label for="custom-break-weeks">How many weeks the break lasts</label>
 <input id="custom-break-weeks" type="number" min="0" max="{calendars.MAX_BREAK_WEEKS}" value="0" inputmode="numeric">
 </div>
-<p class="hint">For a session you type yourself, Groot does not know the exam dates or the public holidays, and it treats every time as Sydney time.</p>
+<p class="hint">For a session you type yourself, Groot does not know the exam dates or the public holidays.</p>
 <p id="custom-message" class="message" role="status"></p>
 </fieldset>"""
 

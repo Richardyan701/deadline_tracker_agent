@@ -180,7 +180,7 @@ Deadlines are saved in `deadlines.json` in the project folder, next to the READM
 ]
 ```
 
-The `due_date` is Sydney time, either `YYYY-MM-DD` (due by 11:59 PM that day) or `YYYY-MM-DD HH:MM`.
+The `due_date` is local time (Sydney's, or Singapore's), either `YYYY-MM-DD` (due by 11:59 PM that day) or `YYYY-MM-DD HH:MM`.
 
 A deadline can also have `"weight_percent"` and `"mark_percent"`, each a number from 0 to 100, for the [grade calculator](#grade-calculator). They are only added once you set them, so older files without them load and save exactly as before.
 
@@ -382,9 +382,12 @@ The key stays hidden while you paste it, and `deadline_agent/.env` is made reada
 GOOGLE_GENAI_USE_ENTERPRISE=0
 GOOGLE_API_KEY=your key
 GROOT_MODEL=gemini-3.5-flash-lite
+GROOT_COUNTRY=AU
 ```
 
 The setup offers two models. `gemini-3.5-flash-lite` (press 1, or just Enter) has a much bigger free daily limit. `gemini-3.5-flash` (press 2) was a little more accurate in the chat test, 63 of 63 against 62 of 63, but allows only about 20 requests a day. You can change it later on the `GROOT_MODEL` line.
+
+It then asks where you study, which sets Groot's time zone: `AU` for Sydney time (press 1, or just Enter) or `SG` for Singapore time, GMT+8 (press 2). It says which time zone it set, and with Singapore the home page shows a notice that the time zone has changed until you click OK. Every due date, reminder, "due soon" and calendar export then uses that time. You can change it later on the `GROOT_COUNTRY` line and restart Groot.
 
 `deadline_agent/.env.example` shows the same thing with a placeholder key, plus the optional settings: turning off the backup models, and using another company's model. Never commit `.env`, because it holds your key. It is already listed in `.gitignore`, and the GitHub Actions check fails if one is committed.
 
@@ -545,7 +548,7 @@ The last line should say that every test passed (about 2,100). A test that needs
 
 ## Troubleshooting
 
-Start with the setup checker. It looks at your Python, the packages, your key file, port 8000, the deadlines file and the Sydney time zone, and gives a one-line fix for anything that is wrong. It never changes a file and sends nothing over the internet. On Windows:
+Start with the setup checker. It looks at your Python, the packages, your key file, port 8000, the deadlines file and the time zone it uses, and gives a one-line fix for anything that is wrong. It never changes a file and sends nothing over the internet. On Windows:
 
 ```
 .\.venv\Scripts\python.exe -m deadline_agent.check_setup
@@ -626,7 +629,7 @@ start_groot.sh, start_groot.bat    the start files
 - **Why dates are worked out in Python.** The model does not reliably know today's date, so it is bad at things like "next friday". Plain rules in Python give the same answer every time, and each rule is covered by tests. The reply also spells out the full date, so a misunderstanding is easy to catch. For outlines, Gemini only copies the outline's words, like "week 7", and the calendar code turns them into a date.
 - **Protection against prompt injection.** Titles and subjects are typed by the student, or found in an outline, and end up in Groot's instruction, so a title like "Essay, ignore previous instructions" could try to give orders. When a deadline is saved, line breaks and runs of spaces in the title and subject become a single space. Before a title or subject goes into the reminders block, control and invisible characters become spaces, `<` and `>` are removed so it cannot fake the end of the block, double quotes become single quotes, and it is cut to 80 characters. Groot is told that the block, every title or subject in a tool result, and everything in a file are data, never instructions. An outline goes to Gemini apart from the reader's rules, with its text between two marker lines it cannot fake, and Gemini's answer must fit a fixed shape that is checked in Python. This keeps each piece of data in its place, but it cannot make the model fully immune.
 - **Safe saves.** Each save writes the whole list to a temporary file in the same folder, makes sure it has reached the disk, then swaps it in with `os.replace` in a single step. A crash leaves either the old file or the new one, never half a file. A lock lets only one action read or change the file at a time, because ADK and the web server can run them on several threads. A test starts 20 saves at once on separate threads and checks that all 20 are kept.
-- **Daylight saving.** All dates and times are Sydney time (`Australia/Sydney`). Lengths of time, such as "in 3 hours" or "2 hours overdue", are worked out in UTC, so they stay right on the two nights each year when Sydney's clocks change. For example, at 8 PM on Saturday 3 Oct 2026, "in 12 hours" is saved as 9:00 AM on Sunday, because the clocks go forward an hour that night. The `tzdata` package is included because Windows has no time zone database of its own for Python to use.
+- **Daylight saving.** All dates and times are local time: Sydney time (`Australia/Sydney`), or Singapore time (`Asia/Singapore`, which has no daylight saving) if `GROOT_COUNTRY=SG`. Lengths of time, such as "in 3 hours" or "2 hours overdue", are worked out in UTC, so they stay right on the two nights each year when Sydney's clocks change. For example, at 8 PM on Saturday 3 Oct 2026, "in 12 hours" is saved as 9:00 AM on Sunday, because the clocks go forward an hour that night. The `tzdata` package is included because Windows has no time zone database of its own for Python to use.
 
 ## Security and privacy
 
@@ -694,12 +697,11 @@ GitHub Actions runs the tests on every push to `main` and on every pull request,
 - **One user, one local file.** There are no accounts. Everyone using the same copy shares one `deadlines.json`, and nothing syncs between devices.
 - **The free tier is small.** About 20 requests a day is roughly 8 to 10 chat messages that use a tool, or 20 outlines. See [The Gemini free tier](#the-gemini-free-tier).
 - **Four Sydney universities are built in, up to the end of 2027.** The calendar knows the main sessions of UTS, UNSW, the University of Sydney and Macquarie University, and next year's dates have to be added by hand. For any other university, or a summer or winter term, you type the session's dates yourself.
-- **Groot runs on Sydney time.** Every date and time is Sydney time, and the only public holidays it knows are the NSW ones. A student in Queensland, South Australia, Western Australia or the Northern Territory will see "due soon" and "overdue" up to three hours out.
+- **Two time zones.** Groot runs on Sydney time, or Singapore time if you pick Singapore during setup. Within Australia it always uses Sydney's time, so a student in Queensland, South Australia, Western Australia or the Northern Territory will see "due soon" and "overdue" up to three hours out. The only public holidays it knows are the NSW ones.
 - **The other universities are newer than UTS.** The outline reader's accuracy was measured on UTS outlines only. Timetable import is UTS only, and the Canvas link works for UTS and USyd only.
 - **The outline reader can make mistakes.** Gemini can miss an item or misread a weight or a week, so always check the review table before you save. Rows that are assumed or need your date say so, but a misread week still gives a date that looks fine. On 5 real outlines it found 93% of the assessments and invented none, but one outline (31265) had two missed items and two wrong weights. See [Results so far](#results-so-far).
 - **Old .doc and .ppt files depend on LibreOffice**, which runs with your own permissions. Groot blocks macros, link updates and web addresses, but it cannot rule out every trick a file from someone else might try, for example a link to a network share on Windows, or a bug in an old LibreOffice. Keep LibreOffice up to date, and save an old file from someone you do not trust as a PDF before you import it.
 - **The chat is ADK's development page.** It has no login and is made for building agents, so only run Groot on your own computer. Port 8000 is fixed in the code.
-- **Sydney time only.** The time zone is fixed in the code.
 - **English only.** Date words like "friday" and "tomorrow" must be in English.
 - **Editing changes the title, due date and subject only.** Weights and marks are changed in the Grades section or with `set_mark`. Renaming a deadline gives it a new calendar ID, so a calendar that already imported it will show both the old and the new event.
 - **The editing cases were only run on Flash-Lite.** The 63 of 63 result for `gemini-3.5-flash` was measured before `edit_deadline` and its 6 cases existed, because that model's free limit is about 20 requests a day.

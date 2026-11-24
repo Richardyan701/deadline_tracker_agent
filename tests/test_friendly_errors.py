@@ -157,7 +157,7 @@ def test_groot_uses_the_friendly_error_callback():
 
 
 @pytest.mark.parametrize("stream", [False, True], ids=["plain", "streaming"])
-def test_daily_limit_shows_when_it_resets_in_sydney_time(stream):
+def test_daily_limit_shows_when_it_resets_in_local_time(stream):
     # 20215 seconds after 1:23 PM is 6:59:55 PM, which is about 7:00 PM
     texts = chat((429, limit_error(quota_failure(PER_DAY), retry_info("20215s"))), stream=stream)
 

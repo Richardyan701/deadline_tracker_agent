@@ -115,7 +115,7 @@ Because both give you one place to keep your study life in order: a list of task
 - **You can use another company's AI instead:** Groq, OpenAI (ChatGPT), Anthropic (Claude), xAI (Grok), DeepSeek, OpenRouter, or a model on your own computer with Ollama. It takes two lines in `.env`, and Groot's pages then say where your words go. Only Gemini models have been measured, and other models read outlines as text only. See [Using a model from another company](docs/reference.md#using-a-model-from-another-company).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
 - **Four Sydney universities are built in, up to the end of 2027.** Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. For any other university or term, you type the session's dates yourself.
-- **Groot runs on Sydney time** and only knows NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
+- **Groot runs on Sydney time, or Singapore time** if you pick Singapore during setup. In Australia it always uses Sydney's time and NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
 - **UTS is the best tested.** The other three universities have one real outline each behind them so far.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
 - **Run it on your own computer only.** The chat page has no login.

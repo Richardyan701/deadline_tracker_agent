@@ -10,6 +10,25 @@ const addMessage = document.getElementById("add-message");
 const exportButton = document.getElementById("export-button");
 const markMessage = document.getElementById("mark-message");
 
+// The notice that Groot's clock is not Sydney's (see time_zone_notice in pages.py). It shows until
+// OK is clicked, and again if the time zone changes. Remembering is a convenience, so a browser
+// that blocks storage just shows it each time.
+const zoneNotice = document.getElementById("time-zone-notice");
+if (zoneNotice) {
+  const SEEN = "groot-time-zone-seen";
+  let seen = null;
+  try {
+    seen = localStorage.getItem(SEEN);
+  } catch {}
+  zoneNotice.hidden = seen === zoneNotice.dataset.zone;
+  document.getElementById("time-zone-ok").addEventListener("click", () => {
+    zoneNotice.hidden = true;
+    try {
+      localStorage.setItem(SEEN, zoneNotice.dataset.zone);
+    } catch {}
+  });
+}
+
 // Ask the server for this page again and swap in its fresh lists.
 async function refreshLists() {
   const response = await fetch("/groot");

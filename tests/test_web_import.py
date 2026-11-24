@@ -918,7 +918,7 @@ def test_the_page_has_the_date_fields_for_a_university_that_is_not_listed(client
     assert '<input id="custom-weeks" type="number" min="1" max="20" value="12" inputmode="numeric">' in text
     assert '<input id="custom-break-after" type="number" min="0" max="19" value="0" inputmode="numeric">' in text
     assert '<input id="custom-break-weeks" type="number" min="0" max="4" value="0" inputmode="numeric">' in text
-    assert "Groot does not know the exam dates or the public holidays, and it treats every time as Sydney time." in text
+    assert "Groot does not know the exam dates or the public holidays." in text
 
 
 def test_preview_with_a_session_the_student_typed(client, reader):

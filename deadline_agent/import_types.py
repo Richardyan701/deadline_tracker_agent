@@ -41,7 +41,7 @@ class CanvasEvent(TypedDict):
 
     subject_code: str  # the first subject code in the event's course tag or title, or "" if there is none
     title: str  # the event's title, without the course tag in square brackets
-    due: str  # Sydney time, "YYYY-MM-DD HH:MM"
+    due: str  # local time, "YYYY-MM-DD HH:MM"
     all_day: bool  # True if Canvas has a date but no time
     uid: str  # Canvas's own id for the event
 
