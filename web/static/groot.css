@@ -669,11 +669,99 @@ input[type="checkbox"] {
   font-weight: 600;
 }
 
-/* The short privacy note under the buttons on the home page */
+/* The short privacy note under the buttons on the home page, with the details folded away */
 .privacy-note {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.privacy-note p {
+  margin: 0;
+}
+
+details.more summary,
+.reminders summary,
+.paste-box summary {
+  cursor: pointer;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+
+details.more p {
+  margin: 0.25rem 0 0;
+}
+
+/* The note under the buttons when the calendar app's copy is out of date */
+.nudge {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--warn-ink);
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  font-size: 0.95rem;
+}
+
+/* The calendar reminder times, next to Export to calendar */
+.reminders {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.reminders fieldset {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+label.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem; /* big enough to tap on a phone */
+  font-weight: 400;
+}
+
+/* "Add many at once" */
+.paste-box {
+  margin-top: 1rem;
+}
+
+.paste-box textarea {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0.25rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #8a94a1;
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.paste-rows {
+  padding-left: 1.25rem;
+}
+
+.paste-rows li {
+  margin: 0.35rem 0;
+}
+
+.paste-rows .row-note {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.paste-rows li.problem .row-note {
+  color: var(--bad-ink);
 }
 
 /* ---------- the Edit box on the home page ---------- */

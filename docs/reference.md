@@ -19,7 +19,9 @@ Groot is one web app that runs on your own computer. It has three pages, and all
 - **Which week it is.** Under the title, a line like "Today is in week 7 of NUS AY2026/27 Semester 2 (Jan to May 2027)." It also says when the session has not started, is on a break, is in the exam period or has finished.
 - **Add a deadline** takes a title, a due date in plain words like "next friday 5pm" and an optional subject. It follows the same rules as the chat, see [Date phrases it understands](#date-phrases-it-understands), and shows the same message, good or bad. Above it, **Week numbers count in** picks your university and session, so you can type dates like "friday week 7", see [Week numbers](#week-numbers).
 - **UTS tip.** While a UTS session is chosen, a short tip under the due date box says that most Canvas assignments can get an instant 3-day extension with no documents, requested in Canvas (Assignment Extensions) in the 14 days before the due date, and not for quizzes, exams or in-class tasks. It links to [UTS's short extensions page](https://www.uts.edu.au/current-students/managing-your-course/classes-and-assessment/special-circumstances/short-extensions), which has the full rules. The wording was checked against that page on 24 Nov 2026. Groot never moves a due date by itself, because nothing changes until you request the extension. If you get one, edit the date.
-- **Export to calendar** downloads `deadlines.ics`, see [Export to your calendar](#export-to-your-calendar).
+- **Add many at once**, under the add form, takes a pasted list with one deadline per line, see [Adding many at once](#adding-many-at-once).
+- **Export to calendar** downloads `deadlines.ics`, see [Export to your calendar](#export-to-your-calendar). Under it, **Calendar reminders** picks when your calendar app reminds you, and a note says when your deadlines have changed since your last export.
+- **The privacy note** is one short line. **Privacy details** opens the full note.
 - **Import from outlines** and **Chat with Groot** open the other two pages.
 
 ### The chat
@@ -223,12 +225,30 @@ A deadline can also have `"weight_percent"` and `"mark_percent"`, each a number 
 - **Backups.** Download backup saves a `groot-backup-YYYY-MM-DD.json` file. Restore a backup replaces the deadlines in that browser, and it also accepts the laptop version's `deadlines.json`, so you can move your deadlines to the website. A file that is not a Groot backup is refused and nothing changes. Once you have deadlines, the page reminds you to back up, and again when your last backup is 7 or more days old.
 - **iPhones and iPads.** Safari can erase a website's saved data if you use Safari for 7 days without visiting it. A website added to the Home Screen is counted separately, so the page suggests Share, then Add to Home Screen, until you tap OK. The page also asks the browser to keep its data, though some browsers always say no.
 - **Time zone.** In Singapore's time zone the website uses Singapore time, and everywhere else Sydney time, the same as the laptop version's two settings.
-- **Example deadlines.** Add example deadlines adds three made-up ones, so you can try every button straight away.
+- **Try a sample semester.** For someone just trying Groot, it fills their next semester with 9 made-up assignments of common types (a quiz, an annotated bibliography, a lab report, a reflective journal, a case study, a literature review, a group presentation, an essay and a report), due the way outlines say it, like "tuesday week 9 11:59pm". Choose your university first. A semester that has already started is skipped for the next one, because its early weeks are in the past. Each title starts with "Example: ", and **Remove examples** deletes exactly those. The types come from UTS's [Types of assignments](https://www.uts.edu.au/for-students/current-students/support/helps/self-help-resources/types-assignments) page, Macquarie's assessment types guide and NUS's grading policy.
 - **How it is built.** `website/build.py` copies the page (`website/`), the home page's script and styles (`web/static/`) and the Python files listed in `PY_FILES` in `web/browser.py`. Nothing else is copied, so a `.env` file or `deadlines.json` can never be published. The Website workflow (`.github/workflows/website.yml`) builds and publishes it on GitHub Pages after every change to `main`. `website/make_icons.py` draws the app icon (it needs Pillow).
+
+## Adding many at once
+
+Paste a list into **Add many at once**, one deadline per line: the title, when it is due, and the subject if you like.
+
+| A line like | Works because |
+| --- | --- |
+| `Quiz 1, friday week 3 5pm, Statistics` | commas between the parts |
+| `Essay \| 20 dec \| Academic Writing` | also `;` or a tab (columns copied from a spreadsheet) |
+| `Lab report due wednesday 9am for Biology` | no separator: "due" or "by" ends the title, and "for" starts the subject |
+| `Quiz 2, 20 nov, 5pm` | a date can hold a comma: the longest part that is a date wins |
+| `- Quiz 3, 20 nov` or `3. Quiz 3, 20 nov` | bullets and numbers at the start are ignored |
+
+**Check the list** shows how Groot read each line, with the full date, and why any line cannot be added: a date it does not understand, a title already saved or listed twice, a line with no separator, or a date in the past. Nothing is saved until **Add these**, which adds the ready lines through the same tool as one deadline at a time, so sensitive details are still held back. Up to 100 lines of up to 300 characters each. No AI is used. The rules are in `deadline_agent/paste.py`.
 
 ## Export to your calendar
 
-Click **Export to calendar** on the home page, or ask Groot something like "add these to my calendar". Either way, every unfinished deadline is saved to `deadlines.ics` in the project folder, next to `deadlines.json`, and the home page also downloads it for you. To save it somewhere else, set the `DEADLINES_ICS_FILE` environment variable to the path you want. It is a standard iCalendar file. Each deadline becomes a one-minute event that starts at its due time (11:59 PM when it has no time), with the subject in its notes and a reminder 1 day before. Finished deadlines are left out, and if nothing is unfinished, no file is made. `deadlines.ics` is listed in `.gitignore`, so it is not committed.
+Click **Export to calendar** on the home page, or ask Groot something like "add these to my calendar". Either way, every unfinished deadline is saved to `deadlines.ics` in the project folder, next to `deadlines.json`, and the home page also downloads it for you. To save it somewhere else, set the `DEADLINES_ICS_FILE` environment variable to the path you want. It is a standard iCalendar file. Each deadline becomes a one-minute event that starts at its due time (11:59 PM when it has no time), with the subject in its notes and a pop-up reminder at each time chosen under **Calendar reminders** on the home page: 1 week, 2 days, 1 day, 5 hours, 1 hour or 30 minutes before. Unless you change it, that is 1 day before.
+
+**Why the reminders come from your calendar app.** A web page cannot pop up a reminder while it is closed: Chrome ended work on the feature that would have allowed it ([Notification Triggers](https://developer.chrome.com/docs/web-platform/notification-triggers)), and the other way needs a server that holds your deadlines. Your phone's or computer's calendar app can, so Groot puts the reminders in the calendar file. Outlook uses only the first reminder of each event, which is the earliest one chosen ([Microsoft's notes on the iCalendar alarm component](https://msdn.microsoft.com/en-us/library/908dc008-2a3a-48c1-88d0-633cdc0aaeee)), and Google's help pages do not say whether an imported file keeps its reminders, so check one event after importing.
+
+**Your calendar app has a copy, not a live link.** A deadline added or moved after an export gets no reminder until you export again. So after each export Groot keeps a short fingerprint of each exported event (not the deadline itself), and the home page says "Your deadlines or reminder times changed since your last export" whenever they no longer match. Finished deadlines are left out, and if nothing is unfinished, no file is made. `deadlines.ics` is listed in `.gitignore`, so it is not committed.
 
 To import it:
 
@@ -714,7 +734,7 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_reminders.py` | 113 | Reminder groups, exact edges like 11:59 PM, the friendly phrases, the reminders block, and the prompt injection protection |
 | `tests/test_outline.py` | 109 | What the outline reader sends to Gemini, how the answer is checked, prompt injection and API errors, with a fake Gemini |
 | `tests/test_calendars.py` | 443 | Every week of every session at all four universities against the official calendars, the breaks, UNSW's flexibility week, the exams, finished sessions and public holidays |
-| `tests/test_web.py` | 152 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
+| `tests/test_web.py` | 174 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
 | `tests/test_tools.py` | 80 | The tools, title matching, saving, backups of unreadable files, failed saves and many threads at once |
 | `tests/test_eval.py` | 77 | The outline evaluation's pairing, scores, real dates and spacing of requests |
 | `tests/test_web_import.py` | 102 | The import page: every file kind, refused files, the timetable, Canvas, Preview and Save |
@@ -732,7 +752,9 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
 | `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
-| `tests/test_browser.py` | 29 | Groot's website: every request, backups and restores, the standard-library-only check, the build's exact file list, the page's security rules and the app icon |
+| `tests/test_browser.py` | 36 | Groot's website: every request, backups and restores, the standard-library-only check, the build's exact file list, the page's security rules and the app icon |
+| `tests/test_paste.py` | 28 | Adding many at once: every way of writing a line, each problem, adding only the ready lines, and the route |
+| `tests/test_calendar_reminders.py` | 19 | Choosing reminder times, every reminder in the calendar file, the "export again" note at each change, and the route's Origin check |
 | `tests/test_week_dates.py` | 62 | Week-number dates at every university, the question when no day is given, quiet weeks, public holidays, refused weeks, the saved choice and where a day falls in a session |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.

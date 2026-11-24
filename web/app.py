@@ -12,6 +12,8 @@ and adds Groot's routes under /groot:
     POST /groot/api/edit      change a deadline       JSON {"title", "new_title", "due_date", "subject"}
     POST /groot/api/mark      save a mark or weight   JSON {"title", "mark_percent", "weight_percent"}
     POST /groot/api/session   choose the session week numbers count in  JSON {"session"}
+    POST /groot/api/reminders choose the calendar file's reminder times  JSON {"reminders": ["1d", "5h"]}
+    POST /groot/api/paste     check or add a pasted list   JSON {"text", "save": true to add}
     POST /groot/api/export    download deadlines.ics  JSON {}
     POST /groot/api/preview   read outlines (Gemini)  multipart form, see uploads.py
     POST /groot/api/save      save the ticked rows    JSON {"rows": [{"title", "due_date", "subject", "weight_percent"}]}
@@ -38,7 +40,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from google.adk.cli.fast_api import get_fast_api_app
 
-from deadline_agent import calendars, importer, tools
+from deadline_agent import calendars, importer, paste, tools
 
 from . import Refused, pages, preview, uploads
 
@@ -198,6 +200,20 @@ def edit(data: dict = Depends(json_from_groot)) -> dict:
 def session(data: dict = Depends(json_from_groot)) -> dict:
     """Choose the university session that week numbers, like "friday week 7", count in. "" switches them off."""
     return tools.choose_session(data.get("session"))
+
+
+@router.post("/api/reminders")
+def reminders(data: dict = Depends(json_from_groot)) -> dict:
+    """Choose when the calendar file reminds the student, like ["1d", "5h", "30m"]. [] turns reminders off."""
+    return tools.choose_reminders(data.get("reminders"))
+
+
+@router.post("/api/paste")
+def paste_list(data: dict = Depends(json_from_groot)) -> dict:
+    """Check a pasted list of deadlines, one per line, or add the ready lines when "save" is true."""
+    if data.get("save") is True:
+        return paste.add(data.get("text"))
+    return paste.check(data.get("text"))
 
 
 @router.post("/api/mark")

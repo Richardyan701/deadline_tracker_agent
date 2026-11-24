@@ -1,7 +1,7 @@
 // Agent Groot's home page: mark done, edit, delete, add a deadline, enter marks and export to a calendar.
 // Each button calls Groot's JSON API, which runs the same tools as the chat.
 // Then the server draws the lists again, so they always match the deadlines file.
-import {answer, post, show, showOffline} from "./common.js";
+import {answer, element, post, show, showOffline} from "./common.js";
 
 const topMessage = document.getElementById("top-message");
 const tableMessage = document.getElementById("table-message");
@@ -36,7 +36,7 @@ async function refreshLists() {
     throw new Error(`the home page answered ${response.status}`);  // shown as "Groot did not answer"
   }
   const fresh = new DOMParser().parseFromString(await response.text(), "text/html");
-  for (const id of ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip"]) {
+  for (const id of ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip", "export-nudge"]) {
     document.getElementById(id).replaceWith(fresh.getElementById(id));
   }
 }
@@ -192,6 +192,7 @@ exportButton.addEventListener("click", async () => {
         status: "success",
         message: "Downloaded deadlines.ics. Open it to add your unfinished deadlines to Google Calendar, Outlook or your phone.",
       });
+      await refreshLists();  // the "export again" note goes away
     } else {
       show(topMessage, await answer(response));  // for example, nothing to export yet
     }
@@ -199,6 +200,93 @@ exportButton.addEventListener("click", async () => {
     showOffline(topMessage);
   } finally {
     exportButton.disabled = false;
+  }
+});
+
+// The calendar reminder times. A change is saved straight away, and the closed picker's line is updated.
+const reminderPicker = document.getElementById("reminder-picker");
+const reminderSummary = document.getElementById("reminder-summary");
+const reminderMessage = document.getElementById("reminder-message");
+
+// "1 day", "1 day and 5 hours", "1 day, 5 hours and 30 minutes"
+function joinWords(words) {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
+reminderPicker.addEventListener("change", async () => {
+  const boxes = [...reminderPicker.querySelectorAll("input[name=reminder]")];
+  const chosen = boxes.filter((box) => box.checked);
+  boxes.forEach((box) => (box.disabled = true));
+  try {
+    const result = await answer(await post("/groot/api/reminders", {reminders: chosen.map((box) => box.value)}));
+    show(reminderMessage, result);
+    if (result.status === "success") {
+      const words = chosen.map((box) => box.parentElement.textContent.trim());
+      reminderSummary.textContent = words.length ? `Calendar reminders: ${joinWords(words)} before` : "Calendar reminders: off";
+      await refreshLists();  // the calendar now needs exporting again
+    }
+  } catch {
+    showOffline(reminderMessage);
+  } finally {
+    boxes.forEach((box) => (box.disabled = false));
+  }
+});
+
+// "Add many at once": check the pasted list first, then add the lines that are ready
+const pasteForm = document.getElementById("paste-form");
+const pasteText = document.getElementById("paste-text");
+const pasteAdd = document.getElementById("paste-add");
+const pasteMessage = document.getElementById("paste-message");
+const pasteRows = document.getElementById("paste-rows");
+
+// One list item per line, built with textContent, so nothing pasted can turn into HTML
+function showRows(rows) {
+  pasteRows.replaceChildren(
+    ...rows.map((row) => {
+      const item = element("li", "", row.ok ? "ok" : "problem");
+      const subject = row.subject ? ` (${row.subject})` : "";
+      const what = row.title ? `${row.title}: ${row.due || "no date yet"}${subject}` : `Line ${row.line}: ${row.text}`;
+      item.append(element("span", what, "row-what"));
+      if (row.message) {
+        item.append(element("span", row.message, "row-note"));
+      }
+      return item;
+    }),
+  );
+}
+
+async function sendPaste(save) {
+  const result = await answer(await post("/groot/api/paste", {text: pasteText.value, save}));
+  show(pasteMessage, result);
+  showRows(result.rows || []);
+  return result;
+}
+
+pasteForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const result = await sendPaste(false);
+    pasteAdd.hidden = !(result.rows || []).some((row) => row.ok);
+  } catch {
+    showOffline(pasteMessage);
+  }
+});
+
+// After any change to the list, it has to be checked again before adding
+pasteText.addEventListener("input", () => {
+  pasteAdd.hidden = true;
+});
+
+pasteAdd.addEventListener("click", async () => {
+  pasteAdd.disabled = true;
+  try {
+    await sendPaste(true);
+    pasteAdd.hidden = true;
+    await refreshLists();
+  } catch {
+    showOffline(pasteMessage);
+  } finally {
+    pasteAdd.disabled = false;
   }
 });
 

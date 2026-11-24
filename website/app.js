@@ -17,9 +17,12 @@ const LAST_BACKUP = "groot-last-backup";
 const INSTALL_SEEN = "groot-install-tip-seen";
 const FLASH = "groot-flash";  // a message to show after the page reloads
 // The parts of the page drawn again after a change. The same list as refreshLists in home.js.
-export const REDRAWN = ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip"];
-// The requests that change something, so they are saved straight after
-const CHANGES = new Set(["add", "done", "delete", "edit", "mark", "session", "restore", "examples"]);
+export const REDRAWN = ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip", "export-nudge"];
+// The requests that change something, so they are saved straight after.
+// export is one too: it notes what the calendar app now has.
+const CHANGES = new Set([
+  "add", "done", "delete", "edit", "mark", "session", "reminders", "paste", "export", "restore", "sample", "removeexamples",
+]);
 const NOT_KEPT =
   "This browser is blocking Groot's storage (for example in a private window), " +
   "so your deadlines will be gone when you close this page.";
@@ -206,8 +209,17 @@ function setUpWebsiteButtons() {
     }
   });
 
-  document.getElementById("examples-button").addEventListener("click", async () => {
-    const result = run("examples");
+  document.getElementById("sample-button").addEventListener("click", async () => {
+    const result = run("sample");
+    show(message, result);
+    if (result.status === "success") {
+      document.getElementById("home-session").value = result.session;  // it may have moved to the next semester
+      await redraw();
+    }
+  });
+
+  document.getElementById("remove-examples-button").addEventListener("click", async () => {
+    const result = run("removeexamples");
     show(message, result);
     if (result.status === "success") {
       await redraw();
@@ -256,7 +268,7 @@ function remindAboutBackups() {
     return;
   }
   if (!last) {
-    show(top, {status: "working", message: 'Tip: use "Download backup" at the bottom of this page now and then, in case this browser\'s data is cleared.'});
+    show(top, {status: "working", message: "Tip: download a backup now and then. The button is at the bottom of the page."});
   } else if (daysSince(last) >= 7) {
     show(top, {status: "working", message: `Your last backup was ${daysSince(last)} days ago. "Download backup" is at the bottom of this page.`});
   }
