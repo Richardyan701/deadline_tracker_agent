@@ -4,7 +4,7 @@
 
 **Agent Groot is a free, open-source study assistant that keeps track of your university deadlines.** Drop in your subject outlines and it finds every assessment and its real date, then reminds you before anything is due. You can also just tell it: *"Quiz 2 due next friday 5pm"*.
 
-It has the calendars of **UTS, UNSW, the University of Sydney and Macquarie University** built in. At any other university, you type when week 1 starts and it does the rest.
+It has the 2027 calendars of **UTS, UNSW, the University of Sydney and Macquarie University** in Australia, and **NUS, NTU and SMU** in Singapore, built in. At any other university, you type when week 1 starts and it does the rest.
 
 Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydney. I'm learning programming, mathematics and data analytics, and I built Groot to put them to work on a real problem uni students have: keeping track of every deadline across their subjects. I designed it and directed its building, with Google's Agent Development Kit (ADK), Gemini, and Claude as a coding partner (see [How this was built](#how-this-was-built)). It runs on your own computer.
 
@@ -22,7 +22,7 @@ Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydne
 - **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
 - **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up.
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
-- **Feeds the calendar you already use.** One click exports your deadlines to Google Calendar, Outlook or your phone. It also imports your Canvas calendar (UTS and USyd) and your UTS timetable.
+- **Feeds the calendar you already use.** One click exports your deadlines to Google Calendar, Outlook or your phone. It also imports your Canvas calendar (UTS, USyd and NUS) and your UTS timetable.
 - **Has a home page that uses no AI**, plus a chat with Groot.
 - **Holds back sensitive details.** A chat message with a card number or password in it is never sent to the AI. The same details are removed from outlines and never saved.
 
@@ -114,9 +114,10 @@ Because both give you one place to keep your study life in order: a list of task
 - **You can get a much bigger limit for free.** Add `GROOT_MODEL=gemini-3.5-flash-lite` to `deadline_agent/.env` and restart. Flash-Lite ran more than 120 requests in one evening without hitting a limit. See [Choosing another Gemini model](docs/reference.md#choosing-another-gemini-model).
 - **You can use another company's AI instead:** Groq, OpenAI (ChatGPT), Anthropic (Claude), xAI (Grok), DeepSeek, OpenRouter, or a model on your own computer with Ollama. It takes two lines in `.env`, and Groot's pages then say where your words go. Only Gemini models have been measured, and other models read outlines as text only. See [Using a model from another company](docs/reference.md#using-a-model-from-another-company).
 - **Check the review table before saving imported deadlines.** Gemini can misread an outline.
-- **Four Sydney universities are built in, up to the end of 2027.** Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. For any other university or term, you type the session's dates yourself.
+- **Seven universities are built in, up to the end of 2027:** four in Sydney and three in Singapore. Each year's dates are added by hand from the official calendars, and Groot tells you when a calendar has run out. NTU's August to December 2027 dates are marked "indicative" by NTU. For any other university or term, you type the session's dates yourself.
+- **The grade calculator uses Australian grade bands,** so it is switched off for students in Singapore.
 - **Groot runs on Sydney time, or Singapore time** if you pick Singapore during setup. In Australia it always uses Sydney's time and NSW public holidays, so outside the eastern states "due soon" can be a few hours out.
-- **UTS is the best tested.** The other three universities have one real outline each behind them so far.
+- **UTS is the best tested.** UNSW, USyd, Macquarie and SMU have one real outline each behind them so far, and NUS and NTU none yet.
 - **One user, one local file.** There are no accounts, and nothing syncs between devices.
 - **Run it on your own computer only.** The chat page has no login.
 - **The grade calculator can't check minimum rules** (like a minimum exam mark). Read your subject outline.

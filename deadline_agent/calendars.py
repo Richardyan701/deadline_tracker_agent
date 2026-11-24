@@ -5,16 +5,23 @@ weeks are not evenly spaced, because most sessions have a break in the middle
 that has no week number. So the dates come from the official calendars below,
 never from counting weeks.
 
-Four Sydney universities are built in: UTS, UNSW, the University of Sydney
-and Macquarie University. Each one counts its weeks differently:
+Seven universities are built in: four in Sydney (UTS, UNSW, the University
+of Sydney and Macquarie University) and three in Singapore (NUS, NTU and
+SMU). Each one counts its weeks differently:
 
     UTS         12 teaching weeks. The StuVac week in the middle has no number.
     UNSW        10 weeks in a term, all in a row. Week 6 is "flexibility week",
                 which keeps its number even though most classes do not run.
     USyd        13 teaching weeks. The mid-semester break has no number.
     Macquarie   13 teaching weeks. The two-week mid-session recess has no number.
+    NUS         13 teaching weeks. Recess week (after week 6) and reading week
+                (before the exams) have no number.
+    NTU         13 teaching weeks. Recess week (after week 7) has no number.
+    SMU         Weeks 1 to 14 in a row, with week 8 as recess week, which keeps
+                its number, so 13 of them are teaching weeks.
 
-Weeks start on Monday. Dates are plain Sydney dates and times with no
+Weeks start on Monday. Dates are plain local dates and times (Sydney's for the
+Australian universities, Singapore's for the Singaporean ones) with no
 timezone attached, the same as the saved due dates in tools.py.
 
 THE CALENDARS RUN OUT. Every university publishes new dates each year, so
@@ -36,6 +43,16 @@ Universities Australia "Academic calendar 2026-27" table):
                 (classes start, mid-session break, classes resume, classes end and exams)
     Second source for all four
                 https://universitiesaustralia.edu.au/our-universities/teaching-calendars/
+    NUS         https://nus.edu.sg/registrar/docs/default-source/calendar/ay2026-2027.pdf
+                https://nus.edu.sg/registrar/docs/default-source/calendar/ay2027-2028.pdf
+    NTU         https://www.ntu.edu.sg/admissions/matriculation/academic-calendars, the
+                AY2026-27 semester calendar and the AY2027-28 one, which NTU marks as
+                "indicative", so its dates may still change
+    SMU         https://www.smu.edu.sg/sites/default/files/courses/calendars/ug-jd/2026-2027.pdf
+                https://www.smu.edu.sg/sites/default/files/courses/calendars/ug-jd/2027-2028.pdf
+                (the undergraduate and Juris Doctor calendars)
+    Each Singapore date was read from the university's own PDF and agrees with
+    what third-party summaries (for example NTUMods) say where they cover it.
 
 Only each university's main calendar is here. Other calendars (UTS Health,
 UNSW Canberra, summer and winter terms, intensive units and so on) are not.
@@ -47,12 +64,16 @@ from datetime import date, datetime, timedelta
 from .tools import WEEKDAY_NAMES
 
 # The universities Groot knows, in the order the drop box lists them.
-# "name" is the short name used in sentences, "full_name" is for the picker.
+# "name" is the short name used in sentences, "full_name" is for the picker,
+# and "country" is a key of region.COUNTRIES (and of HOLIDAYS below).
 UNIVERSITIES = {
-    "uts": {"name": "UTS", "full_name": "University of Technology Sydney (UTS)"},
-    "unsw": {"name": "UNSW", "full_name": "UNSW Sydney"},
-    "usyd": {"name": "USyd", "full_name": "University of Sydney"},
-    "mq": {"name": "Macquarie", "full_name": "Macquarie University"},
+    "uts": {"name": "UTS", "full_name": "University of Technology Sydney (UTS)", "country": "AU"},
+    "unsw": {"name": "UNSW", "full_name": "UNSW Sydney", "country": "AU"},
+    "usyd": {"name": "USyd", "full_name": "University of Sydney", "country": "AU"},
+    "mq": {"name": "Macquarie", "full_name": "Macquarie University", "country": "AU"},
+    "nus": {"name": "NUS", "full_name": "National University of Singapore (NUS)", "country": "SG"},
+    "ntu": {"name": "NTU", "full_name": "Nanyang Technological University (NTU)", "country": "SG"},
+    "smu": {"name": "SMU", "full_name": "Singapore Management University (SMU)", "country": "SG"},
 }
 
 
@@ -67,7 +88,8 @@ def _mondays(first: date, count: int) -> list[date]:
 #   "weeks"        the Monday of each teaching week, week 1 first
 #   "breaks"       the Monday of each week between week 1 and the exams that has no week number
 #   "exams"        the first and last day of the exam period
-#   "quiet_weeks"  (only UNSW) numbered weeks when most classes do not run, with what they are called
+#   "quiet_weeks"  (UNSW and SMU) numbered weeks when most classes do not run, with what they are called
+#   "exam_weeks"   (only SMU) the week numbers the calendar gives its exam weeks
 SESSIONS = {
     # ---------- UTS: 12 teaching weeks, with StuVac after week 7 or 8 ----------
     "AUT2026": {
@@ -192,9 +214,75 @@ SESSIONS = {
         # Exams: 8 to 26 Nov
         "exams": (date(2027, 11, 8), date(2027, 11, 26)),
     },
+    # ---------- NUS: 13 teaching weeks; recess week and reading week have no number ----------
+    "NUS_AY2627_S2": {
+        "university": "nus",
+        "name": "AY2026/27 Semester 2 (Jan to May 2027)",
+        # Weeks 1 to 6 start on Mon 11 Jan. Recess week is Sat 20 to Sun 28 Feb.
+        # Weeks 7 to 13 start on Mon 1 Mar. Reading week is Sat 17 to Fri 23 Apr.
+        "weeks": _mondays(date(2027, 1, 11), 6) + _mondays(date(2027, 3, 1), 7),
+        "breaks": [date(2027, 2, 22), date(2027, 4, 19)],
+        # Examination: Sat 24 Apr to Sat 8 May
+        "exams": (date(2027, 4, 24), date(2027, 5, 8)),
+    },
+    "NUS_AY2728_S1": {
+        "university": "nus",
+        "name": "AY2027/28 Semester 1 (Aug to Dec 2027)",
+        # Weeks 1 to 6 start on Mon 9 Aug. Recess week is Sat 18 to Sun 26 Sep.
+        # Weeks 7 to 13 start on Mon 27 Sep. Reading week is Sat 13 to Fri 19 Nov.
+        "weeks": _mondays(date(2027, 8, 9), 6) + _mondays(date(2027, 9, 27), 7),
+        "breaks": [date(2027, 9, 20), date(2027, 11, 15)],
+        # Examination: Sat 20 Nov to Sat 4 Dec
+        "exams": (date(2027, 11, 20), date(2027, 12, 4)),
+    },
+    # ---------- NTU: 13 teaching weeks; recess week (after week 7) has no number ----------
+    "NTU_AY2627_S2": {
+        "university": "ntu",
+        "name": "AY2026/27 Semester 2 (Jan to May 2027)",
+        # Teaching weeks 1 to 7 start on Mon 11 Jan. Recess week is Mon 1 to Fri 5 Mar.
+        # Teaching weeks 8 to 13 start on Mon 8 Mar, and week 13 ends on Fri 16 Apr.
+        "weeks": _mondays(date(2027, 1, 11), 7) + _mondays(date(2027, 3, 8), 6),
+        "breaks": [date(2027, 3, 1)],
+        # Revision and examination weeks: Mon 19 Apr to Fri 7 May (NTU's calendar does not separate them)
+        "exams": (date(2027, 4, 19), date(2027, 5, 7)),
+    },
+    "NTU_AY2728_S1": {
+        "university": "ntu",
+        "name": "AY2027/28 Semester 1 (Aug to Dec 2027, indicative)",
+        # NTU marks this calendar "indicative": its dates may still change.
+        # Teaching weeks 1 to 7 start on Mon 9 Aug. Recess week is Mon 27 Sep to Fri 1 Oct.
+        # Teaching weeks 8 to 13 start on Mon 4 Oct.
+        "weeks": _mondays(date(2027, 8, 9), 7) + _mondays(date(2027, 10, 4), 6),
+        "breaks": [date(2027, 9, 27)],
+        # Revision and examination weeks: Mon 15 Nov to Fri 3 Dec
+        "exams": (date(2027, 11, 15), date(2027, 12, 3)),
+    },
+    # ---------- SMU: weeks 1 to 14 in a row; week 8 is recess week and keeps its number ----------
+    "SMU_AY2627_T2": {
+        "university": "smu",
+        "name": "AY2026/27 Term 2 (Jan to May 2027)",
+        # Weeks 1 to 14 start on Mon 11 Jan. Week 8 (Mon 1 to Sun 7 Mar) is recess week.
+        "weeks": _mondays(date(2027, 1, 11), 14),
+        "breaks": [],
+        # Examination (weeks 15 and 16): Mon 19 Apr to Sun 2 May
+        "exams": (date(2027, 4, 19), date(2027, 5, 2)),
+        "quiet_weeks": {8: "recess week"},
+        "exam_weeks": (15, 16),  # SMU's calendar numbers its two exam weeks
+    },
+    "SMU_AY2728_T1": {
+        "university": "smu",
+        "name": "AY2027/28 Term 1 (Aug to Dec 2027)",
+        # Weeks 1 to 14 start on Mon 16 Aug. Week 8 (Mon 4 to Sun 10 Oct) is recess week.
+        "weeks": _mondays(date(2027, 8, 16), 14),
+        "breaks": [],
+        # Examination (weeks 15 and 16): Mon 22 Nov to Sun 5 Dec
+        "exams": (date(2027, 11, 22), date(2027, 12, 5)),
+        "quiet_weeks": {8: "recess week"},
+        "exam_weeks": (15, 16),
+    },
 }
 
-# Every NSW public holiday in 2026 and 2027, since all four universities are in Sydney.
+# Every NSW public holiday in 2026 and 2027, for the Australian universities, which are all in Sydney.
 # Source: the NSW Government list at https://www.nsw.gov.au/about-nsw/public-holidays
 # The extra Monday after Anzac Day 2026 was announced on 15 Feb 2026:
 # https://www.nsw.gov.au/ministerial-releases/minns-labor-government-announces-extra-public-holiday-year
@@ -229,6 +317,29 @@ PUBLIC_HOLIDAYS = {
     date(2027, 12, 27): "the extra Christmas Day holiday",
     date(2027, 12, 28): "the extra Boxing Day holiday",
 }
+
+# Every Singapore public holiday in 2027, for the Singaporean universities.
+# Source: the Ministry of Manpower's official list, as published on the government's
+# open data site: https://data.gov.sg/datasets/d_0ba69fc6d56717ff0bf8083c6af3bb84/view
+# and https://www.mom.gov.sg/newsroom/press-releases/2026/0618-public-holidays-for-2027
+# The Hari Raya dates depend on sighting the moon, so MOM may move them.
+SINGAPORE_HOLIDAYS = {
+    date(2027, 1, 1): "New Year's Day",
+    date(2027, 2, 6): "Chinese New Year",
+    date(2027, 2, 7): "Chinese New Year",
+    date(2027, 2, 8): "the Chinese New Year holiday in lieu",  # day 2 falls on a Sunday
+    date(2027, 3, 10): "Hari Raya Puasa",
+    date(2027, 3, 26): "Good Friday",
+    date(2027, 5, 1): "Labour Day",
+    date(2027, 5, 17): "Hari Raya Haji",
+    date(2027, 5, 20): "Vesak Day",
+    date(2027, 8, 9): "National Day",
+    date(2027, 10, 28): "Deepavali",
+    date(2027, 12, 25): "Christmas Day",
+}
+
+# Which holidays apply to a university in each country, and what the notes call them
+HOLIDAYS = {"AU": ("NSW", PUBLIC_HOLIDAYS), "SG": ("Singapore", SINGAPORE_HOLIDAYS)}
 
 
 # ---------- a session the student describes themselves ----------
@@ -397,3 +508,17 @@ def teaching_weeks(session: str, first: int, last: int) -> list[tuple[int, date]
 def is_public_holiday(day: date) -> bool:
     """True if the day is one of the NSW public holidays in PUBLIC_HOLIDAYS."""
     return day in PUBLIC_HOLIDAYS
+
+
+def holiday_on(session: str, day: date) -> tuple[str, str] | None:
+    """The public holiday on a day where the session's university is, as (place, holiday), or None.
+
+    For example ("NSW", "Good Friday") for a UTS session, or ("Singapore",
+    "Vesak Day") for an NUS one. A session the student typed themselves has no
+    known country, so it never has holidays.
+    """
+    key = session_info(session)["university"]
+    if key not in UNIVERSITIES:
+        return None
+    place, holidays = HOLIDAYS[UNIVERSITIES[key]["country"]]
+    return (place, holidays[day]) if day in holidays else None

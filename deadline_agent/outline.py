@@ -417,8 +417,10 @@ def _subject_code(value) -> str:
     """The subject code, like "33130" or "COMP1511". Without one the outline cannot be used, so this is an error.
 
     Spaces are taken out and letters are made capitals, so "comp 1511" becomes "COMP1511".
+    Any kind of dash becomes "-", so SMU's "COR‐IS1704" (with a Unicode hyphen) becomes "COR-IS1704".
     """
     code = "".join(value.split()).upper() if isinstance(value, str) else ""
+    code = re.sub("[\u2010-\u2015\u2212]", "-", code)
     if not re.fullmatch(SUBJECT_CODE, code):
         raise OutlineError(
             f"{AI} did not find a subject code like 33130 or COMP1511. Is this a subject outline "

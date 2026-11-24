@@ -74,6 +74,44 @@ WEEKS = {
         # recess from 20 Sep
         d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11),
     ],
+    # NUS AY2026/27 Semester 2, copied week by week from the official NUS calendar PDF
+    "NUS_AY2627_S2": [
+        d(11, 1), d(18, 1), d(25, 1), d(1, 2), d(8, 2), d(15, 2),
+        # recess week Sat 20 to Sun 28 Feb
+        d(1, 3), d(8, 3), d(15, 3), d(22, 3), d(29, 3), d(5, 4), d(12, 4),
+        # reading week Sat 17 to Fri 23 Apr
+    ],
+    # NUS AY2027/28 Semester 1
+    "NUS_AY2728_S1": [
+        d(9, 8), d(16, 8), d(23, 8), d(30, 8), d(6, 9), d(13, 9),
+        # recess week Sat 18 to Sun 26 Sep
+        d(27, 9), d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11),
+        # reading week Sat 13 to Fri 19 Nov
+    ],
+    # NTU AY2026/27 Semester 2, read from the official NTU calendar grid (teaching weeks numbered on the left)
+    "NTU_AY2627_S2": [
+        d(11, 1), d(18, 1), d(25, 1), d(1, 2), d(8, 2), d(15, 2), d(22, 2),
+        # recess week Mon 1 to Fri 5 Mar
+        d(8, 3), d(15, 3), d(22, 3), d(29, 3), d(5, 4), d(12, 4),
+    ],
+    # NTU AY2027/28 Semester 1 (indicative)
+    "NTU_AY2728_S1": [
+        d(9, 8), d(16, 8), d(23, 8), d(30, 8), d(6, 9), d(13, 9), d(20, 9),
+        # recess week Mon 27 Sep to Fri 1 Oct
+        d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11),
+    ],
+    # SMU AY2026/27 Term 2, from the official SMU undergraduate calendar: weeks 1 to 14, week 8 is recess
+    "SMU_AY2627_T2": [
+        d(11, 1), d(18, 1), d(25, 1), d(1, 2), d(8, 2), d(15, 2), d(22, 2),
+        d(1, 3),  # week 8, recess week
+        d(8, 3), d(15, 3), d(22, 3), d(29, 3), d(5, 4), d(12, 4),
+    ],
+    # SMU AY2027/28 Term 1
+    "SMU_AY2728_T1": [
+        d(16, 8), d(23, 8), d(30, 8), d(6, 9), d(13, 9), d(20, 9), d(27, 9),
+        d(4, 10),  # week 8, recess week
+        d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11), d(15, 11),
+    ],
 }
 EVERY_WEEK = [(session, number, monday) for session, mondays in WEEKS.items() for number, monday in enumerate(mondays, 1)]
 
@@ -84,6 +122,9 @@ LAST_TEACHING_DAY = {
     "UNSW_T1_2027": d(23, 4), "UNSW_T2_2027": d(6, 8), "UNSW_T3_2027": d(19, 11),
     "USYD_S1_2027": d(30, 5), "USYD_S2_2027": d(7, 11),
     "MQ_S1_2027": d(6, 6), "MQ_S2_2027": d(7, 11),
+    "NUS_AY2627_S2": d(16, 4), "NUS_AY2728_S1": d(12, 11),
+    "NTU_AY2627_S2": d(16, 4), "NTU_AY2728_S1": d(12, 11),
+    "SMU_AY2627_T2": d(18, 4), "SMU_AY2728_T1": d(21, 11),
 }  # fmt: skip
 
 # The first and last day of each exam period
@@ -93,6 +134,9 @@ EXAMS = {
     "UNSW_T1_2027": (d(30, 4), d(13, 5)), "UNSW_T2_2027": (d(13, 8), d(26, 8)), "UNSW_T3_2027": (d(26, 11), d(9, 12)),
     "USYD_S1_2027": (d(7, 6), d(19, 6)), "USYD_S2_2027": (d(15, 11), d(27, 11)),
     "MQ_S1_2027": (d(7, 6), d(25, 6)), "MQ_S2_2027": (d(8, 11), d(26, 11)),
+    "NUS_AY2627_S2": (d(24, 4), d(8, 5)), "NUS_AY2728_S1": (d(20, 11), d(4, 12)),
+    "NTU_AY2627_S2": (d(19, 4), d(7, 5)), "NTU_AY2728_S1": (d(15, 11), d(3, 12)),
+    "SMU_AY2627_T2": (d(19, 4), d(2, 5)), "SMU_AY2728_T1": (d(22, 11), d(5, 12)),
 }  # fmt: skip
 
 
@@ -135,6 +179,8 @@ def test_every_week_starts_on_a_monday(session, week, monday):
         ("UNSW_T1_2027", 10), ("UNSW_T2_2027", 10), ("UNSW_T3_2027", 10),
         ("USYD_S1_2027", 13), ("USYD_S2_2027", 13),
         ("MQ_S1_2027", 13), ("MQ_S2_2027", 13),
+        ("NUS_AY2627_S2", 13), ("NUS_AY2728_S1", 13), ("NTU_AY2627_S2", 13), ("NTU_AY2728_S1", 13),
+        ("SMU_AY2627_T2", 14), ("SMU_AY2728_T1", 14),  # week 8 is recess but keeps its number
     ],
 )  # fmt: skip
 def test_each_university_has_its_own_number_of_teaching_weeks(session, weeks):
@@ -156,6 +202,10 @@ def test_session_names():
         "UNSW_T1_2027": "Term 1 2027", "UNSW_T2_2027": "Term 2 2027", "UNSW_T3_2027": "Term 3 2027",
         "USYD_S1_2027": "Semester 1 2027", "USYD_S2_2027": "Semester 2 2027",
         "MQ_S1_2027": "Session 1 2027", "MQ_S2_2027": "Session 2 2027",
+        "NUS_AY2627_S2": "AY2026/27 Semester 2 (Jan to May 2027)", "NUS_AY2728_S1": "AY2027/28 Semester 1 (Aug to Dec 2027)",
+        "NTU_AY2627_S2": "AY2026/27 Semester 2 (Jan to May 2027)",
+        "NTU_AY2728_S1": "AY2027/28 Semester 1 (Aug to Dec 2027, indicative)",
+        "SMU_AY2627_T2": "AY2026/27 Term 2 (Jan to May 2027)", "SMU_AY2728_T1": "AY2027/28 Term 1 (Aug to Dec 2027)",
     }  # fmt: skip
 
 
@@ -184,6 +234,12 @@ def test_university_name(session, name):
         ("USYD_S2_2027", [d(27, 9), d(8, 11)]),
         ("MQ_S1_2027", [d(12, 4), d(19, 4)]),  # the two recess weeks
         ("MQ_S2_2027", [d(20, 9), d(27, 9)]),
+        ("NUS_AY2627_S2", [d(22, 2), d(19, 4)]),  # recess week, reading week
+        ("NUS_AY2728_S1", [d(20, 9), d(15, 11)]),
+        ("NTU_AY2627_S2", [d(1, 3)]),  # recess week (revision week is part of the exam period)
+        ("NTU_AY2728_S1", [d(27, 9)]),
+        ("SMU_AY2627_T2", []),  # recess is week 8, which keeps its number
+        ("SMU_AY2728_T1", []),
     ],
 )
 def test_breaks_match_the_official_calendars(session, breaks):
@@ -290,10 +346,13 @@ def test_no_university_has_run_out_while_a_2027_session_is_still_to_come():
 
 
 def test_universities_with_no_session_left_are_named():
-    # UTS Spring 2027 exams end on 19 Nov, Macquarie on 26 Nov, USyd on 27 Nov and UNSW on 9 Dec
+    # UTS Spring 2027 exams end on 19 Nov, Macquarie on 26 Nov, USyd on 27 Nov, NTU on 3 Dec,
+    # NUS on 4 Dec, SMU on 5 Dec and UNSW on 9 Dec
     assert calendars.finished_universities(date(2027, 11, 20)) == ["UTS"]
     assert calendars.finished_universities(date(2027, 11, 28)) == ["UTS", "USyd", "Macquarie"]
-    assert calendars.finished_universities(date(2027, 12, 10)) == ["UTS", "UNSW", "USyd", "Macquarie"]
+    assert calendars.finished_universities(date(2027, 12, 4)) == ["UTS", "USyd", "Macquarie", "NTU"]  # NUS ends today
+    assert calendars.finished_universities(date(2027, 12, 6)) == ["UTS", "USyd", "Macquarie", "NUS", "NTU", "SMU"]
+    assert calendars.finished_universities(date(2027, 12, 10)) == ["UTS", "UNSW", "USyd", "Macquarie", "NUS", "NTU", "SMU"]
     assert calendars.open_sessions(date(2027, 12, 10)) == {}
 
 
@@ -553,3 +612,71 @@ def test_a_custom_code_that_makes_no_sense_is_a_clear_error(code):
 def test_the_longest_and_shortest_custom_sessions_are_accepted():
     assert calendars.last_week("CUSTOM:2027-03-01:1:0:0") == 1
     assert calendars.last_week("CUSTOM:2027-03-01:20:19:4") == 20
+
+
+# ---------- Singapore ----------
+
+
+def test_every_university_is_in_a_known_country():
+    from deadline_agent import region
+    assert {info["country"] for info in calendars.UNIVERSITIES.values()} == set(region.COUNTRIES)
+    assert [key for key, info in calendars.UNIVERSITIES.items() if info["country"] == "SG"] == ["nus", "ntu", "smu"]
+
+
+def test_smu_week_8_is_recess_week():
+    for session in ["SMU_AY2627_T2", "SMU_AY2728_T1"]:
+        assert calendars.quiet_week(session, 8) == "recess week"
+        assert [week for week in range(1, 15) if calendars.quiet_week(session, week)] == [8]
+    assert calendars.week_start("SMU_AY2627_T2", 8) == d(1, 3)  # "Recess 8 1-Mar-27 - 7-Mar-27"
+    assert calendars.week_start("SMU_AY2728_T1", 8) == d(4, 10)  # "Recess 8 4-Oct-27 - 10-Oct-27"
+
+
+def test_nus_and_ntu_recess_weeks_have_no_number():
+    # NUS: week 6 is followed by recess, then week 7. NTU: week 7 is followed by recess, then week 8.
+    assert calendars.week_start("NUS_AY2627_S2", 7) - calendars.week_start("NUS_AY2627_S2", 6) == timedelta(weeks=2)
+    assert calendars.week_start("NTU_AY2627_S2", 8) - calendars.week_start("NTU_AY2627_S2", 7) == timedelta(weeks=2)
+    assert calendars.quiet_week("NUS_AY2627_S2", 7) is None and calendars.quiet_week("NTU_AY2627_S2", 8) is None
+
+
+# Copied from the government's official list (data.gov.sg, published by the Ministry of Manpower)
+SINGAPORE_2027 = {
+    d(1, 1): "New Year's Day", d(6, 2): "Chinese New Year", d(7, 2): "Chinese New Year",
+    d(8, 2): "the Chinese New Year holiday in lieu", d(10, 3): "Hari Raya Puasa", d(26, 3): "Good Friday",
+    d(1, 5): "Labour Day", d(17, 5): "Hari Raya Haji", d(20, 5): "Vesak Day", d(9, 8): "National Day",
+    d(28, 10): "Deepavali", d(25, 12): "Christmas Day",
+}  # fmt: skip
+
+
+def test_singapore_holidays_match_the_official_list():
+    assert calendars.SINGAPORE_HOLIDAYS == SINGAPORE_2027
+
+
+@pytest.mark.parametrize("session", ["NUS_AY2627_S2", "NTU_AY2728_S1", "SMU_AY2627_T2"])
+def test_a_singapore_session_uses_singapore_holidays(session):
+    assert calendars.holiday_on(session, d(20, 5)) == ("Singapore", "Vesak Day")
+    assert calendars.holiday_on(session, d(4, 10)) is None  # Labour Day in NSW, an ordinary day in Singapore
+
+
+def test_an_australian_session_uses_nsw_holidays():
+    assert calendars.holiday_on("SPR2027", d(4, 10)) == ("NSW", "Labour Day")
+    assert calendars.holiday_on("SPR2027", d(9, 8)) is None  # National Day in Singapore, an ordinary day in NSW
+
+
+def test_a_typed_session_has_no_holidays():
+    assert calendars.holiday_on("CUSTOM:2027-03-01:12:0:0", d(26, 3)) is None
+
+
+@pytest.mark.parametrize(
+    "session, week, weekday, expected",
+    [
+        ("NUS_AY2627_S2", 6, "friday", datetime(2027, 2, 19, 23, 59)),  # the last day before recess week
+        ("NUS_AY2627_S2", 7, "monday", datetime(2027, 3, 1, 23, 59)),
+        ("NTU_AY2627_S2", 7, "friday", datetime(2027, 2, 26, 23, 59)),
+        ("NTU_AY2627_S2", 8, "monday", datetime(2027, 3, 8, 23, 59)),
+        ("SMU_AY2627_T2", 9, "friday", datetime(2027, 3, 12, 23, 59)),  # the week after recess week
+        ("NUS_AY2728_S1", 13, "friday", datetime(2027, 11, 12, 23, 59)),
+        ("SMU_AY2728_T1", 14, "friday", datetime(2027, 11, 19, 23, 59)),
+    ],
+)
+def test_singapore_week_dates(session, week, weekday, expected):
+    assert calendars.week_date(session, week, weekday, "23:59") == expected

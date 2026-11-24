@@ -114,6 +114,7 @@ def test_the_first_code_in_the_title_is_used_when_the_tag_has_none():
         ("Assignment 1 [INFO1110 Introduction to Programming]", "INFO1110", "Assignment 1"),  # a USyd unit code in the tag
         ("Quiz 2 [COMP1511_T1_2027]", "COMP1511", "Quiz 2"),
         ("MATH1021 Assignment 2", "MATH1021", "MATH1021 Assignment 2"),  # in the title, with no tag
+        ("Problem Set 3 [CS1010S Programming Methodology]", "CS1010S", "Problem Set 3"),  # NUS, with a letter at the end
     ],
 )
 def test_subject_codes_with_four_letters_and_four_digits(summary, code, title):
@@ -207,7 +208,7 @@ def test_a_refused_link_names_every_canvas_host():
     with pytest.raises(canvas.CanvasError) as error:
         canvas.check_link("https://moodle.telt.unsw.edu.au/calendar/export.ics")
     assert str(error.value) == (
-        "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au or instructure.com can be used."
+        "Only Canvas links from canvas.uts.edu.au, canvas.sydney.edu.au, canvas.nus.edu.sg or instructure.com can be used."
     )
 
 

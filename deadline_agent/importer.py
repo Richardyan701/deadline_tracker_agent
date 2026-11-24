@@ -7,7 +7,8 @@ in docs/superpowers/specs/2026-11-04-outline-dropbox-design.md:
    with a date from the university's calendar and a status saying how sure it is.
 2. A Canvas event that clearly matches a row gives that row its exact date.
    Canvas events that match nothing become extra rows.
-3. Rows on a NSW public holiday are flagged, and rows already past start unticked.
+3. Rows on a public holiday (NSW's or Singapore's, by university) are flagged,
+   and rows already past start unticked.
 
 Nothing is saved until save_rows is called with the rows the student confirmed.
 """
@@ -75,10 +76,9 @@ def build_preview(
     canvas_rows = _apply_canvas(outline, events, subject_names)
 
     rows = [row for _, row in outline] + canvas_rows
-    # Groot only knows the NSW public holidays, and a session the student described may be in another state
-    holidays = not calendars.is_custom(session)
+    # A session the student described has no known country, so its public holidays are not known
     for row in rows:
-        _check_date(row, now, holidays)
+        _check_date(row, now, session)
         row["include"] = row["status"] in ("exact", "assumed")
     return rows
 
@@ -195,9 +195,19 @@ def _not_a_week_note(week, session: str) -> str:
     """The note for a row whose week is missing or is not a teaching week."""
     if week is None:
         return "The outline does not say which week, so the date is unknown."
-    name = calendars.session_info(session)["name"]
+    info = calendars.session_info(session)
     last = calendars.last_week(session)
-    return f"The outline says week {week}, but {name} only has teaching weeks 1 to {last}, so the date is unknown."
+    note = f"The outline says week {week}, but {info['name']} only has teaching weeks 1 to {last}, so the date is unknown."
+    # Only a university whose official calendar numbers its exam weeks gets this hint (SMU's weeks
+    # 15 and 16, see "exam_weeks" in calendars.py). Elsewhere a week number past teaching is a guess.
+    exam_weeks = info.get("exam_weeks", ())
+    if week in exam_weeks:
+        first, final = info["exams"]
+        note += (
+            f" Week {week} falls in the exam period ({tools._friendly_day(first)} to {tools._friendly_day(final)}),"
+            f" so check the {calendars.university_name(session)} exam timetable for the date."
+        )
+    return note
 
 
 def _date_row(item: ExtractedItem) -> PreviewRow:
@@ -424,14 +434,15 @@ def _canvas_row(event: CanvasEvent, subject_names: dict[str, str], note: str) ->
 # ---------- checks for every row with a date ----------
 
 
-def _check_date(row: PreviewRow, now: datetime, holidays: bool = True) -> None:
-    """Flag a date on a NSW public holiday (unless holidays is False), and mark a date that has passed as past."""
+def _check_date(row: PreviewRow, now: datetime, session: str) -> None:
+    """Flag a date on a public holiday where the session's university is, and mark a date that has passed as past."""
     if row["due_date"] is None:
         return
     due = tools._parse_due_date(row["due_date"])
-    if holidays and calendars.is_public_holiday(due.date()):
-        holiday = calendars.PUBLIC_HOLIDAYS[due.date()]
-        row["note"] += f" {tools._friendly_day(due)} is a NSW public holiday ({holiday}), so check this date."
+    holiday = calendars.holiday_on(session, due.date())
+    if holiday:
+        place, name = holiday
+        row["note"] += f" {tools._friendly_day(due)} is a {place} public holiday ({name}), so check this date."
         if row["status"] == "exact":
             row["status"] = "assumed"  # a date on a holiday is at best assumed
     if due < now:
