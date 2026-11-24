@@ -214,6 +214,18 @@ A deadline can also have `"weight_percent"` and `"mark_percent"`, each a number 
 
 **If the file cannot be read.** A file with broken JSON, missing fields or a date in the wrong form does not stop Groot. It is treated as an empty list, and reading it never changes it. The next time something is saved, the old file is first copied to a new file in the same folder called `deadlines.json.corrupt-YYYYMMDD-HHMMSS`, then a fresh list is saved. If that name is already taken, `-2`, `-3` and so on are added, so an older copy is never overwritten. The success message names the copy, so Groot can tell you about it. If the file cannot even be copied (for example, you are not allowed to open it), the save is refused and the file is left alone, with the message "I couldn't save your deadlines (...), so nothing has changed." A file saved with a byte order mark, which Windows PowerShell 5.1 and older versions of Notepad add, loads normally.
 
+## Groot's website
+
+**[https://richardyan701.github.io/deadline_tracker_agent/](https://richardyan701.github.io/deadline_tracker_agent/)** is Groot with nothing to install. It is the home page: the deadline list, Due soon, clash warnings, week numbers, the UTS tip, grades and calendar export. Outline import and the chat are not on it yet, because they need an AI key.
+
+- **It runs Groot's own Python code in your browser**, using [Pyodide](https://pyodide.org) 314.0.7, so the dates and messages are exactly the laptop version's. The first visit downloads about 6.4 MB from Pyodide's address (cdn.jsdelivr.net), and after that the browser keeps a copy.
+- **Nothing is sent anywhere.** Your deadlines and your chosen session are saved in that browser's own storage (`localStorage`), so no one else can see them, and they do not follow you to another browser or device. The page's security rules only let it load scripts from itself and Pyodide's address.
+- **Backups.** Download backup saves a `groot-backup-YYYY-MM-DD.json` file. Restore a backup replaces the deadlines in that browser, and it also accepts the laptop version's `deadlines.json`, so you can move your deadlines to the website. A file that is not a Groot backup is refused and nothing changes. Once you have deadlines, the page reminds you to back up, and again when your last backup is 7 or more days old.
+- **iPhones and iPads.** Safari can erase a website's saved data if you use Safari for 7 days without visiting it. A website added to the Home Screen is counted separately, so the page suggests Share, then Add to Home Screen, until you tap OK. The page also asks the browser to keep its data, though some browsers always say no.
+- **Time zone.** In Singapore's time zone the website uses Singapore time, and everywhere else Sydney time, the same as the laptop version's two settings.
+- **Example deadlines.** Add example deadlines adds three made-up ones, so you can try every button straight away.
+- **How it is built.** `website/build.py` copies the page (`website/`), the home page's script and styles (`web/static/`) and the Python files listed in `PY_FILES` in `web/browser.py`. Nothing else is copied, so a `.env` file or `deadlines.json` can never be published. The Website workflow (`.github/workflows/website.yml`) builds and publishes it on GitHub Pages after every change to `main`. `website/make_icons.py` draws the app icon (it needs Pillow).
+
 ## Export to your calendar
 
 Click **Export to calendar** on the home page, or ask Groot something like "add these to my calendar". Either way, every unfinished deadline is saved to `deadlines.ics` in the project folder, next to `deadlines.json`, and the home page also downloads it for you. To save it somewhere else, set the `DEADLINES_ICS_FILE` environment variable to the path you want. It is a standard iCalendar file. Each deadline becomes a one-minute event that starts at its due time (11:59 PM when it has no time), with the subject in its notes and a reminder 1 day before. Finished deadlines are left out, and if nothing is unfinished, no file is made. `deadlines.ics` is listed in `.gitignore`, so it is not committed.
@@ -702,7 +714,7 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_reminders.py` | 113 | Reminder groups, exact edges like 11:59 PM, the friendly phrases, the reminders block, and the prompt injection protection |
 | `tests/test_outline.py` | 109 | What the outline reader sends to Gemini, how the answer is checked, prompt injection and API errors, with a fake Gemini |
 | `tests/test_calendars.py` | 443 | Every week of every session at all four universities against the official calendars, the breaks, UNSW's flexibility week, the exams, finished sessions and public holidays |
-| `tests/test_web.py` | 142 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
+| `tests/test_web.py` | 152 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
 | `tests/test_tools.py` | 80 | The tools, title matching, saving, backups of unreadable files, failed saves and many threads at once |
 | `tests/test_eval.py` | 77 | The outline evaluation's pairing, scores, real dates and spacing of requests |
 | `tests/test_web_import.py` | 102 | The import page: every file kind, refused files, the timetable, Canvas, Preview and Save |
@@ -720,6 +732,7 @@ There are about 2,400 tests, run with pytest:
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
 | `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
+| `tests/test_browser.py` | 29 | Groot's website: every request, backups and restores, the standard-library-only check, the build's exact file list, the page's security rules and the app icon |
 | `tests/test_week_dates.py` | 62 | Week-number dates at every university, the question when no day is given, quiet weeks, public holidays, refused weeks, the saved choice and where a day falls in a session |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.
