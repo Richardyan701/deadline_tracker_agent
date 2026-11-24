@@ -53,7 +53,10 @@ def test_the_website_page_says_where_the_deadlines_are_kept():
     page = browser.home_html()
     assert pages.WEBSITE_NOTE in page
     assert '<button type="button" id="backup-button" class="secondary">Download backup</button>' in page
-    assert 'id="restore-input"' in page and 'id="examples-button"' in page
+    assert 'id="restore-input"' in page
+    assert '<button type="button" id="sample-button" class="secondary">Try a sample semester</button>' in page
+    assert '<button type="button" id="remove-examples-button" class="secondary">Remove examples</button>' in page
+    assert "<p>Private: your deadlines are saved only in this browser.</p>" in page
     assert '<select id="home-session"' in page and '<form id="add-form">' in page
 
 
@@ -170,10 +173,94 @@ def test_restore_ignores_a_session_groot_does_not_know():
     assert tools._chosen_session() is None
 
 
-def test_example_deadlines_are_added_once():
-    assert ask("examples")["message"] == "Added 3 example deadlines. Delete them whenever you like."
-    assert titles() == ["Example: Quiz 1", "Example: Essay draft", "Example: Group presentation"]  # soonest first
-    assert ask("examples") == {"status": "error", "message": "The example deadlines are already in your list."}
+# ---------- the sample semester ----------
+
+# UTS Autumn 2027, worked out by hand: week 2 starts 22 Feb, week 3 1 Mar, week 4 8 Mar, week 5 15 Mar,
+# week 7 29 Mar, week 8 5 Apr, StuVac 12 Apr, week 9 19 Apr, week 10 26 Apr
+SAMPLE_IN_AUT2027 = {
+    "Example: Quiz 1": "2027-02-26 17:00",
+    "Example: Annotated bibliography": "2027-03-07 23:59",
+    "Example: Lab report": "2027-03-10 09:00",
+    "Example: Reflective journal": "2027-03-21 23:59",
+    "Example: Case study": "2027-04-02 17:00",
+    "Example: Literature review": "2027-04-11 23:59",
+    "Example: Group presentation": "2027-04-19 10:00",
+    "Example: Essay": "2027-04-20 23:59",
+    "Example: Report": "2027-04-30 17:00",
+}
+
+
+def test_the_sample_semester_needs_a_university_first():
+    assert ask("sample") == {"status": "error", "message": browser.CHOOSE_FIRST}
+    assert titles() == []
+
+
+def test_the_sample_semester_fills_a_semester_that_has_not_started():
+    ask("session", {"session": "AUT2027"})
+    result = ask("sample")
+    assert result == {
+        "status": "success",
+        "message": 'Added 9 made-up deadlines for UTS Autumn 2027. "Remove examples" takes them out again.',
+        "session": "AUT2027",
+    }
+    saved = {deadline["title"]: deadline["due_date"] for deadline in tools.list_deadlines()["deadlines"]}
+    assert saved == SAMPLE_IN_AUT2027
+    # Two deadlines within 48 hours in week 9 show the clash warning once week 9 is near (Sunday 18 Apr 2027)
+    clashes = tools._clashes(now=datetime(2027, 4, 18, 9, 0))
+    assert [[d["title"] for d in clash["deadlines"]] for clash in clashes if clash["type"] == "close_together"] == [
+        ["Example: Group presentation", "Example: Essay"]
+    ]
+
+
+def test_a_semester_that_has_started_moves_the_sample_to_the_next_one():
+    # On 5 Nov 2026 UNSW Term 3 2026 is nearly over, so the sample goes in Term 1 2027 (week 2 starts 22 Feb)
+    ask("session", {"session": "UNSW_T3_2026"})
+    result = ask("sample")
+    assert result["message"] == (
+        'Added 9 made-up deadlines for UNSW Term 1 2027. Week numbers now count in UNSW Term 1 2027. '
+        '"Remove examples" takes them out again.'
+    )
+    assert tools._chosen_session() == "UNSW_T1_2027"
+    assert tools.list_deadlines()["deadlines"][0]["due_date"] == "2027-02-26 17:00"
+
+
+def test_no_later_semester(monkeypatch):
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 9, 1, 10, 0))
+    ask("session", {"session": "NUS_AY2728_S1"})  # started on 9 Aug 2027, and it is the last NUS one here
+    assert ask("sample") == {"status": "error", "message": "Groot doesn't have a later NUS semester yet."}
+
+
+def test_the_sample_is_added_once_and_removed_without_touching_real_deadlines():
+    ask("session", {"session": "AUT2027"})
+    ask("add", {"title": "My real essay", "due_date": "friday 5pm", "subject": ""})
+    ask("sample")
+    assert ask("sample") == {"status": "error", "message": "The sample semester is already in your list."}
+    assert ask("removeexamples") == {"status": "success", "message": "Removed 9 made-up deadlines."}
+    assert titles() == ["My real essay"]
+    assert ask("removeexamples") == {"status": "error", "message": "There are no made-up deadlines to remove."}
+
+
+def test_backups_keep_the_reminder_times():
+    ask("reminders", {"reminders": ["1d", "5h", "30m"]})
+    backup = ask("backup")["backup"]
+    assert json.loads(backup)["reminders"] == ["1d", "5h", "30m"]
+    ask("reminders", {"reminders": []})
+    ask("restore", {"backup": backup})
+    assert tools.chosen_reminders() == ["1d", "5h", "30m"]
+
+
+def test_an_older_backup_without_reminder_times_keeps_the_current_ones():
+    ask("reminders", {"reminders": ["2d"]})
+    older = json.dumps({"format": browser.BACKUP_FORMAT, "deadlines": [], "session": ""})
+    assert ask("restore", {"backup": older})["status"] == "success"
+    assert tools.chosen_reminders() == ["2d"]
+
+
+def test_paste_works_on_the_website():
+    checked = ask("paste", {"text": "Quiz 1, friday 5pm, Statistics"})
+    assert checked["status"] == "success" and titles() == []  # checking saves nothing
+    added = ask("paste", {"text": "Quiz 1, friday 5pm, Statistics", "save": True})
+    assert added["message"] == "Added 1 deadline." and titles() == ["Quiz 1"]
 
 
 # ---------- the website only needs what a browser has ----------
@@ -208,10 +295,15 @@ ONLY_THE_STANDARD_LIBRARY = textwrap.dedent(
     os.environ["DEADLINES_ICS_FILE"] = os.path.join(folder, "deadlines.ics")
     os.environ["GROOT_COUNTRY"] = "SG"
 
+    from datetime import datetime
+    from deadline_agent import tools
     from web import browser
+    tools._now = lambda: datetime(2026, 11, 5, 10, 0)  # the same day every time
     browser.home_html()
     for action, data in [
-        ("examples", {}), ("session", {"session": "NUS_AY2627_S2"}),
+        ("session", {"session": "NUS_AY2627_S2"}), ("sample", {}), ("removeexamples", {}),
+        ("reminders", {"reminders": ["1d", "30m"]}),
+        ("paste", {"text": "Quiz, friday 5pm"}), ("paste", {"text": "Quiz, friday 5pm", "save": True}),
         ("add", {"title": "Lab", "due_date": "friday week 7 5pm", "subject": ""}),
         ("edit", {"title": "Lab", "new_title": "Lab 1", "due_date": "", "subject": ""}),
         ("mark", {"title": "Lab 1", "mark_percent": 70, "weight_percent": 20}), ("done", {"title": "Lab 1"}),
@@ -303,9 +395,12 @@ def test_the_website_redraws_the_same_parts_as_home_js():
 
 def test_every_request_that_changes_something_is_saved():
     script = (WEBSITE / "app.js").read_text(encoding="utf-8")
-    changes = set(json.loads(re.search(r"const CHANGES = new Set\((\[[^\]]*\])\);", script)[1]))
-    assert changes == {"add", "done", "delete", "edit", "mark", "session", "restore", "examples"}
-    for action in changes | {"export", "backup"}:
+    listed = re.search(r"const CHANGES = new Set\((\[[^\]]*\])\);", script)[1]
+    changes = set(re.findall(r'"([a-z]+)"', listed))
+    assert changes == {
+        "add", "done", "delete", "edit", "mark", "session", "reminders", "paste", "export", "restore", "sample", "removeexamples",
+    }
+    for action in changes | {"backup"}:
         assert ask(action)["message"] != "Groot does not know that request.", action
 
 

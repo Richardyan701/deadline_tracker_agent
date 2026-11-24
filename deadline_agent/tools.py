@@ -356,8 +356,25 @@ def _read_day(text: str, today: date):
 
 
 def _settings_file() -> Path:
-    """The small settings file next to the deadlines file. It holds the chosen university session."""
+    """The small settings file next to the deadlines file: the chosen session and reminder times."""
     return _data_file().with_name(SETTINGS_NAME)
+
+
+def _settings() -> dict:
+    """Everything in the settings file, or {} when there is no file yet or it is broken."""
+    try:
+        saved = json.loads(_settings_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def _save_setting(name: str, value) -> None:
+    """Change one setting and keep the others. Raises OSError if the file cannot be written."""
+    with _file_lock:
+        settings = _settings()
+        settings[name] = value
+        _replace_file(_settings_file(), json.dumps(settings, indent=2) + "\n")
 
 
 def _chosen_session() -> str | None:
@@ -368,10 +385,10 @@ def _chosen_session() -> str | None:
     """
     from . import calendars  # here, not at the top, because calendars.py imports this module
 
+    session = _settings().get("session")
     try:
-        session = json.loads(_settings_file().read_text(encoding="utf-8")).get("session")
         calendars.session_info(session)
-    except (OSError, ValueError, AttributeError, TypeError):
+    except (ValueError, TypeError):
         return None
     return session
 
@@ -397,11 +414,67 @@ def choose_session(session: str) -> dict:
     else:
         message = "Week numbers are switched off. Choose your university and session to use them again."
     try:
-        with _file_lock:
-            _replace_file(_settings_file(), json.dumps({"session": session}, indent=2) + "\n")
+        _save_setting("session", session)
     except OSError as error:
         return _not_saved(error)
     return {"status": "success", "message": message}
+
+
+# The reminder times a student can choose for the calendar file, longest first.
+# Each one is the iCalendar TRIGGER (how long before the due time) and its name.
+REMINDER_TIMES = {
+    "1w": ("-P7D", "1 week"),
+    "2d": ("-P2D", "2 days"),
+    "1d": ("-P1D", "1 day"),
+    "5h": ("-PT5H", "5 hours"),
+    "1h": ("-PT1H", "1 hour"),
+    "30m": ("-PT30M", "30 minutes"),
+}
+DEFAULT_REMINDERS = ("1d",)
+
+
+def _valid_reminders(reminders) -> bool:
+    return isinstance(reminders, list) and all(isinstance(key, str) and key in REMINDER_TIMES for key in reminders)
+
+
+def chosen_reminders() -> list[str]:
+    """The reminder times chosen on the home page, longest first, like ["1d", "5h"]. 1 day before if none were chosen."""
+    saved = _settings().get("reminders")
+    if not _valid_reminders(saved):
+        return list(DEFAULT_REMINDERS)
+    return [key for key in REMINDER_TIMES if key in saved]
+
+
+def reminder_words(keys) -> str:
+    """For example "1 day, 5 hours and 30 minutes", or "" for none."""
+    words = [REMINDER_TIMES[key][1] for key in keys]
+    if not words:
+        return ""
+    if len(words) == 1:
+        return words[0]
+    return ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def choose_reminders(reminders) -> dict:
+    """Choose when the calendar file reminds the student before each deadline.
+
+    reminders is a list of keys of REMINDER_TIMES, like ["1d", "5h", "30m"],
+    or [] for no reminders. Returns "status" and a "message".
+    """
+    if not _valid_reminders(reminders):
+        return {"status": "error", "message": "Choose reminder times from the list."}
+    keys = [key for key in REMINDER_TIMES if key in reminders]  # longest first, each once
+    try:
+        _save_setting("reminders", keys)
+    except OSError as error:
+        return _not_saved(error)
+    if not keys:
+        return {"status": "success", "message": "Reminders are off. Export to calendar again to update your calendar."}
+    return {
+        "status": "success",
+        "message": f"Your calendar will remind you {reminder_words(keys)} before each deadline. "
+        "Export to calendar again to update it.",
+    }
 
 
 def _read_week(text: str, today: date):
@@ -1172,10 +1245,12 @@ def _uid(title: str) -> str:
     return hashlib.sha256(_title_key(title).encode("utf-8", "replace")).hexdigest()
 
 
-def _event_lines(deadline: dict, stamp: str) -> list:
-    """The lines of one calendar event for a deadline, with a reminder 1 day before.
+def _event_lines(deadline: dict, stamp: str, reminders=DEFAULT_REMINDERS) -> list:
+    """The lines of one calendar event for a deadline, with a pop-up reminder at each chosen time.
 
-    stamp is when the file was made, in UTC.
+    stamp is when the file was made, in UTC. reminders are keys of
+    REMINDER_TIMES, longest first. Outlook only uses the first reminder of
+    each event, so that one is the earliest.
     """
     start = _utc(_parse_due_date(deadline["due_date"]))
     end = start + timedelta(minutes=1)  # the end must come after the start, so each event lasts 1 minute
@@ -1190,18 +1265,52 @@ def _event_lines(deadline: dict, stamp: str) -> list:
     ]
     if deadline["subject"]:
         lines.append("DESCRIPTION:" + _ics_text("Subject: " + deadline["subject"]))
-    lines += [
-        "BEGIN:VALARM",  # a pop-up reminder
-        "ACTION:DISPLAY",
-        "TRIGGER:-P1D",  # 1 day before the start
-        f"DESCRIPTION:{title} is due tomorrow",
-        "END:VALARM",
-        "END:VEVENT",
-    ]
+    for key in reminders:
+        trigger, words = REMINDER_TIMES[key]
+        lines += [
+            "BEGIN:VALARM",  # a pop-up reminder
+            "ACTION:DISPLAY",
+            "TRIGGER:" + trigger,  # this long before the start
+            f"DESCRIPTION:{title} is due " + ("tomorrow" if key == "1d" else _ics_text("in " + words)),
+            "END:VALARM",
+        ]
+    lines.append("END:VEVENT")
     return lines
 
 
-def _calendar_text(deadlines: list, stamp: str) -> str:
+def _export_marks(deadlines: list, reminders) -> list[str]:
+    """A short fingerprint of each event a calendar export holds: its title, due date, subject and reminders.
+
+    Saved after each export, so Groot can tell when the calendar app's copy
+    is out of date. Fingerprints, not the deadlines themselves, so the
+    settings file does not hold a second copy of them.
+    """
+    marks = []
+    for deadline in deadlines:
+        text = "|".join([_title_key(deadline["title"]), deadline["due_date"], deadline["subject"], ",".join(reminders)])
+        marks.append(hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:16])
+    return sorted(marks)
+
+
+def calendar_state() -> str:
+    """Whether the calendar app has an up-to-date copy of the unfinished deadlines.
+
+    "empty"    nothing unfinished, so there is nothing to export
+    "never"    never exported from here
+    "changed"  a deadline or the reminder times changed since the last export
+    "current"  the last export still matches
+    """
+    with _file_lock:
+        unfinished = [deadline for deadline in _load_deadlines() if not deadline["done"]]
+    if not unfinished:
+        return "empty"
+    exported = _settings().get("exported")
+    if not isinstance(exported, list):
+        return "never"
+    return "current" if _export_marks(unfinished, chosen_reminders()) == exported else "changed"
+
+
+def _calendar_text(deadlines: list, stamp: str, reminders=DEFAULT_REMINDERS) -> str:
     """The whole .ics file for these deadlines, with long lines folded and CRLF line endings."""
     lines = [
         "BEGIN:VCALENDAR",
@@ -1212,7 +1321,7 @@ def _calendar_text(deadlines: list, stamp: str) -> str:
         "METHOD:PUBLISH",
     ]
     for deadline in deadlines:
-        lines += _event_lines(deadline, stamp)
+        lines += _event_lines(deadline, stamp, reminders)
     lines.append("END:VCALENDAR")
     return "".join(_fold(line) + CRLF for line in lines)
 
@@ -1674,7 +1783,8 @@ def export_calendar() -> dict:
     Call this when the student asks things like "add these to my calendar",
     "export my deadlines" or "put my deadlines in Google Calendar, Outlook or
     my phone". Finished deadlines are left out. Each deadline becomes an
-    event at its due time, with a reminder 1 day before.
+    event at its due time, with pop-up reminders at the times the student
+    chose on Groot's home page (1 day before, unless they changed it).
 
     After it works, tell the student where the file is and, in one or two
     short sentences, how to import it: in Google Calendar on a computer, open
@@ -1691,6 +1801,7 @@ def export_calendar() -> dict:
     """
     stamp = _ics_time(_utc(_now()))
     path = _calendar_file()
+    reminders = chosen_reminders()
     with _file_lock:
         unfinished = [d for d in _soonest_first(_load_deadlines()) if not d["done"]]
         if not unfinished:
@@ -1701,7 +1812,7 @@ def export_calendar() -> dict:
                 "exported": 0,
             }
         try:
-            _replace_file(path, _calendar_text(unfinished, stamp))
+            _replace_file(path, _calendar_text(unfinished, stamp, reminders))
         except OSError as error:
             reason = error.strerror or type(error).__name__
             return {
@@ -1709,6 +1820,11 @@ def export_calendar() -> dict:
                 "message": f"I couldn't save your calendar file ({reason}). Please check its folder is not "
                 "read-only and the file is not open in another program, then try again.",
             }
+    try:
+        # Outside the lock above, because _save_setting takes it too. Only a note, so a failure is ignored.
+        _save_setting("exported", _export_marks(unfinished, reminders))
+    except OSError:
+        pass
     count = len(unfinished)
     return {
         "status": "success",

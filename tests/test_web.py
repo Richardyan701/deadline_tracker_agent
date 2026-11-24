@@ -38,6 +38,8 @@ CHANGES = [
     ("/groot/api/edit", {"title": "Essay", "new_title": "Final Essay"}),
     ("/groot/api/mark", {"title": "Essay", "mark_percent": 80}),
     ("/groot/api/session", {"session": "NUS_AY2627_S2"}),
+    ("/groot/api/reminders", {"reminders": ["1d", "5h"]}),
+    ("/groot/api/paste", {"text": "Quiz, friday", "save": True}),
     ("/groot/api/export", {}),
     ("/groot/api/save", {"rows": [{"title": "Quiz", "due_date": "friday", "subject": ""}]}),
 ]

@@ -23,7 +23,8 @@ Hello, I'm Richard, a first-year Artificial Intelligence student at UTS in Sydne
 - **Reads your subject outlines** (PDF, Word, slides, spreadsheets, images and more) and turns "due in week 7" into a real date. Each university counts its weeks differently, so you pick yours and Groot uses its official 2027 calendar.
 - **Understands plain English dates** like "next friday 5pm", "in 3 days" or "20/11". The date maths is done by tested Python code, not guessed by the AI.
 - **Understands week numbers too, with no AI.** Pick your university and session once, then type "friday week 7 5pm". Groot skips the breaks with no week number, shows which week it is now, and warns you about public holidays and recess weeks.
-- **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up.
+- **Reminds you** of anything overdue or due soon, and **warns you about clashes** when deadlines bunch up. Your calendar app pops up reminders at the times you pick, like 1 day, 5 hours and 30 minutes before.
+- **Adds many deadlines at once** from a pasted list, one per line, with no AI.
 - **Works out the mark you need** on the rest of a subject to get a Pass, Credit, Distinction or High Distinction.
 - **Feeds the calendar you already use.** One click exports your deadlines to Google Calendar, Outlook or your phone. It also imports your Canvas calendar (UTS, USyd and NUS) and your UTS timetable.
 - **Has a home page that uses no AI**, plus a chat with Groot.

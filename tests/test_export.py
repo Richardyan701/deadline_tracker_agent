@@ -330,7 +330,8 @@ def test_exporting_again_replaces_the_old_file(deadlines_file, ics_file):
     save(deadlines_file, ("Quiz", "2026-11-21"))
 
     assert values(export_text(ics_file), "SUMMARY") == ["Quiz"]
-    assert sorted(p.name for p in ics_file.parent.iterdir()) == ["deadlines.ics", "deadlines.json"]
+    # groot_settings.json notes what was exported, so the home page can tell when the calendar is out of date
+    assert sorted(p.name for p in ics_file.parent.iterdir()) == ["deadlines.ics", "deadlines.json", "groot_settings.json"]
 
 
 # ---------- where the file goes ----------
@@ -376,7 +377,8 @@ def test_the_lock_is_held_while_reading_and_writing(deadlines_file, monkeypatch)
 
     tools.export_calendar()
 
-    assert seen == [("read", True), ("write", True)]
+    # The calendar file, then the note of what was exported (written under the lock by _save_setting)
+    assert seen == [("read", True), ("write", True), ("write", True)]
 
 
 def test_export_waits_while_another_tool_call_has_the_lock(deadlines_file, ics_file):
@@ -412,7 +414,8 @@ def test_a_failed_save_is_a_clear_error_and_keeps_the_old_file(deadlines_file, i
         "read-only and the file is not open in another program, then try again.",
     }
     assert ics_file.read_bytes() == before
-    assert sorted(p.name for p in ics_file.parent.iterdir()) == ["deadlines.ics", "deadlines.json"]  # no temporary file left
+    # No temporary file left. groot_settings.json notes what was exported.
+    assert sorted(p.name for p in ics_file.parent.iterdir()) == ["deadlines.ics", "deadlines.json", "groot_settings.json"]
 
 
 def test_saving_into_a_missing_folder_is_a_clear_error(tmp_path, monkeypatch, deadlines_file):

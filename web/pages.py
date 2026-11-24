@@ -68,6 +68,23 @@ def add_form() -> str:
 </form>"""
 
 
+# "Add many at once": paste a list, check how Groot reads each line, then add them (see paste.py)
+PASTE_BOX = """<details id="paste-box" class="paste-box">
+<summary>Add many at once</summary>
+<form id="paste-form">
+<label for="paste-text">One deadline per line: the title, when it's due, and the subject if you like.</label>
+<textarea id="paste-text" name="text" rows="6" spellcheck="false" aria-describedby="paste-hint"></textarea>
+<p id="paste-hint" class="hint">For example:<br>Quiz 1, friday week 3 5pm, Statistics<br>Essay, 20 dec, Academic Writing<br>Lab report due wednesday 9am</p>
+<div class="actions">
+<button type="submit" class="secondary">Check the list</button>
+<button type="button" id="paste-add" hidden>Add these</button>
+</div>
+<p id="paste-message" class="message" role="status"></p>
+<ol id="paste-rows" class="paste-rows"></ol>
+</form>
+</details>"""
+
+
 # The Edit box. It sits outside the lists, so it stays when they are drawn again.
 # home.js fills it in from the Edit button that was clicked.
 EDIT_DIALOG = """<dialog id="edit-dialog" aria-labelledby="edit-heading">
@@ -127,6 +144,17 @@ def home_privacy_note() -> str:
     )
 
 
+def privacy_summary(website: bool = False) -> str:
+    """The one short privacy line people actually read. The full note sits under "Privacy details"."""
+    if website:
+        return "Private: your deadlines are saved only in this browser."
+    model = model_choice.chosen_model()
+    if _on_this_computer(model):
+        return "Private: your deadlines and chats stay on this computer."
+    ai = model_choice.provider_of(model)["name"]
+    return f"Your deadlines stay on this computer. The chat and outline import use {ai}, so never type private details."
+
+
 def import_warnings() -> list[str]:
     """The warnings above the Preview button, for the model in use."""
     model = model_choice.chosen_model()
@@ -178,9 +206,8 @@ def time_zone_notice() -> str:
 
 # The honest note under the Grades heading
 GRADES_NOTE = (
-    "Groot works out the average you need on the tasks still to come for each grade band: "
-    "Pass 50, Credit 65, Distinction 75 and High Distinction 85. Some subjects also have minimum rules, "
-    "for example at least 40% on the exam, that Groot cannot check, so read your subject outline too."
+    "The average you need on what's left of each subject for a Pass (50), Credit (65), Distinction (75) or "
+    "High Distinction (85). Groot can't check minimum rules, like a minimum exam mark, so read your outline too."
 )
 
 BAND_KEYS = ["pass", "credit", "distinction", "high distinction"]
@@ -205,12 +232,17 @@ WEBSITE_NOTE = (
 # The website's own section: backups and example deadlines. site/app.js gives the buttons their actions.
 WEBSITE_SECTION = """<section aria-labelledby="browser-heading">
 <h2 id="browser-heading">Your data in this browser</h2>
-<p class="hint">A backup keeps your deadlines safe if this browser's data is cleared, and moves them to another device or browser. Restoring a backup replaces the deadlines here.</p>
+<p class="hint">Keep a backup in case this browser's data is cleared. It also moves your deadlines to another device.</p>
 <div class="actions">
 <button type="button" id="backup-button" class="secondary">Download backup</button>
 <input id="restore-input" class="visually-hidden" type="file" accept=".json,application/json">
 <label for="restore-input" class="button secondary">Restore a backup</label>
-<button type="button" id="examples-button" class="secondary">Add example deadlines</button>
+</div>
+<h3>Just trying Groot?</h3>
+<p class="hint">"Try a sample semester" fills your next semester with made-up assignments, like an essay due "sunday week 9 11:59pm", so you can see how everything works. Choose your university under "Add a deadline" first.</p>
+<div class="actions">
+<button type="button" id="sample-button" class="secondary">Try a sample semester</button>
+<button type="button" id="remove-examples-button" class="secondary">Remove examples</button>
 </div>
 <p id="browser-message" class="message" role="status"></p>
 </section>"""
@@ -242,7 +274,14 @@ def home_body(
 <div class="actions">
 {actions}
 </div>
-<p class="privacy-note">{escape(note, quote=False)} Every date and time here is {escape(tools.PLACE["clock"])}.</p>
+{export_nudge()}
+{reminder_picker()}
+<div class="privacy-note">
+<p>{escape(privacy_summary(website), quote=False)}</p>
+<details class="more"><summary>Privacy details</summary>
+<p>{escape(note, quote=False)} Every date and time here is {escape(tools.PLACE["clock"])}.</p>
+</details>
+</div>
 {time_zone_notice()}
 <p id="top-message" class="message" role="status"></p>
 </header>
@@ -262,6 +301,7 @@ def home_body(
 <h2 id="add-heading">Add a deadline</h2>
 {session_chooser(now)}
 {add_form()}
+{PASTE_BOX}
 </section>
 <section aria-labelledby="grades-heading">
 <h2 id="grades-heading">Grades</h2>
@@ -271,6 +311,52 @@ def home_body(
 </section>
 {WEBSITE_SECTION if website else ""}
 </main>"""
+
+
+def export_nudge() -> str:
+    """A line under the buttons when the calendar app's copy of the deadlines is missing or out of date.
+
+    The calendar app only knows what was in the file at the last export, so
+    a deadline added or moved later gets no reminder until the next export.
+    It always has the id export-nudge, so home.js can swap in a fresh copy.
+    """
+    state = tools.calendar_state()
+    if state == "never":
+        text = "Export to calendar so your calendar app can remind you before each deadline."
+    elif state == "changed":
+        text = "Your deadlines or reminder times changed since your last export. Export again so your calendar has them all."
+    else:
+        return '<p id="export-nudge" class="nudge" hidden></p>'
+    return f'<p id="export-nudge" class="nudge">{escape(text)}</p>'
+
+
+def reminder_summary(keys) -> str:
+    """The line on the closed reminder picker, like "Calendar reminders: 1 day and 5 hours before"."""
+    return f"Calendar reminders: {tools.reminder_words(keys)} before" if keys else "Calendar reminders: off"
+
+
+def reminder_picker() -> str:
+    """The reminder times for the calendar file, ticked as chosen. home.js saves a change straight away.
+
+    Web pages cannot pop up a reminder while they are closed, so the
+    reminders go into the calendar file and the student's calendar app
+    shows them (see tools.REMINDER_TIMES).
+    """
+    chosen = tools.chosen_reminders()
+    boxes = "".join(
+        f'<label class="check"><input type="checkbox" name="reminder" value="{key}"{" checked" if key in chosen else ""}>'
+        f"{escape(words)}</label>"
+        for key, (_, words) in tools.REMINDER_TIMES.items()
+    )
+    return (
+        '<details id="reminder-picker" class="reminders">'
+        f'<summary id="reminder-summary">{escape(reminder_summary(chosen))}</summary>'
+        f'<fieldset><legend>Remind me this long before each deadline:</legend><div class="checks">{boxes}</div></fieldset>'
+        '<p class="hint">Your calendar app shows these reminders, even when Groot is closed. '
+        "After changing them, export to calendar again.</p>"
+        '<p id="reminder-message" class="message" role="status"></p>'
+        "</details>"
+    )
 
 
 def week_line(now: datetime) -> str:
@@ -313,7 +399,7 @@ def session_chooser(now: datetime) -> str:
         '<div class="field">'
         '<label for="home-session">Week numbers count in <span class="optional">(optional)</span></label>'
         f'<select id="home-session" aria-describedby="home-session-hint">{options}</select>'
-        '<p id="home-session-hint" class="hint">Pick your university and session, then you can type dates like "friday week 7 5pm".</p>'
+        '<p id="home-session-hint" class="hint">Then you can type dates like "friday week 7 5pm".</p>'
         '<p id="session-message" class="message" role="status"></p>'
         "</div>"
     )

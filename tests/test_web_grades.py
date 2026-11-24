@@ -117,7 +117,7 @@ def test_grades_with_no_deadlines(client):
 
 def test_grades_has_the_honest_note(client):
     page = client.get("/groot").text
-    assert "Some subjects also have minimum rules, for example at least 40% on the exam, that Groot cannot check" in page
+    assert "Groot can&#x27;t check minimum rules, like a minimum exam mark, so read your outline too." in page
 
 
 def test_grades_form_lists_every_deadline(client, deadlines_file):
@@ -273,5 +273,5 @@ def test_import_page_script_sends_the_weight():
 
 def test_home_page_script_refreshes_the_new_parts():
     script = (web_app.STATIC_DIR / "home.js").read_text(encoding="utf-8")
-    assert '["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip"]' in script
+    assert '["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip", "export-nudge"]' in script
     assert 'post("/groot/api/mark"' in script
