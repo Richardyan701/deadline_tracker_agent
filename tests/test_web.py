@@ -12,6 +12,7 @@ import json
 import re
 from datetime import datetime
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -36,6 +37,7 @@ CHANGES = [
     ("/groot/api/delete", {"title": "Essay"}),
     ("/groot/api/edit", {"title": "Essay", "new_title": "Final Essay"}),
     ("/groot/api/mark", {"title": "Essay", "mark_percent": 80}),
+    ("/groot/api/session", {"session": "NUS_AY2627_S2"}),
     ("/groot/api/export", {}),
     ("/groot/api/save", {"rows": [{"title": "Quiz", "due_date": "friday", "subject": ""}]}),
 ]
@@ -574,3 +576,49 @@ def test_the_page_script_shows_the_notice_until_ok_is_clicked():
     assert 'const SEEN = "groot-time-zone-seen";' in code
     assert "zoneNotice.hidden = seen === zoneNotice.dataset.zone;" in code
     assert "localStorage.setItem(SEEN, zoneNotice.dataset.zone);" in code
+
+
+# ---------- week numbers: the session picker and the "which week is it" line ----------
+
+
+def test_home_page_asks_for_a_session_when_none_is_chosen(client):
+    page = client.get("/groot").text
+    assert '<p id="week-line" class="week-line">Choose your university and session' in page
+    assert '<select id="home-session"' in page
+    # Only real sessions on the home page: "my university is not listed" needs the import page's extra fields
+    picker = page[page.index('<select id="home-session"'):page.index("</select>", page.index('<select id="home-session"'))]
+    assert 'value="NUS_AY2627_S2"' in picker
+    assert "CUSTOM" not in picker
+    assert " selected" not in picker
+
+
+def test_choosing_a_session_on_the_home_page(client):
+    answer = client.post("/groot/api/session", json={"session": "NUS_AY2627_S2"}).json()
+    assert answer["status"] == "success"
+    page = client.get("/groot").text
+    # It is 5 Nov 2026, before NUS's week 1 (Monday 11 Jan 2027)
+    assert (
+        '<p id="week-line" class="week-line">NUS AY2026/27 Semester 2 (Jan to May 2027) has not started yet. '
+        "Week 1 starts on Monday 11 Jan 2027.</p>"
+    ) in page
+    assert '<option value="NUS_AY2627_S2" data-university="nus" selected>' in page
+
+
+def test_week_line_during_the_session(client, monkeypatch):
+    client.post("/groot/api/session", json={"session": "SMU_AY2627_T2"})
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 3, 3, 9, 0))
+    assert "Today is in week 8 of SMU AY2026/27 Term 2 (Jan to May 2027). It&#x27;s SMU&#x27;s recess week." in client.get("/groot").text
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 3, 8, 9, 0))
+    assert "Today is in week 9 of SMU AY2026/27 Term 2 (Jan to May 2027).</p>" in client.get("/groot").text
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 4, 21, 9, 0))
+    assert "It is the exam period of SMU AY2026/27 Term 2" in client.get("/groot").text
+
+
+def test_an_unknown_session_from_the_page_is_refused(client):
+    answer = client.post("/groot/api/session", json={"session": "<script>"}).json()
+    assert answer == {"status": "error", "message": "Groot does not know that session. Choose one from the list."}
+
+
+def test_home_script_saves_the_session_choice():
+    script = (Path(web_app.__file__).parent / "static" / "home.js").read_text(encoding="utf-8")
+    assert 'post("/groot/api/session", {session: sessionPicker.value})' in script

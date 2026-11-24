@@ -172,6 +172,24 @@ def clashes_block() -> str:
     )
 
 
+def week_numbers_line() -> str:
+    """One line saying which university session week numbers count in, and which week it is now."""
+    from . import calendars
+
+    session = tools._chosen_session()
+    if session is None:
+        return (
+            "\nNo university session is chosen, so dates like 'friday week 7' do not work yet. If the student"
+            " uses week numbers, tell them to choose their university and session on Groot's home page."
+        )
+    name = f"{calendars.university_name(session)} {calendars.session_info(session)['name']}"
+    where = calendars.where_is(session, tools._now().date())
+    return (
+        f"\nWeek numbers count in {name}, and today is in {where}."
+        " add_deadline understands dates like 'friday week 7 5pm', so pass them on exactly as typed."
+    )
+
+
 def groot_instruction(context: ReadonlyContext) -> str:
     """Groot's instruction plus today's date and the current reminders.
 
@@ -190,6 +208,7 @@ def groot_instruction(context: ReadonlyContext) -> str:
         + OUTLINE_RULES
         + REMINDER_RULES
         + CLASH_RULE
+        + week_numbers_line()
         + clashes_block()
         + reminders_block()
     )

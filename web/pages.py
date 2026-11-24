@@ -25,7 +25,7 @@ ADD_FORM = """<form id="add-form">
 <div class="field">
 <label for="add-when">When is it due?</label>
 <input id="add-when" name="due_date" autocomplete="off" aria-describedby="add-when-hint">
-<p id="add-when-hint" class="hint">Plain words work, like "next friday 5pm", "in 3 days" or "20 nov".</p>
+<p id="add-when-hint" class="hint">Plain words work, like "next friday 5pm", "in 3 days", "20 nov" or "friday week 7".</p>
 </div>
 <div class="field">
 <label for="add-subject">Subject <span class="optional">(optional)</span></label>
@@ -164,6 +164,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
     body = f"""<header class="top">
 <h1>Agent Groot</h1>
 <p class="tagline">Your study deadlines, all in one place.</p>
+{week_line(now)}
 <div class="actions">
 <button type="button" id="export-button">Export to calendar</button>
 <a class="button" href="/groot/import">Import from outlines</a>
@@ -187,6 +188,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 </section>
 <section aria-labelledby="add-heading">
 <h2 id="add-heading">Add a deadline</h2>
+{session_chooser(now)}
 {ADD_FORM}
 </section>
 <section aria-labelledby="grades-heading">
@@ -197,6 +199,52 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 </section>
 </main>"""
     return _layout("Agent Groot", "home.js", body)
+
+
+def week_line(now: datetime) -> str:
+    """The line under the tagline saying which week of the chosen session it is.
+
+    It always has the id week-line, so home.js can swap in a fresh copy after
+    the session changes.
+    """
+    session = tools._chosen_session()
+    if session is None:
+        text = 'Choose your university and session under "Add a deadline" to use week numbers, like "friday week 7".'
+        return f'<p id="week-line" class="week-line">{escape(text)}</p>'
+    info = calendars.session_info(session)
+    name = f"{calendars.university_name(session)} {info['name']}"
+    where = calendars.where_is(session, now.date())
+    if where.startswith("week"):
+        week, _, called = where.partition(", ")  # "week 8" and "SMU's recess week"
+        text = f"Today is in {week} of {name}." + (f" It's {called}." if called else "")
+    elif where == "a break with no week number":
+        text = f"This week is a break with no week number in {name}."
+    elif where == "the exam period":
+        text = f"It is the exam period of {name}."
+    elif where == "before week 1":
+        first = calendars.week_start(session, 1)
+        text = f"{name} has not started yet. Week 1 starts on {first.strftime('%A')} {first.day} {first.strftime('%b %Y')}."
+    else:
+        text = f"{name} has finished. Choose your next session to keep using week numbers."
+    return f'<p id="week-line" class="week-line">{escape(text)}</p>'
+
+
+def session_chooser(now: datetime) -> str:
+    """The picker for the session that week numbers count in, with the chosen one selected.
+
+    home.js saves a new choice through /groot/api/session. Only sessions that
+    have not finished are offered.
+    """
+    chosen = tools._chosen_session()
+    options = _session_picker(calendars.open_sessions(now.date()), custom=False, selected=chosen)
+    return (
+        '<div class="field">'
+        '<label for="home-session">Week numbers count in <span class="optional">(optional)</span></label>'
+        f'<select id="home-session" aria-describedby="home-session-hint">{options}</select>'
+        '<p id="home-session-hint" class="hint">Pick your university and session, then you can type dates like "friday week 7 5pm".</p>'
+        '<p id="session-message" class="message" role="status"></p>'
+        "</div>"
+    )
 
 
 def due_soon(reminders: dict) -> str:
@@ -389,15 +437,19 @@ CUSTOM_FIELDS = f"""<fieldset id="custom-field" class="field" hidden>
 </fieldset>"""
 
 
-def _session_picker(sessions: dict) -> str:
+def _session_picker(sessions: dict, custom: bool = True, selected: str | None = None) -> str:
     """The options of the university and session picker, grouped by country, then university.
 
     The student's own country (tools.PLACE) comes first, so a student in
-    Singapore sees NUS, NTU and SMU at the top. It starts on an empty choice on purpose. Each university counts its
-    weeks differently, so a wrong guess would give wrong dates, and the
+    Singapore sees NUS, NTU and SMU at the top. Unless selected names a
+    session, it starts on an empty choice on purpose. Each university counts
+    its weeks differently, so a wrong guess would give wrong dates, and the
     student has to pick. import.js remembers their pick for next time.
-    Each option carries its university, which import.js uses to show only
-    the extra fields that university can use.
+    Each option starts with the university's short name ("NUS AY2026/27
+    Semester 2"), so a closed picker on a phone still says which university.
+    It also carries its university, which import.js uses to show only the
+    extra fields that university can use. custom=False leaves out "My
+    university is not listed", which needs the import page's extra fields.
     """
     groups = ""
     home_first = sorted(
@@ -407,18 +459,20 @@ def _session_picker(sessions: dict) -> str:
     for key, university in home_first:
         country = region.COUNTRIES[university["country"]]["name"]
         options = "".join(
-            f'<option value="{escape(code)}" data-university="{escape(key)}">{escape(info["name"])}</option>'
+            f'<option value="{escape(code)}" data-university="{escape(key)}"{" selected" if code == selected else ""}>'
+            f'{escape(university["name"])} {escape(info["name"])}</option>'
             for code, info in sessions.items()
             if info["university"] == key
         )
         if options:
             groups += f'<optgroup label="{escape(country)}: {escape(university["full_name"])}">{options}</optgroup>'
     # A student anywhere else types their own session's dates into the fields below the picker
-    groups += (
-        '<optgroup label="Another university">'
-        f'<option value="{CUSTOM_CHOICE}" data-university="other">My university is not listed</option>'
-        "</optgroup>"
-    )
+    if custom:
+        groups += (
+            '<optgroup label="Another university">'
+            f'<option value="{CUSTOM_CHOICE}" data-university="other">My university is not listed</option>'
+            "</optgroup>"
+        )
     return '<option value="">Choose your university and session</option>' + groups
 
 

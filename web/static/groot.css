@@ -623,6 +623,12 @@ input[type="checkbox"] {
   margin: 0;
 }
 
+/* Which week of the chosen session it is, under the tagline */
+.week-line {
+  margin: 0.25rem 0 0.75rem;
+  font-weight: 600;
+}
+
 /* The short privacy note under the buttons on the home page */
 .privacy-note {
   margin: 0.75rem 0 0;

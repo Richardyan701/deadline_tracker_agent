@@ -8,3 +8,5 @@ deadlines.json
 deadlines.json.*
 # The calendar file made by export_calendar
 deadlines.ics
+# The university session chosen for week numbers (see choose_session in tools.py)
+groot_settings.json

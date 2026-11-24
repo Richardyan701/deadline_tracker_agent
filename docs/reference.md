@@ -16,7 +16,8 @@ Groot is one web app that runs on your own computer. It has three pages, and all
 
 - **Due soon** lists everything unfinished that is overdue, due today or due in the next 7 days, with phrases like "in 3 hours" or "2 days overdue". It uses the same code as the chat's reminders, so the two always agree.
 - **All deadlines** lists every deadline, soonest first. Each one has an **Edit** button, which opens a small box to change its title, due date or subject, and a **Delete** button, which asks you first. Each unfinished one also has a **Mark done** button. Finished deadlines are greyed out.
-- **Add a deadline** takes a title, a due date in plain words like "next friday 5pm" and an optional subject. It follows the same rules as the chat, see [Date phrases it understands](#date-phrases-it-understands), and shows the same message, good or bad.
+- **Which week it is.** Under the title, a line like "Today is in week 7 of NUS AY2026/27 Semester 2 (Jan to May 2027)." It also says when the session has not started, is on a break, is in the exam period or has finished.
+- **Add a deadline** takes a title, a due date in plain words like "next friday 5pm" and an optional subject. It follows the same rules as the chat, see [Date phrases it understands](#date-phrases-it-understands), and shows the same message, good or bad. Above it, **Week numbers count in** picks your university and session, so you can type dates like "friday week 7", see [Week numbers](#week-numbers).
 - **Export to calendar** downloads `deadlines.ics`, see [Export to your calendar](#export-to-your-calendar).
 - **Import from outlines** and **Chat with Groot** open the other two pages.
 
@@ -94,6 +95,27 @@ Some things are refused. Nothing is saved, and the reply says why:
 - **Phrases it does not know**, such as `next week`, `the day after tomorrow`, `nov 20` (month first), `20/11/26` (a two-digit year) or `20-11-2026`. The reply gives examples of what to type: "I couldn't work out a date from 'next week'. Try something like 'next friday 5pm', 'in 3 days' or '20 nov'."
 - **Dates that do not exist**, such as `30 feb`. February has already passed in November, so it looks at next year, and the reply starts with "30 Feb 2027 doesn't exist, so please check the day and month." followed by the same examples.
 - **Dates in the past**, such as `9am` when it is already 10 AM. The reply shows the date it understood so you can check it: "'9am' would be Thursday 5 Nov 2026, 9:00 AM, which is already in the past. Please check the date and time."
+
+### Week numbers
+
+Outlines often say "due Friday of week 7" instead of a date. Choose your university and session once, under **Week numbers count in** on the home page, and you can type the week instead. No AI is used: the dates come from the same official calendars as the outline import (see `deadline_agent/calendars.py`).
+
+These are real results with **NUS AY2026/27 Semester 2** chosen. Its weeks 1 to 6 start on 11 Jan to 15 Feb 2027, recess week is 22 Feb, and weeks 7 to 13 start on 1 Mar to 12 Apr.
+
+| You type | Saved as |
+| --- | --- |
+| `friday week 7 5pm` | Friday 5 Mar 2027, 5:00 PM (week 7 comes after recess week) |
+| `friday of week 7`, `week 7 friday` or `fri wk 7` | Friday 5 Mar 2027, 11:59 PM |
+| `monday of week 11` | Monday 29 Mar 2027, 11:59 PM |
+| `sunday week 13 11:59pm` | Sunday 18 Apr 2027, 11:59 PM |
+
+- **Weeks run Monday to Sunday**, and only teaching weeks have numbers. Breaks with no number, like UTS's StuVac or NUS's recess week, are skipped. Weeks that are numbered but quiet, like UNSW's flexibility week (week 6) and SMU's recess week (week 8), keep their numbers, and the reply warns you.
+- **The day must be given.** Some subjects are due on Friday, others on Sunday, so Groot does not guess. Typing just `week 9` gets a question instead: "Which day of week 9 is it due? Week 9 runs from Monday 15 Mar to Sunday 21 Mar 2027. Type the day too, like 'friday week 9' or 'sunday week 9 11:59pm'."
+- **The reply names the week and session**, for example, on 3 Mar 2027, "Saved 'Lab report', due Friday 19 Mar 2027, 5:00 PM. That's week 9 of NUS AY2026/27 Semester 2 (Jan to May 2027)." It adds a warning when the day is a public holiday where your university is, such as "Friday 26 Mar 2027 is a Singapore public holiday (Good Friday), so check this date."
+- **A week the session does not have is refused**, for example "NUS AY2026/27 Semester 2 (Jan to May 2027) has weeks 1 to 13, so there is no week 14." SMU numbers its exam weeks 15 and 16, so for those the reply points you to the exam timetable.
+- **With no session chosen**, week numbers are refused with a note saying where to choose one. Choosing "Choose your university and session" (the empty choice) switches week numbers off again.
+- **Editing a deadline** understands week numbers too, and the chat passes them to the same code.
+- **Your choice is saved** in `groot_settings.json`, next to `deadlines.json`. It is listed in `.gitignore`. A broken or unknown choice in that file counts as no choice.
 
 ### "friday" vs "next friday"
 
@@ -626,7 +648,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 2,100 tests, no API key needed
+tests/               about 2,400 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -670,7 +692,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are about 2,100 tests, run with pytest:
+There are about 2,400 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
@@ -679,10 +701,10 @@ There are about 2,100 tests, run with pytest:
 | `tests/test_reminders.py` | 113 | Reminder groups, exact edges like 11:59 PM, the friendly phrases, the reminders block, and the prompt injection protection |
 | `tests/test_outline.py` | 109 | What the outline reader sends to Gemini, how the answer is checked, prompt injection and API errors, with a fake Gemini |
 | `tests/test_calendars.py` | 443 | Every week of every session at all four universities against the official calendars, the breaks, UNSW's flexibility week, the exams, finished sessions and public holidays |
-| `tests/test_web.py` | 99 | The home page and its API, escaping, the Origin and content type checks, and the real server shared with ADK's chat |
+| `tests/test_web.py` | 142 | The home page and its API, escaping, the Origin and content type checks, the week numbers picker, and the real server shared with ADK's chat |
 | `tests/test_tools.py` | 80 | The tools, title matching, saving, backups of unreadable files, failed saves and many threads at once |
 | `tests/test_eval.py` | 77 | The outline evaluation's pairing, scores, real dates and spacing of requests |
-| `tests/test_web_import.py` | 70 | The import page: every file kind, refused files, the timetable, Canvas, Preview and Save |
+| `tests/test_web_import.py` | 102 | The import page: every file kind, refused files, the timetable, Canvas, Preview and Save |
 | `tests/test_importer.py` | 68 | Every row of the date rules, Canvas matching, public holidays, past dates and saving |
 | `tests/test_start_and_setup.py` | 55 | The start files (`start_groot.sh` is run for real) and every part of the setup checker |
 | `tests/test_friendly_errors.py` | 50 | The chat's replies for limits, key problems and timeouts |
@@ -697,6 +719,7 @@ There are about 2,100 tests, run with pytest:
 | `tests/test_grades.py` | 74 | The grade maths, secured and unreachable bands, missing weights, `set_mark`, `grade_needed`, old files and the drop box's weights |
 | `tests/test_edit.py` | 31 | Editing a deadline: each change, refused dates and titles, odd arguments, `POST /groot/api/edit` and the Edit button |
 | `tests/test_web_grades.py` | 24 | The Heads up box, the Grades section, `POST /groot/api/mark` and its Origin check |
+| `tests/test_week_dates.py` | 62 | Week-number dates at every university, the question when no day is given, quiet weeks, public holidays, refused weeks, the saved choice and where a day falls in a session |
 
 No test needs an API key or the internet. Each test saves to its own temporary file, and every test that depends on the date sets the clock itself, so the results never depend on today's date.
 
