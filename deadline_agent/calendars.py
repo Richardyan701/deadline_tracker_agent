@@ -37,6 +37,14 @@ Universities Australia "Academic calendar 2026-27" table):
                 https://drupal.uts.edu.au/sites/default/files/article/downloads/2026AssessmentPlanners_CalendarMain.pdf
     UTS 2027    https://www.uts.edu.au/for-students/current-students/managing-your-course/important-dates/academic-year-dates/2027-academic-year-dates
     UNSW 2027   https://www.unsw.edu.au/student/managing-your-studies/key-dates/academic-calendar
+    UNSW 2026   the 2026 Term 3 table on the same page
+    USyd 2026   the "Student wall calendar 2026" on the same page as 2027, and the
+                Semester 2 STUVAC and exam dates on
+                https://www.sydney.edu.au/students/exams-assessments/exams/dates.html
+    Macquarie 2026
+                classes and recess from Universities Australia's 2026 summary and
+                Macquarie's 2026 holiday letter (recess 21 Sep to 5 Oct), and the exam
+                period on https://iexams.mq.edu.au/
     USyd 2027   the "Student wall calendar 2027" on https://www.sydney.edu.au/students/key-dates.html
     Macquarie 2027
                 the Session 1 and Session 2 table on https://students.mq.edu.au/study/course/dates
@@ -134,6 +142,17 @@ SESSIONS = {
     },
     # ---------- UNSW: 10 weeks in a row, and week 6 is flexibility week ----------
     # UNSW changes to two 12-week semesters in 2028, so the 2028 sessions will look different.
+    "UNSW_T3_2026": {
+        "university": "unsw",
+        "name": "Term 3 2026",
+        # From UNSW's academic calendar: teaching period T3 14 Sep to 20 Nov, flexibility week 19 to 25 Oct
+        "weeks": _mondays(date(2026, 9, 14), 10),
+        # Study period T3: 21 to 26 Nov
+        "breaks": [date(2026, 11, 23)],
+        # Exams T3: 27 Nov to 10 Dec
+        "exams": (date(2026, 11, 27), date(2026, 12, 10)),
+        "quiet_weeks": {6: "flexibility week"},
+    },
     "UNSW_T1_2027": {
         "university": "unsw",
         "name": "Term 1 2027",
@@ -168,6 +187,18 @@ SESSIONS = {
         "quiet_weeks": {6: "flexibility week"},
     },
     # ---------- USyd: 13 teaching weeks, with a one-week mid-semester break ----------
+    "USYD_S2_2026": {
+        "university": "usyd",
+        "name": "Semester 2 2026",
+        # From USyd's 2026 student wall calendar: teaching weeks 3 Aug to 8 Nov, mid-semester break
+        # 28 Sep to 5 Oct, where Mon 5 Oct is the Labour Day holiday. The calendar numbers weeks 1 to 8
+        # from 3 Aug and weeks 9 to 13 from 5 Oct.
+        "weeks": _mondays(date(2026, 8, 3), 8) + _mondays(date(2026, 10, 5), 5),
+        # The mid-semester break, then STUVAC 9 to 15 Nov
+        "breaks": [date(2026, 9, 28), date(2026, 11, 9)],
+        # Examinations: 16 to 28 Nov (also on USyd's exam dates page)
+        "exams": (date(2026, 11, 16), date(2026, 11, 28)),
+    },
     "USYD_S1_2027": {
         "university": "usyd",
         "name": "Semester 1 2027",
@@ -192,6 +223,17 @@ SESSIONS = {
         "exams": (date(2027, 11, 15), date(2027, 11, 27)),
     },
     # ---------- Macquarie: 13 teaching weeks, with a two-week mid-session recess ----------
+    "MQ_S2_2026": {
+        "university": "mq",
+        "name": "Session 2 2026",
+        # Classes 27 Jul to 8 Nov (Universities Australia's 2026 summary). Session 2 recess 21 Sep to
+        # 5 Oct (Macquarie's 2026 holiday letter), where Mon 5 Oct is the Labour Day holiday.
+        # So weeks 1 to 8 start on 27 Jul and weeks 9 to 13 start on 5 Oct.
+        "weeks": _mondays(date(2026, 7, 27), 8) + _mondays(date(2026, 10, 5), 5),
+        "breaks": [date(2026, 9, 21), date(2026, 9, 28)],
+        # Session 2 2026 exam period: 9 to 27 Nov (iexams.mq.edu.au)
+        "exams": (date(2026, 11, 9), date(2026, 11, 27)),
+    },
     "MQ_S1_2027": {
         "university": "mq",
         "name": "Session 1 2027",
@@ -215,6 +257,16 @@ SESSIONS = {
         "exams": (date(2027, 11, 8), date(2027, 11, 26)),
     },
     # ---------- NUS: 13 teaching weeks; recess week and reading week have no number ----------
+    "NUS_AY2627_S1": {
+        "university": "nus",
+        "name": "AY2026/27 Semester 1 (Aug to Dec 2026)",
+        # Weeks 1 to 6 start on Mon 10 Aug. Recess week is Sat 19 to Sun 27 Sep.
+        # Weeks 7 to 13 start on Mon 28 Sep. Reading week is Sat 14 to Fri 20 Nov.
+        "weeks": _mondays(date(2026, 8, 10), 6) + _mondays(date(2026, 9, 28), 7),
+        "breaks": [date(2026, 9, 21), date(2026, 11, 16)],
+        # Examination: Sat 21 Nov to Sat 5 Dec
+        "exams": (date(2026, 11, 21), date(2026, 12, 5)),
+    },
     "NUS_AY2627_S2": {
         "university": "nus",
         "name": "AY2026/27 Semester 2 (Jan to May 2027)",
@@ -236,6 +288,16 @@ SESSIONS = {
         "exams": (date(2027, 11, 20), date(2027, 12, 4)),
     },
     # ---------- NTU: 13 teaching weeks; recess week (after week 7) has no number ----------
+    "NTU_AY2627_S1": {
+        "university": "ntu",
+        "name": "AY2026/27 Semester 1 (Aug to Dec 2026)",
+        # Teaching weeks 1 to 7 start on Mon 10 Aug. Recess week is Mon 28 Sep to Fri 2 Oct.
+        # Teaching weeks 8 to 13 start on Mon 5 Oct.
+        "weeks": _mondays(date(2026, 8, 10), 7) + _mondays(date(2026, 10, 5), 6),
+        "breaks": [date(2026, 9, 28)],
+        # Revision and examination weeks: Mon 16 Nov to Fri 4 Dec
+        "exams": (date(2026, 11, 16), date(2026, 12, 4)),
+    },
     "NTU_AY2627_S2": {
         "university": "ntu",
         "name": "AY2026/27 Semester 2 (Jan to May 2027)",
@@ -258,6 +320,17 @@ SESSIONS = {
         "exams": (date(2027, 11, 15), date(2027, 12, 3)),
     },
     # ---------- SMU: weeks 1 to 14 in a row; week 8 is recess week and keeps its number ----------
+    "SMU_AY2627_T1": {
+        "university": "smu",
+        "name": "AY2026/27 Term 1 (Aug to Dec 2026)",
+        # Weeks 1 to 14 start on Mon 17 Aug. Week 8 (Mon 5 to Sun 11 Oct) is recess week.
+        "weeks": _mondays(date(2026, 8, 17), 14),
+        "breaks": [],
+        # Examination (weeks 15 and 16): Mon 23 Nov to Sun 6 Dec
+        "exams": (date(2026, 11, 23), date(2026, 12, 6)),
+        "quiet_weeks": {8: "recess week"},
+        "exam_weeks": (15, 16),
+    },
     "SMU_AY2627_T2": {
         "university": "smu",
         "name": "AY2026/27 Term 2 (Jan to May 2027)",
@@ -318,12 +391,20 @@ PUBLIC_HOLIDAYS = {
     date(2027, 12, 28): "the extra Boxing Day holiday",
 }
 
-# Every Singapore public holiday in 2027, for the Singaporean universities.
-# Source: the Ministry of Manpower's official list, as published on the government's
+# Every Singapore public holiday from August 2026 to the end of 2027, for the Singaporean
+# universities. The earliest session here starts in August 2026, so earlier 2026 holidays are left out.
+# 2026: the holiday lists printed on the NUS and NTU AY2026/27 calendars, which also say that
+# when a holiday falls on a Sunday, the Monday after it is a holiday too.
+# 2027: the Ministry of Manpower's official list, as published on the government's
 # open data site: https://data.gov.sg/datasets/d_0ba69fc6d56717ff0bf8083c6af3bb84/view
 # and https://www.mom.gov.sg/newsroom/press-releases/2026/0618-public-holidays-for-2027
 # The Hari Raya dates depend on sighting the moon, so MOM may move them.
 SINGAPORE_HOLIDAYS = {
+    date(2026, 8, 9): "National Day",
+    date(2026, 8, 10): "the National Day holiday in lieu",  # 9 Aug 2026 is a Sunday
+    date(2026, 11, 8): "Deepavali",
+    date(2026, 11, 9): "the Deepavali holiday in lieu",  # 8 Nov 2026 is a Sunday
+    date(2026, 12, 25): "Christmas Day",
     date(2027, 1, 1): "New Year's Day",
     date(2027, 2, 6): "Chinese New Year",
     date(2027, 2, 7): "Chinese New Year",

@@ -204,7 +204,17 @@ def test_a_week_already_past_is_refused(monkeypatch):
     monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 3, 10, 9, 0))  # Wednesday of week 8
     result = add("friday week 7")
     assert result["status"] == "error"
-    assert "already in the past" in result["message"]
+    assert result["message"] == (
+        "'friday week 7' would be Friday 5 Mar 2027, 11:59 PM, which is already in the past. Please check the date "
+        'and time. To plan ahead, choose your next session under "Week numbers count in" on the home page.'
+    )
+
+
+def test_an_ordinary_past_date_gets_no_session_hint(monkeypatch):
+    choose("NUS_AY2627_S2")
+    monkeypatch.setattr(tools, "_now", lambda: datetime(2027, 3, 10, 10, 0))
+    result = tools.add_deadline("Old", "9am")  # 9 AM today, an hour ago
+    assert result["status"] == "error" and "Week numbers count in" not in result["message"]
 
 
 @pytest.mark.parametrize("words", ["in 2 weeks", "end of next week", "in a week", "end of the week"])

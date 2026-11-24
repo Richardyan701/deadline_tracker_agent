@@ -190,14 +190,17 @@ def test_the_page_script_takes_its_file_endings_from_the_picker():
 # The Singapore universities in the picker, after the Australian ones for a student in Australia
 SINGAPORE_GROUPS = (
     '<optgroup label="Singapore: National University of Singapore (NUS)">'
+    '<option value="NUS_AY2627_S1" data-university="nus">NUS AY2026/27 Semester 1 (Aug to Dec 2026)</option>'
     '<option value="NUS_AY2627_S2" data-university="nus">NUS AY2026/27 Semester 2 (Jan to May 2027)</option>'
     '<option value="NUS_AY2728_S1" data-university="nus">NUS AY2027/28 Semester 1 (Aug to Dec 2027)</option>'
     "</optgroup>"
     '<optgroup label="Singapore: Nanyang Technological University (NTU)">'
+    '<option value="NTU_AY2627_S1" data-university="ntu">NTU AY2026/27 Semester 1 (Aug to Dec 2026)</option>'
     '<option value="NTU_AY2627_S2" data-university="ntu">NTU AY2026/27 Semester 2 (Jan to May 2027)</option>'
     '<option value="NTU_AY2728_S1" data-university="ntu">NTU AY2027/28 Semester 1 (Aug to Dec 2027, indicative)</option>'
     "</optgroup>"
     '<optgroup label="Singapore: Singapore Management University (SMU)">'
+    '<option value="SMU_AY2627_T1" data-university="smu">SMU AY2026/27 Term 1 (Aug to Dec 2026)</option>'
     '<option value="SMU_AY2627_T2" data-university="smu">SMU AY2026/27 Term 2 (Jan to May 2027)</option>'
     '<option value="SMU_AY2728_T1" data-university="smu">SMU AY2027/28 Term 1 (Aug to Dec 2027)</option>'
     "</optgroup>"
@@ -228,15 +231,18 @@ def test_the_session_picker_starts_empty_and_groups_sessions_by_university(clien
         '<option value="SPR2027" data-university="uts">UTS Spring 2027</option>'
         "</optgroup>"
         '<optgroup label="Australia: UNSW Sydney">'
+        '<option value="UNSW_T3_2026" data-university="unsw">UNSW Term 3 2026</option>'
         '<option value="UNSW_T1_2027" data-university="unsw">UNSW Term 1 2027</option>'
         '<option value="UNSW_T2_2027" data-university="unsw">UNSW Term 2 2027</option>'
         '<option value="UNSW_T3_2027" data-university="unsw">UNSW Term 3 2027</option>'
         "</optgroup>"
         '<optgroup label="Australia: University of Sydney">'
+        '<option value="USYD_S2_2026" data-university="usyd">USyd Semester 2 2026</option>'
         '<option value="USYD_S1_2027" data-university="usyd">USyd Semester 1 2027</option>'
         '<option value="USYD_S2_2027" data-university="usyd">USyd Semester 2 2027</option>'
         "</optgroup>"
         '<optgroup label="Australia: Macquarie University">'
+        '<option value="MQ_S2_2026" data-university="mq">Macquarie Session 2 2026</option>'
         '<option value="MQ_S1_2027" data-university="mq">Macquarie Session 1 2027</option>'
         '<option value="MQ_S2_2027" data-university="mq">Macquarie Session 2 2027</option>'
         "</optgroup>"

@@ -541,11 +541,21 @@ def _understand_due_date(phrase: str, now: datetime) -> str:
         due = _parse_due_date(saved)
 
     if due < now:
-        raise ValueError(
-            f"'{text}' would be {_friendly(due)}, which is already in the past. "
-            "Please check the date and time."
-        )
+        message = f"'{text}' would be {_friendly(due)}, which is already in the past. Please check the date and time."
+        if _is_week_words(text):
+            message += ' To plan ahead, choose your next session under "Week numbers count in" on the home page.'
+        raise ValueError(message)
     return saved
+
+
+def _is_week_words(phrase: str) -> bool:
+    """True if the phrase gives a week number, like "friday week 7 5pm"."""
+    words = " ".join(word for word in phrase.lower().replace(",", " ").split() if word not in FILLER_WORDS)
+    try:
+        _, words = _split_time(words)
+    except ValueError:
+        return False
+    return WEEK_WORDS.fullmatch(" ".join(words.split())) is not None
 
 
 def _is_percent(value) -> bool:
