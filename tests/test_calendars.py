@@ -44,11 +44,24 @@ WEEKS = {
         # StuVac 20 to 24 Sep
         d(27, 9), d(4, 10), d(11, 10), d(18, 10),
     ],
+    # UNSW Term 3 2026: teaching period 14 Sep to 20 Nov, flexibility week 19 to 25 Oct
+    "UNSW_T3_2026": [
+        d(14, 9, 2026), d(21, 9, 2026), d(28, 9, 2026), d(5, 10, 2026), d(12, 10, 2026),
+        d(19, 10, 2026),  # week 6, flexibility week
+        d(26, 10, 2026), d(2, 11, 2026), d(9, 11, 2026), d(16, 11, 2026),
+    ],
     # UNSW 2027: ten weeks in a row, week 6 is flexibility week
     "UNSW_T1_2027": [d(15, 2), d(22, 2), d(1, 3), d(8, 3), d(15, 3), d(22, 3), d(29, 3), d(5, 4), d(12, 4), d(19, 4)],
     "UNSW_T2_2027": [d(31, 5), d(7, 6), d(14, 6), d(21, 6), d(28, 6), d(5, 7), d(12, 7), d(19, 7), d(26, 7), d(2, 8)],
     "UNSW_T3_2027": [
         d(13, 9), d(20, 9), d(27, 9), d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11), d(15, 11),
+    ],
+    # USyd Semester 2 2026, read from the circled week numbers on USyd's 2026 wall calendar
+    "USYD_S2_2026": [
+        d(3, 8, 2026), d(10, 8, 2026), d(17, 8, 2026), d(24, 8, 2026),
+        d(31, 8, 2026), d(7, 9, 2026), d(14, 9, 2026), d(21, 9, 2026),
+        # mid-semester break 28 Sep to 5 Oct (Mon 5 Oct is Labour Day)
+        d(5, 10, 2026), d(12, 10, 2026), d(19, 10, 2026), d(26, 10, 2026), d(2, 11, 2026),
     ],
     # USyd 2027: teaching weeks 22 Feb to 30 May, mid-semester break 29 Mar to 4 Apr
     "USYD_S1_2027": [
@@ -62,6 +75,13 @@ WEEKS = {
         # mid-semester break from 27 Sep
         d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11),
     ],
+    # Macquarie Session 2 2026: classes 27 Jul to 8 Nov, recess 21 Sep to 5 Oct (Mon 5 Oct is Labour Day)
+    "MQ_S2_2026": [
+        d(27, 7, 2026), d(3, 8, 2026), d(10, 8, 2026), d(17, 8, 2026),
+        d(24, 8, 2026), d(31, 8, 2026), d(7, 9, 2026), d(14, 9, 2026),
+        # recess 21 Sep to 5 Oct
+        d(5, 10, 2026), d(12, 10, 2026), d(19, 10, 2026), d(26, 10, 2026), d(2, 11, 2026),
+    ],
     # Macquarie 2027: classes 22 Feb to 6 Jun, recess 12 to 25 Apr
     "MQ_S1_2027": [
         d(22, 2), d(1, 3), d(8, 3), d(15, 3), d(22, 3), d(29, 3), d(5, 4),
@@ -73,6 +93,13 @@ WEEKS = {
         d(26, 7), d(2, 8), d(9, 8), d(16, 8), d(23, 8), d(30, 8), d(6, 9), d(13, 9),
         # recess from 20 Sep
         d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11),
+    ],
+    # NUS AY2026/27 Semester 1, copied week by week from the official NUS calendar PDF
+    "NUS_AY2627_S1": [
+        d(10, 8, 2026), d(17, 8, 2026), d(24, 8, 2026), d(31, 8, 2026), d(7, 9, 2026), d(14, 9, 2026),
+        # recess week Sat 19 to Sun 27 Sep
+        d(28, 9, 2026), d(5, 10, 2026), d(12, 10, 2026), d(19, 10, 2026), d(26, 10, 2026), d(2, 11, 2026), d(9, 11, 2026),
+        # reading week Sat 14 to Fri 20 Nov
     ],
     # NUS AY2026/27 Semester 2, copied week by week from the official NUS calendar PDF
     "NUS_AY2627_S2": [
@@ -88,6 +115,12 @@ WEEKS = {
         d(27, 9), d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11),
         # reading week Sat 13 to Fri 19 Nov
     ],
+    # NTU AY2026/27 Semester 1, read from the official NTU calendar grid (teaching weeks numbered on the left)
+    "NTU_AY2627_S1": [
+        d(10, 8, 2026), d(17, 8, 2026), d(24, 8, 2026), d(31, 8, 2026), d(7, 9, 2026), d(14, 9, 2026), d(21, 9, 2026),
+        # recess week Mon 28 Sep to Fri 2 Oct
+        d(5, 10, 2026), d(12, 10, 2026), d(19, 10, 2026), d(26, 10, 2026), d(2, 11, 2026), d(9, 11, 2026),
+    ],
     # NTU AY2026/27 Semester 2, read from the official NTU calendar grid (teaching weeks numbered on the left)
     "NTU_AY2627_S2": [
         d(11, 1), d(18, 1), d(25, 1), d(1, 2), d(8, 2), d(15, 2), d(22, 2),
@@ -99,6 +132,12 @@ WEEKS = {
         d(9, 8), d(16, 8), d(23, 8), d(30, 8), d(6, 9), d(13, 9), d(20, 9),
         # recess week Mon 27 Sep to Fri 1 Oct
         d(4, 10), d(11, 10), d(18, 10), d(25, 10), d(1, 11), d(8, 11),
+    ],
+    # SMU AY2026/27 Term 1, from the official SMU undergraduate calendar: weeks 1 to 14, week 8 is recess
+    "SMU_AY2627_T1": [
+        d(17, 8, 2026), d(24, 8, 2026), d(31, 8, 2026), d(7, 9, 2026), d(14, 9, 2026), d(21, 9, 2026), d(28, 9, 2026),
+        d(5, 10, 2026),  # week 8, recess week
+        d(12, 10, 2026), d(19, 10, 2026), d(26, 10, 2026), d(2, 11, 2026), d(9, 11, 2026), d(16, 11, 2026),
     ],
     # SMU AY2026/27 Term 2, from the official SMU undergraduate calendar: weeks 1 to 14, week 8 is recess
     "SMU_AY2627_T2": [
@@ -119,21 +158,26 @@ EVERY_WEEK = [(session, number, monday) for session, mondays in WEEKS.items() fo
 LAST_TEACHING_DAY = {
     "AUT2026": d(15, 5, 2026), "SPR2026": d(23, 10, 2026),
     "AUT2027": d(14, 5), "SPR2027": d(22, 10),
+    "UNSW_T3_2026": d(20, 11, 2026), "USYD_S2_2026": d(8, 11, 2026), "MQ_S2_2026": d(8, 11, 2026),
     "UNSW_T1_2027": d(23, 4), "UNSW_T2_2027": d(6, 8), "UNSW_T3_2027": d(19, 11),
     "USYD_S1_2027": d(30, 5), "USYD_S2_2027": d(7, 11),
     "MQ_S1_2027": d(6, 6), "MQ_S2_2027": d(7, 11),
-    "NUS_AY2627_S2": d(16, 4), "NUS_AY2728_S1": d(12, 11),
-    "NTU_AY2627_S2": d(16, 4), "NTU_AY2728_S1": d(12, 11),
-    "SMU_AY2627_T2": d(18, 4), "SMU_AY2728_T1": d(21, 11),
+    "NUS_AY2627_S1": d(13, 11, 2026), "NUS_AY2627_S2": d(16, 4), "NUS_AY2728_S1": d(12, 11),
+    "NTU_AY2627_S1": d(13, 11, 2026), "NTU_AY2627_S2": d(16, 4), "NTU_AY2728_S1": d(12, 11),
+    "SMU_AY2627_T1": d(22, 11, 2026), "SMU_AY2627_T2": d(18, 4), "SMU_AY2728_T1": d(21, 11),
 }  # fmt: skip
 
 # The first and last day of each exam period
 EXAMS = {
     "AUT2026": (d(25, 5, 2026), d(12, 6, 2026)), "SPR2026": (d(2, 11, 2026), d(20, 11, 2026)),
     "AUT2027": (d(24, 5), d(11, 6)), "SPR2027": (d(1, 11), d(19, 11)),
+    "UNSW_T3_2026": (d(27, 11, 2026), d(10, 12, 2026)), "USYD_S2_2026": (d(16, 11, 2026), d(28, 11, 2026)),
+    "MQ_S2_2026": (d(9, 11, 2026), d(27, 11, 2026)),
     "UNSW_T1_2027": (d(30, 4), d(13, 5)), "UNSW_T2_2027": (d(13, 8), d(26, 8)), "UNSW_T3_2027": (d(26, 11), d(9, 12)),
     "USYD_S1_2027": (d(7, 6), d(19, 6)), "USYD_S2_2027": (d(15, 11), d(27, 11)),
     "MQ_S1_2027": (d(7, 6), d(25, 6)), "MQ_S2_2027": (d(8, 11), d(26, 11)),
+    "NUS_AY2627_S1": (d(21, 11, 2026), d(5, 12, 2026)), "NTU_AY2627_S1": (d(16, 11, 2026), d(4, 12, 2026)),
+    "SMU_AY2627_T1": (d(23, 11, 2026), d(6, 12, 2026)),
     "NUS_AY2627_S2": (d(24, 4), d(8, 5)), "NUS_AY2728_S1": (d(20, 11), d(4, 12)),
     "NTU_AY2627_S2": (d(19, 4), d(7, 5)), "NTU_AY2728_S1": (d(15, 11), d(3, 12)),
     "SMU_AY2627_T2": (d(19, 4), d(2, 5)), "SMU_AY2728_T1": (d(22, 11), d(5, 12)),
@@ -176,9 +220,11 @@ def test_every_week_starts_on_a_monday(session, week, monday):
     "session, weeks",
     [
         ("AUT2026", 12), ("SPR2026", 12), ("AUT2027", 12), ("SPR2027", 12),
+        ("UNSW_T3_2026", 10), ("USYD_S2_2026", 13), ("MQ_S2_2026", 13),
         ("UNSW_T1_2027", 10), ("UNSW_T2_2027", 10), ("UNSW_T3_2027", 10),
         ("USYD_S1_2027", 13), ("USYD_S2_2027", 13),
         ("MQ_S1_2027", 13), ("MQ_S2_2027", 13),
+        ("NUS_AY2627_S1", 13), ("NTU_AY2627_S1", 13), ("SMU_AY2627_T1", 14),
         ("NUS_AY2627_S2", 13), ("NUS_AY2728_S1", 13), ("NTU_AY2627_S2", 13), ("NTU_AY2728_S1", 13),
         ("SMU_AY2627_T2", 14), ("SMU_AY2728_T1", 14),  # week 8 is recess but keeps its number
     ],
@@ -199,9 +245,12 @@ def test_session_names():
     names = {code: info["name"] for code, info in calendars.SESSIONS.items()}
     assert names == {
         "AUT2026": "Autumn 2026", "SPR2026": "Spring 2026", "AUT2027": "Autumn 2027", "SPR2027": "Spring 2027",
+        "UNSW_T3_2026": "Term 3 2026", "USYD_S2_2026": "Semester 2 2026", "MQ_S2_2026": "Session 2 2026",
         "UNSW_T1_2027": "Term 1 2027", "UNSW_T2_2027": "Term 2 2027", "UNSW_T3_2027": "Term 3 2027",
         "USYD_S1_2027": "Semester 1 2027", "USYD_S2_2027": "Semester 2 2027",
         "MQ_S1_2027": "Session 1 2027", "MQ_S2_2027": "Session 2 2027",
+        "NUS_AY2627_S1": "AY2026/27 Semester 1 (Aug to Dec 2026)",
+        "NTU_AY2627_S1": "AY2026/27 Semester 1 (Aug to Dec 2026)", "SMU_AY2627_T1": "AY2026/27 Term 1 (Aug to Dec 2026)",
         "NUS_AY2627_S2": "AY2026/27 Semester 2 (Jan to May 2027)", "NUS_AY2728_S1": "AY2027/28 Semester 1 (Aug to Dec 2027)",
         "NTU_AY2627_S2": "AY2026/27 Semester 2 (Jan to May 2027)",
         "NTU_AY2728_S1": "AY2027/28 Semester 1 (Aug to Dec 2027, indicative)",
@@ -227,6 +276,9 @@ def test_university_name(session, name):
         ("SPR2026", [d(21, 9, 2026), d(26, 10, 2026)]),
         ("AUT2027", [d(12, 4), d(17, 5)]),
         ("SPR2027", [d(20, 9), d(25, 10)]),
+        ("UNSW_T3_2026", [d(23, 11, 2026)]),  # the study period, 21 to 26 Nov
+        ("USYD_S2_2026", [d(28, 9, 2026), d(9, 11, 2026)]),  # mid-semester break, STUVAC
+        ("MQ_S2_2026", [d(21, 9, 2026), d(28, 9, 2026)]),  # the two recess weeks
         ("UNSW_T1_2027", [d(26, 4)]),  # only the study period, because flexibility week is week 6
         ("UNSW_T2_2027", [d(9, 8)]),
         ("UNSW_T3_2027", [d(22, 11)]),
@@ -234,6 +286,9 @@ def test_university_name(session, name):
         ("USYD_S2_2027", [d(27, 9), d(8, 11)]),
         ("MQ_S1_2027", [d(12, 4), d(19, 4)]),  # the two recess weeks
         ("MQ_S2_2027", [d(20, 9), d(27, 9)]),
+        ("NUS_AY2627_S1", [d(21, 9, 2026), d(16, 11, 2026)]),  # recess week, reading week
+        ("NTU_AY2627_S1", [d(28, 9, 2026)]),  # recess week
+        ("SMU_AY2627_T1", []),  # recess is week 8, which keeps its number
         ("NUS_AY2627_S2", [d(22, 2), d(19, 4)]),  # recess week, reading week
         ("NUS_AY2728_S1", [d(20, 9), d(15, 11)]),
         ("NTU_AY2627_S2", [d(1, 3)]),  # recess week (revision week is part of the exam period)
@@ -638,6 +693,12 @@ def test_nus_and_ntu_recess_weeks_have_no_number():
     assert calendars.quiet_week("NUS_AY2627_S2", 7) is None and calendars.quiet_week("NTU_AY2627_S2", 8) is None
 
 
+# August to December 2026, from the holiday lists on the NUS and NTU AY2026/27 calendars
+SINGAPORE_LATE_2026 = {
+    d(9, 8, 2026): "National Day", d(10, 8, 2026): "the National Day holiday in lieu",
+    d(8, 11, 2026): "Deepavali", d(9, 11, 2026): "the Deepavali holiday in lieu", d(25, 12, 2026): "Christmas Day",
+}  # fmt: skip
+
 # Copied from the government's official list (data.gov.sg, published by the Ministry of Manpower)
 SINGAPORE_2027 = {
     d(1, 1): "New Year's Day", d(6, 2): "Chinese New Year", d(7, 2): "Chinese New Year",
@@ -648,7 +709,7 @@ SINGAPORE_2027 = {
 
 
 def test_singapore_holidays_match_the_official_list():
-    assert calendars.SINGAPORE_HOLIDAYS == SINGAPORE_2027
+    assert calendars.SINGAPORE_HOLIDAYS == SINGAPORE_LATE_2026 | SINGAPORE_2027
 
 
 @pytest.mark.parametrize("session", ["NUS_AY2627_S2", "NTU_AY2728_S1", "SMU_AY2627_T2"])
