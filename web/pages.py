@@ -17,15 +17,47 @@ CHAT_PATH = "/dev-ui/?app=deadline_agent"
 # The groups get_reminders gives back, in the order they are shown
 REMINDER_GROUPS = ["overdue", "due_today", "due_soon"]
 
-ADD_FORM = """<form id="add-form">
+# UTS's own page about short extensions. The tip links to it, so students can check the latest rules there.
+UTS_EXTENSIONS_URL = (
+    "https://www.uts.edu.au/current-students/managing-your-course/classes-and-assessment/special-circumstances/short-extensions"
+)
+
+
+def uts_tip() -> str:
+    """A short tip about UTS's 3-day short extensions, for the space under the due date box.
+
+    It is shown only while a UTS session is chosen. Checked against UTS's
+    page on 24 Nov 2026: 72 hours for most Canvas assignments, granted
+    instantly with no documents, requested in Canvas (Assignment Extensions)
+    in the 14 days before the due time, and not for quizzes, exams or
+    in-class tasks. Groot never moves a date by itself, because nothing
+    changes until the student asks UTS for the extension.
+    It always has the id uts-tip, so home.js can swap in a fresh copy after
+    the session changes.
+    """
+    session = tools._chosen_session()
+    if session is None or calendars.session_info(session)["university"] != "uts":
+        return '<p id="uts-tip" class="tip" hidden></p>'
+    return (
+        '<p id="uts-tip" class="tip"><strong>UTS tip:</strong> most Canvas assignments can get an instant '
+        "3-day extension, no documents needed. Request it in Canvas (Assignment Extensions) in the 14 days "
+        "before it's due. Not for quizzes, exams or in-class tasks. "
+        f'<a href="{UTS_EXTENSIONS_URL}" target="_blank" rel="noopener noreferrer">UTS rules</a></p>'
+    )
+
+
+def add_form() -> str:
+    """The form for adding a deadline, with the UTS tip under the due date box when it applies."""
+    return f"""<form id="add-form">
 <div class="field">
 <label for="add-title">Title</label>
 <input id="add-title" name="title" autocomplete="off">
 </div>
 <div class="field">
 <label for="add-when">When is it due?</label>
-<input id="add-when" name="due_date" autocomplete="off" aria-describedby="add-when-hint">
+<input id="add-when" name="due_date" autocomplete="off" aria-describedby="add-when-hint uts-tip">
 <p id="add-when-hint" class="hint">Plain words work, like "next friday 5pm", "in 3 days", "20 nov" or "friday week 7".</p>
+{uts_tip()}
 </div>
 <div class="field">
 <label for="add-subject">Subject <span class="optional">(optional)</span></label>
@@ -189,7 +221,7 @@ def home_page(reminders: dict, deadlines: list[dict], now: datetime, grades: lis
 <section aria-labelledby="add-heading">
 <h2 id="add-heading">Add a deadline</h2>
 {session_chooser(now)}
-{ADD_FORM}
+{add_form()}
 </section>
 <section aria-labelledby="grades-heading">
 <h2 id="grades-heading">Grades</h2>

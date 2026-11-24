@@ -36,7 +36,7 @@ async function refreshLists() {
     throw new Error(`the home page answered ${response.status}`);  // shown as "Groot did not answer"
   }
   const fresh = new DOMParser().parseFromString(await response.text(), "text/html");
-  for (const id of ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line"]) {
+  for (const id of ["heads-up", "due-soon-list", "deadline-table", "grades", "week-line", "uts-tip"]) {
     document.getElementById(id).replaceWith(fresh.getElementById(id));
   }
 }
@@ -174,7 +174,7 @@ sessionPicker.addEventListener("change", async () => {
   sessionPicker.disabled = true;
   try {
     show(sessionMessage, await answer(await post("/groot/api/session", {session: sessionPicker.value})));
-    await refreshLists();  // the "which week is it" line changes too
+    await refreshLists();  // the "which week is it" line and the UTS tip change too
   } catch {
     showOffline(sessionMessage);
   } finally {

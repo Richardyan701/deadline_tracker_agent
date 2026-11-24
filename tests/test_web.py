@@ -622,3 +622,41 @@ def test_an_unknown_session_from_the_page_is_refused(client):
 def test_home_script_saves_the_session_choice():
     script = (Path(web_app.__file__).parent / "static" / "home.js").read_text(encoding="utf-8")
     assert 'post("/groot/api/session", {session: sessionPicker.value})' in script
+
+
+# ---------- the UTS short extension tip ----------
+
+UTS_TIP = (
+    '<p id="uts-tip" class="tip"><strong>UTS tip:</strong> most Canvas assignments can get an instant '
+    "3-day extension, no documents needed. Request it in Canvas (Assignment Extensions) in the 14 days "
+    "before it's due. Not for quizzes, exams or in-class tasks. "
+    '<a href="https://www.uts.edu.au/current-students/managing-your-course/classes-and-assessment/special-circumstances/short-extensions"'
+    ' target="_blank" rel="noopener noreferrer">UTS rules</a></p>'
+)
+NO_TIP = '<p id="uts-tip" class="tip" hidden></p>'
+
+
+@pytest.mark.parametrize("session", ["AUT2027", "SPR2027"])
+def test_uts_students_see_the_extension_tip_under_the_date_box(client, session):
+    client.post("/groot/api/session", json={"session": session})
+    page = client.get("/groot").text
+    assert UTS_TIP in page
+    # It sits in the due date field, right after the date hint, and the date box points to it
+    assert '<p id="add-when-hint" class="hint">' in page.split(UTS_TIP)[0].rsplit('<div class="field">', 1)[1]
+    assert 'aria-describedby="add-when-hint uts-tip"' in page
+
+
+@pytest.mark.parametrize("session", [None, "UNSW_T1_2027", "USYD_S1_2027", "MQ_S1_2027", "NUS_AY2627_S2", "SMU_AY2627_T2"])
+def test_no_extension_tip_for_other_universities_or_no_session(client, session):
+    if session:
+        client.post("/groot/api/session", json={"session": session})
+    page = client.get("/groot").text
+    assert NO_TIP in page
+    assert "UTS tip" not in page
+
+
+def test_the_tip_goes_away_when_switching_from_uts(client):
+    client.post("/groot/api/session", json={"session": "AUT2027"})
+    assert UTS_TIP in client.get("/groot").text
+    client.post("/groot/api/session", json={"session": "NUS_AY2627_S2"})
+    assert NO_TIP in client.get("/groot").text
