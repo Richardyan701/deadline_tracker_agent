@@ -764,7 +764,7 @@ def test_setup_saves_the_key_and_the_chosen_model(tmp_path, choice, model):
 def test_setup_picks_the_bigger_limit_when_nothing_more_is_typed(tmp_path):
     result, env_file = run_setup(tmp_path, f"{FAKE_KEY}\n")  # the input ends before the model question
     assert result.returncode == 0, result.stdout + result.stderr
-    assert env_file.read_text().endswith("GROOT_MODEL=gemini-3.5-flash-lite\n")
+    assert env_file.read_text().endswith("GROOT_MODEL=gemini-3.5-flash-lite\nGROOT_COUNTRY=AU\n")  # and Australia, the default
 
 
 @needs_bash
