@@ -681,7 +681,7 @@ web/                 Groot's web app, started with python -m web
   preview.py         the import page's Preview
   static/            the CSS and JavaScript the pages load
 eval/                the two evaluations, see Measuring how well it works
-tests/               about 2,400 tests, no API key needed
+tests/               about 2,800 tests, no API key needed
 docs/superpowers/specs/2026-11-04-outline-dropbox-design.md   the drop box's design, written before it was built
 .github/workflows/tests.yml
 requirements.txt     every package at an exact version
@@ -725,7 +725,7 @@ start_groot.sh, start_groot.bat    the start files
 
 ## Tests and CI
 
-There are about 2,400 tests, run with pytest:
+There are about 2,800 tests, run with pytest:
 
 | File | Tests | What they cover |
 | --- | --- | --- |
