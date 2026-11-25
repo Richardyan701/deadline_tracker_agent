@@ -37,9 +37,9 @@ SETTING = "GROOT_MODEL"
 # too busy ("high demand", which is common on the free tier) or has used up
 # its free allowance. Google runs each model separately and gives each its
 # own allowance, and they all use the same key, so this costs nothing.
-# The order comes from a week of hourly checks (18 to 24 Nov 2026, see docs/reference.md):
-# gemini-3.5-flash-lite answered every time, gemini-3.1-flash-lite failed 4 of 28 checks,
-# and gemini-3.5-flash failed 13 of 28, often only after waiting a full minute.
+# The order comes from a week of hourly checks (18 to 25 Nov 2026, see docs/reference.md):
+# gemini-3.5-flash-lite answered every time, gemini-3.1-flash-lite failed 4 of 31 checks,
+# and gemini-3.5-flash failed 13 of 31, often only after waiting a full minute.
 # Only gemini-3.5-flash and gemini-3.5-flash-lite were measured on the chat evaluation.
 BACKUP_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"]
 
