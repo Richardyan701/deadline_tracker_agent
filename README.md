@@ -74,7 +74,7 @@ Measured with the real Gemini model, not just claimed:
 | **Reading 5 real UTS outlines** | 93% of assessments found, none invented, **0 silently wrong dates** |
 | **Reading 1 real outline each from UNSW, USyd and Macquarie** | Every assessment, weight and week read correctly |
 | **69 realistic student messages** (dates, listing, editing, marking done, off-topic, prompt-injection attempts) | **68 of 69 passed** with the lighter Flash-Lite. Gemini 3.5 Flash passed all 63 of the earlier cases |
-| **Automated tests** | About 2,100, run on Python 3.11, 3.13 and 3.14 on every change |
+| **Automated tests** | About 2,800, run on Python 3.11, 3.13 and 3.14 on every change |
 
 Gemini does not answer the same way every time, and these are small samples, so read them as "no failures in these runs", not "it never fails". The weak spot was one outline (31265), where Groot missed two items and got two weights wrong. Full tables are in the [reference](docs/reference.md#results-so-far).
 
@@ -145,11 +145,23 @@ I designed and directed Groot. I decided what it should do and what it must neve
 
 Much of the code was written by Claude, Anthropic's AI, in Claude Code, working to my instructions. To make sure it works, not just looks right:
 
-- **Every change had to pass about 2,400 automated tests**, which GitHub runs before anything can be merged.
+- **Every change has to pass about 2,800 automated tests**, which GitHub runs before anything can be merged.
 - **The parts that use AI were also tried live with the real model**, for example on real outlines from UNSW, USyd and Macquarie.
 - **The evaluations above measure how accurate the AI parts are**, mistakes included.
 
 The git history shows this openly: Claude is credited as co-author on the commits where it wrote code, and some commits made in Claude's cloud sessions carry Claude's name.
+
+## Timeline
+
+| When (2026) | What happened |
+| --- | --- |
+| 10 to 11 Oct | I set up the project with Google's ADK and wrote the first Groot, which could talk about deadlines but not save them yet |
+| 3 to 5 Nov | The core: saving deadlines, plain-English dates, reminders, automatic tests, reading subject outlines, calendar export and the first web pages |
+| 7 to 13 Nov | Measured how well it works, added editing, and made the README easier to read. Then a break for exams |
+| 16 to 19 Nov | Worked through my own feedback: more universities, a check for sensitive details, a choice of AI model, a backup when Gemini is busy, and a demo |
+| 24 to 25 Nov | Singapore universities, week-number dates, a website with nothing to install, reminder times, and pasting in many deadlines at once |
+
+The [full timeline](docs/timeline.md) lists every change, what went well, and what we fixed along the way.
 
 ## Licence
 
